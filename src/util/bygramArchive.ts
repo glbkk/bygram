@@ -155,6 +155,16 @@ export async function getArchivedMessages(chatId: string, messageIds: number[]) 
   });
 }
 
+export async function getArchivedDeletedMessages(chatId: string) {
+  if (!settings.isArchiveEnabled || !settings.isAntiDeleteEnabled) return [];
+
+  const records = await runTransaction(MESSAGE_STORE, 'readonly', (store) => (
+    requestAsPromise<BygramArchiveRecord[]>(store.index('chatId').getAll(IDBKeyRange.only(chatId)))
+  ));
+
+  return records.filter((record) => Boolean(record.deletedAt));
+}
+
 export async function getArchivedChatMessages(chatId: string) {
   const records = await runTransaction(MESSAGE_STORE, 'readonly', (store) => (
     requestAsPromise<BygramArchiveRecord[]>(store.index('chatId').getAll(IDBKeyRange.only(chatId)))

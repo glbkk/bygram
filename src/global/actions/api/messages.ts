@@ -43,6 +43,7 @@ import {
 } from '../../../config';
 import { ensureProtocol, isMixedScriptUrl } from '../../../util/browser/url';
 import { IS_IOS } from '../../../util/browser/windowEnvironment';
+import { getArchivedDeletedMessages } from '../../../util/bygramArchive';
 import { copyTextToClipboardFromPromise } from '../../../util/clipboard';
 import { isDeepLink } from '../../../util/deepLinkParser';
 import { getCurrentTabId } from '../../../util/establishMultitabRole';
@@ -1988,7 +1989,19 @@ async function loadViewportMessages<T extends GlobalState>(
     messages, count, topics,
   } = result;
 
+  const archivedDeletedRecords = await getArchivedDeletedMessages(chatId).catch(() => []);
+
   global = getGlobal();
+
+  const archivedDeletedMessages = archivedDeletedRecords
+    .map(({ message, deletedAt }): ApiMessage => ({
+      ...message,
+      isBygramDeleted: true,
+      bygramDeletedAt: Math.round(deletedAt! / 1000),
+    }))
+    .filter((message) => (
+      threadId === MAIN_THREAD_ID || selectThreadIdFromMessage(global, message) === threadId
+    ));
 
   const localTypingDrafts = selectThreadLocalStateParam(global, chatId, threadId, 'typingDraftIdByRandomId');
   const typingDraftMessages = localTypingDrafts ? Object.values(localTypingDrafts)
@@ -1997,7 +2010,7 @@ async function loadViewportMessages<T extends GlobalState>(
   const localMessages = chatId === SERVICE_NOTIFICATIONS_USER_ID
     ? global.serviceNotifications.filter(({ isDeleted }) => !isDeleted).map(({ message }) => message)
     : typingDraftMessages;
-  const allMessages = ([] as ApiMessage[]).concat(messages, localMessages);
+  const allMessages = archivedDeletedMessages.concat(messages, localMessages);
   const byId = buildCollectionByKey(allMessages, 'id');
   const ids = Object.keys(byId).map(Number);
 
