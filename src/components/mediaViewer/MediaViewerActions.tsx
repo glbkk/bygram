@@ -112,6 +112,7 @@ const MediaViewerActions: FC<OwnProps & StateProps> = ({
 
   const isMessage = item?.type === 'message';
   const message = item?.type === 'message' ? item.message : undefined;
+  const isTtlMedia = message?.content.ttlSeconds !== undefined;
 
   const { canSendPhotos } = getAllowedAttachmentOptions(chat, chatFullInfo);
   const canEditViewedMedia = Boolean(
@@ -220,7 +221,7 @@ const MediaViewerActions: FC<OwnProps & StateProps> = ({
   }
 
   function renderDownloadButton() {
-    if (isProtected || item?.type === 'standalone') {
+    if ((isProtected && !isTtlMedia) || item?.type === 'standalone') {
       return undefined;
     }
 
@@ -273,7 +274,7 @@ const MediaViewerActions: FC<OwnProps & StateProps> = ({
         children: lang('Forward'),
       });
     }
-    if (!isProtected) {
+    if (!isProtected || isTtlMedia) {
       if (isVideo) {
         menuItems.push({
           icon: isDownloading ? 'close' : 'download',

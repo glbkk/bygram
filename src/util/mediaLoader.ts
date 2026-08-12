@@ -15,7 +15,7 @@ import { callApi, cancelApiProgress } from '../api/gramjs';
 import {
   IS_OPUS_SUPPORTED, IS_PROGRESSIVE_SUPPORTED,
 } from './browser/windowEnvironment';
-import { archiveMedia } from './bygramArchive';
+import { archiveMedia, getArchivedMedia } from './bygramArchive';
 import * as cacheApi from './cacheApi';
 import { fetchBlob } from './files';
 import { ACCOUNT_SLOT } from './multiaccount';
@@ -53,11 +53,13 @@ export function fetch<T extends ApiMediaFormat>(
   }
 
   if (mediaFormat === ApiMediaFormat.DownloadUrl) {
-    return (
-      IS_PROGRESSIVE_SUPPORTED
-        ? Promise.resolve(getDownloadUrl(url))
-        : fetch(url, ApiMediaFormat.BlobUrl, isHtmlAllowed, onProgress, callbackUniqueId)
-    );
+    return getArchivedMedia(url).catch(() => undefined).then((archived) => (
+      archived
+        ? prepareMedia(archived)
+        : (IS_PROGRESSIVE_SUPPORTED
+          ? getDownloadUrl(url)
+          : fetch(url, ApiMediaFormat.BlobUrl, isHtmlAllowed, onProgress, callbackUniqueId))
+    ));
   }
 
   if (!fetchPromises.has(url)) {
@@ -149,6 +151,13 @@ async function fetchFromCacheOrRemote(
 
       return prepared;
     }
+  }
+
+  const archived = await getArchivedMedia(url).catch(() => undefined);
+  if (archived) {
+    const prepared = prepareMedia(archived);
+    memoryCache.set(url, prepared);
+    return prepared;
   }
 
   const onProgress = makeOnProgress(url);

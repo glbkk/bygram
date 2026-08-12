@@ -1,4 +1,4 @@
-import { memo } from '../../lib/teact/teact';
+import { memo, useEffect } from '../../lib/teact/teact';
 import { getActions, withGlobal } from '../../global';
 
 import type {
@@ -85,7 +85,7 @@ const MediaViewerContent = ({
   onFooterClick,
   handleSponsoredClick,
 }: OwnProps & StateProps) => {
-  const { updateLastPlaybackTimestamp } = getActions();
+  const { markMessagesRead, updateLastPlaybackTimestamp } = getActions();
 
   const lang = useOldLang();
   const captionContainerId = useUniqueId();
@@ -102,6 +102,7 @@ const MediaViewerContent = ({
     dimensions,
     isGif,
     isVideoAvatar,
+    isFullMediaLoaded,
     mediaSize,
     loadProgress,
   } = useMediaProps({
@@ -113,6 +114,13 @@ const MediaViewerContent = ({
 
   const isOpen = Boolean(media);
   const { isMobile } = useAppLayout();
+
+  useEffect(() => {
+    if (!isActive || !isFullMediaLoaded || !isPhoto || item.type !== 'message') return;
+    if (item.message.content.ttlSeconds === undefined || !item.message.isMediaUnread) return;
+
+    markMessagesRead({ chatId: item.message.chatId, messageIds: [item.message.id] });
+  }, [isActive, isFullMediaLoaded, isPhoto, item]);
 
   const toggleControlsOnMove = useLastCallback(() => {
     toggleControls(true);

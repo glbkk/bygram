@@ -9,5 +9,7 @@ tests/
 *.iml
 dev/perf/screenshot*
 .DS_store
+AGENTS.md
+CLAUDE.md
 .github/workflows/*
 !.github/workflows/package-and-publish.yml

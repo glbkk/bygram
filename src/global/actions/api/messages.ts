@@ -43,7 +43,7 @@ import {
 } from '../../../config';
 import { ensureProtocol, isMixedScriptUrl } from '../../../util/browser/url';
 import { IS_IOS } from '../../../util/browser/windowEnvironment';
-import { getArchivedDeletedMessages } from '../../../util/bygramArchive';
+import { getArchivedRetainedMessages } from '../../../util/bygramArchive';
 import { copyTextToClipboardFromPromise } from '../../../util/clipboard';
 import { isDeepLink } from '../../../util/deepLinkParser';
 import { getCurrentTabId } from '../../../util/establishMultitabRole';
@@ -1989,15 +1989,15 @@ async function loadViewportMessages<T extends GlobalState>(
     messages, count, topics,
   } = result;
 
-  const archivedDeletedRecords = await getArchivedDeletedMessages(chatId).catch(() => []);
+  const archivedRetainedRecords = await getArchivedRetainedMessages(chatId).catch(() => []);
 
   global = getGlobal();
 
-  const archivedDeletedMessages = archivedDeletedRecords
+  const archivedRetainedMessages = archivedRetainedRecords
     .map(({ message, deletedAt }): ApiMessage => ({
       ...message,
-      isBygramDeleted: true,
-      bygramDeletedAt: Math.round(deletedAt! / 1000),
+      isBygramDeleted: deletedAt ? true : message.isBygramDeleted,
+      bygramDeletedAt: deletedAt ? Math.round(deletedAt / 1000) : message.bygramDeletedAt,
     }))
     .filter((message) => (
       threadId === MAIN_THREAD_ID || selectThreadIdFromMessage(global, message) === threadId
@@ -2010,7 +2010,7 @@ async function loadViewportMessages<T extends GlobalState>(
   const localMessages = chatId === SERVICE_NOTIFICATIONS_USER_ID
     ? global.serviceNotifications.filter(({ isDeleted }) => !isDeleted).map(({ message }) => message)
     : typingDraftMessages;
-  const allMessages = archivedDeletedMessages.concat(messages, localMessages);
+  const allMessages = messages.concat(archivedRetainedMessages, localMessages);
   const byId = buildCollectionByKey(allMessages, 'id');
   const ids = Object.keys(byId).map(Number);
 

@@ -65,6 +65,7 @@ export default function useInnerHandlers({
   const {
     id: messageId, forwardInfo, groupedId, content: { paidMedia, video },
   } = message;
+  const hasTtl = message.content.ttlSeconds !== undefined;
 
   const {
     replyToMsgId, replyToPeerId, replyToTopId, isQuote, quoteText, quoteOffset,
@@ -165,12 +166,12 @@ export default function useInnerHandlers({
     });
   });
   const handlePhotoMediaClick = useLastCallback((): void => {
-    const withDynamicLoading = !isScheduled && !paidMedia;
+    const withDynamicLoading = !hasTtl && !isScheduled && !paidMedia;
     openMediaViewerWithPhotoOrVideo(withDynamicLoading);
   });
   const handleVideoMediaClick = useLastCallback(() => {
     const isGif = message.content?.video?.isGif;
-    const withDynamicLoading = !isGif && !isScheduled && !paidMedia;
+    const withDynamicLoading = !hasTtl && !isGif && !isScheduled && !paidMedia;
     openMediaViewerWithPhotoOrVideo(withDynamicLoading);
   });
 

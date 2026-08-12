@@ -997,7 +997,7 @@ export default memo(withGlobal<OwnProps>(
       canCopy: (canCopyNumber || (!isProtected && canCopy)),
       canCopyLink: !isScheduled && canCopyLink,
       canSelect,
-      canDownload: !isProtected && canDownload,
+      canDownload: (!isProtected || hasTtl) && canDownload,
       canSaveGif: !isProtected && canSaveGif,
       canRevote,
       canClosePoll: !isScheduled && canClosePoll,

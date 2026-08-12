@@ -155,14 +155,17 @@ export async function getArchivedMessages(chatId: string, messageIds: number[]) 
   });
 }
 
-export async function getArchivedDeletedMessages(chatId: string) {
-  if (!settings.isArchiveEnabled || !settings.isAntiDeleteEnabled) return [];
+export async function getArchivedRetainedMessages(chatId: string) {
+  if (!settings.isArchiveEnabled) return [];
 
   const records = await runTransaction(MESSAGE_STORE, 'readonly', (store) => (
     requestAsPromise<BygramArchiveRecord[]>(store.index('chatId').getAll(IDBKeyRange.only(chatId)))
   ));
 
-  return records.filter((record) => Boolean(record.deletedAt));
+  return records.filter((record) => (
+    (settings.isAntiDeleteEnabled && Boolean(record.deletedAt))
+    || record.message.content.ttlSeconds !== undefined
+  ));
 }
 
 export async function getArchivedChatMessages(chatId: string) {
@@ -204,6 +207,15 @@ export async function archiveMedia(key: string, blob: Blob) {
       totalSize -= item.size;
     }
   });
+}
+
+export async function getArchivedMedia(key: string) {
+  if (!settings.isMediaArchiveEnabled) return undefined;
+
+  const record = await runTransaction(MEDIA_STORE, 'readonly', (store) => (
+    requestAsPromise<BygramMediaRecord | undefined>(store.get(key))
+  ));
+  return record?.blob;
 }
 
 export async function getBygramArchiveStats(): Promise<BygramArchiveStats> {

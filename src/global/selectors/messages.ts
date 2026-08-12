@@ -543,7 +543,6 @@ export function selectAllowedMessageActionsSlow<T extends GlobalState>(
   const isOwn = isOwnMessage(message);
   const isForwarded = isForwardedMessage(message);
   const isAction = isActionMessage(message);
-  const hasTtl = hasMessageTtl(message);
   const { content } = message;
   const isDocumentSticker = isMessageDocumentSticker(message);
   const isBoostMessage = message.content.action?.type === 'boostApply';
@@ -644,7 +643,7 @@ export function selectAllowedMessageActionsSlow<T extends GlobalState>(
   const canCopyLink = !isLocal && !isAction && (isChannel || isSuperGroup) && !isMonoforum;
   const canSelect = !isLocal && !isAction;
 
-  const canDownload = selectMessageDownloadableMedia(global, message) && !hasTtl;
+  const canDownload = Boolean(selectMessageDownloadableMedia(global, message));
 
   const canSaveGif = message.content.video?.isGif;
 

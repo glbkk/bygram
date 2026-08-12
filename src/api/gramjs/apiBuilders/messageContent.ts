@@ -165,15 +165,11 @@ export function buildMessageMediaContent(
   const voice = buildVoice(media);
   if (voice) return { voice, ttlSeconds };
 
-  if ('round' in media && media.round) {
-    const video = buildVideo(media);
-    if (video) return { video, ttlSeconds };
-  }
+  const photo = buildPhoto(media);
+  if (photo) return { photo, ttlSeconds };
 
-  // Other disappearing media types are not supported
-  if (ttlSeconds !== undefined) {
-    return undefined;
-  }
+  const video = buildVideo(media);
+  if (video) return { video, ttlSeconds };
 
   if (media instanceof GramJs.MessageMediaInvoice && media.extendedMedia instanceof GramJs.MessageExtendedMedia) {
     return buildMessageMediaContent(media.extendedMedia.media, context);
@@ -181,12 +177,6 @@ export function buildMessageMediaContent(
 
   const sticker = buildSticker(media);
   if (sticker) return { sticker };
-
-  const photo = buildPhoto(media);
-  if (photo) return { photo };
-
-  const video = buildVideo(media);
-  if (video) return { video };
 
   const audio = buildAudio(media);
   if (audio) return { audio };
