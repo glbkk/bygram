@@ -1,0 +1,2 @@
+import{np as e,nu as t}from"./InputText-4Yb1ZMIL.js";var n={root:`_40aWbFdG`,thin:`_1yj96yuC`,thick:`_5EdrUuc8`},r=({className:r,size:i=`thin`})=>e(`div`,{className:t(n.root,n[i],r)});export{r as t};
+//# sourceMappingURL=MenuSeparator-jMIW_hg7.js.map
