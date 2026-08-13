@@ -102,6 +102,16 @@ function SettingsBygram({ isActive, onReset }: OwnProps) {
         {lang('BygramIosNotice')}
       </IslandDescription>
 
+      <IslandTitle dir={lang.isRtl ? 'rtl' : undefined}>{lang('BygramPrivacyTitle')}</IslandTitle>
+      <Island>
+        <Checkbox
+          label={lang('BygramGhostMode')}
+          subLabel={lang('BygramGhostModeDesc')}
+          checked={settings.isGhostModeEnabled}
+          onCheck={(value) => handleSettingChange('isGhostModeEnabled', value)}
+        />
+      </Island>
+
       <IslandTitle dir={lang.isRtl ? 'rtl' : undefined}>{lang('BygramMediaTitle')}</IslandTitle>
       <Island>
         <Checkbox

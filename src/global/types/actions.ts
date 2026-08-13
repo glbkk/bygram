@@ -2928,6 +2928,12 @@ export interface ActionPayloads {
     gift: ApiPremiumGiftCodeOption | ApiStarGift | undefined;
   } & WithTabId;
   sendStarGift: StarGiftInfo & WithTabId;
+  sendStarGiftById: {
+    giftId: string;
+    peerId: string;
+    message?: ApiFormattedText;
+    shouldHideName?: boolean;
+  } & WithTabId;
   buyStarGift: {
     peerId: string;
     slug: string;

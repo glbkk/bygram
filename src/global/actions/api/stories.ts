@@ -1,6 +1,7 @@
 import type { ActionReturnType, ReportSection } from '../../types';
 
 import { DEBUG, MESSAGE_ID_REQUIRED_ERROR } from '../../../config';
+import { getBygramSettings } from '../../../util/bygramArchive';
 import { getCurrentTabId } from '../../../util/establishMultitabRole';
 import { oldTranslate } from '../../../util/oldLangProvider';
 import { getServerTime } from '../../../util/serverTime';
@@ -162,6 +163,13 @@ addActionHandler('viewStory', async (global, actions, payload): Promise<void> =>
   }
 
   global = updateLastViewedStoryForPeer(global, peerId, storyId, tabId);
+
+  if (getBygramSettings().isGhostModeEnabled) {
+    global = updateLastReadStoryForPeer(global, peerId, storyId);
+    setGlobal(global);
+    return;
+  }
+
   setGlobal(global);
 
   const serverTime = getServerTime();

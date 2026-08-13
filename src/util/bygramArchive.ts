@@ -5,6 +5,7 @@ export type BygramSettings = {
   isAntiDeleteEnabled: boolean;
   isEditHistoryEnabled: boolean;
   isMediaArchiveEnabled: boolean;
+  isGhostModeEnabled: boolean;
   mediaArchiveLimitMb: number;
 };
 
@@ -50,6 +51,7 @@ const DEFAULT_SETTINGS: BygramSettings = {
   isAntiDeleteEnabled: true,
   isEditHistoryEnabled: true,
   isMediaArchiveEnabled: false,
+  isGhostModeEnabled: false,
   mediaArchiveLimitMb: 256,
 };
 

@@ -171,6 +171,30 @@ addActionHandler('sendStarGift', (global, actions, payload): ActionReturnType =>
   payInputStarInvoice(global, inputInvoice, gift.stars, tabId);
 });
 
+addActionHandler('sendStarGiftById', async (global, actions, payload): Promise<void> => {
+  const {
+    giftId, peerId, message, shouldHideName, tabId = getCurrentTabId(),
+  } = payload;
+
+  const result = await callApi('fetchCheckCanSendGift', { giftId });
+  if (!result) return;
+
+  if (!result.canSend) {
+    actions.openLockedGiftModalInfo({ reason: result.reason, tabId });
+    return;
+  }
+
+  global = getGlobal();
+  const inputInvoice: ApiInputInvoiceStarGift = {
+    type: 'stargift',
+    peerId,
+    giftId,
+    message,
+    shouldHideName,
+  };
+  await payInputStarInvoice(global, inputInvoice, 0, tabId);
+});
+
 addActionHandler('buyStarGift', (global, actions, payload): ActionReturnType => {
   const {
     slug, peerId, price, tabId = getCurrentTabId(),
