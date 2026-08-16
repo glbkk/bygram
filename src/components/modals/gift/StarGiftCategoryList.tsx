@@ -13,14 +13,17 @@ import useLang from '../../../hooks/useLang';
 
 import styles from './StarGiftCategoryList.module.scss';
 
+export type GiftCatalogCategory = StarGiftCategory | 'archived';
+
 type OwnProps = {
   ref?: ElementRef<HTMLDivElement>;
   areUniqueStarGiftsDisallowed?: boolean;
   areLimitedStarGiftsDisallowed?: boolean;
   isSelf?: boolean;
   hasMyUnique?: boolean;
+  hasArchived?: boolean;
   isPinned?: boolean;
-  onCategoryChanged: (category: StarGiftCategory) => void;
+  onCategoryChanged: (category: GiftCatalogCategory) => void;
 };
 
 type StateProps = {
@@ -35,6 +38,7 @@ const StarGiftCategoryList = ({
   areLimitedStarGiftsDisallowed,
   isSelf,
   hasMyUnique,
+  hasArchived,
   isPinned,
 }: StateProps & OwnProps) => {
   let ref = useRef<HTMLDivElement>();
@@ -46,21 +50,22 @@ const StarGiftCategoryList = ({
 
   const hasCollectible = Boolean(idsByCategory?.collectible?.length);
 
-  const [selectedCategory, setSelectedCategory] = useState<StarGiftCategory>('all');
+  const [selectedCategory, setSelectedCategory] = useState<GiftCatalogCategory>('all');
 
-  function handleItemClick(category: StarGiftCategory) {
+  function handleItemClick(category: GiftCatalogCategory) {
     setSelectedCategory(category);
     onCategoryChanged(category);
   }
 
-  function renderCategoryName(category: StarGiftCategory) {
+  function renderCategoryName(category: GiftCatalogCategory) {
     if (category === 'all') return lang('AllGiftsCategory');
     if (category === 'myUnique') return lang('GiftCategoryMyGifts');
     if (category === 'collectible') return lang('GiftCategoryCollectibles');
+    if (category === 'archived') return lang('BygramArchivedGiftTab');
     return category;
   }
 
-  function renderCategoryItem(category: StarGiftCategory) {
+  function renderCategoryItem(category: GiftCatalogCategory) {
     return (
       <div
         className={buildClassName(
@@ -79,6 +84,7 @@ const StarGiftCategoryList = ({
   return (
     <div ref={ref} className={buildClassName(styles.list, isPinned && styles.pinned, 'no-scrollbar')}>
       {renderCategoryItem('all')}
+      {hasArchived && renderCategoryItem('archived')}
       {!areUniqueStarGiftsDisallowed && !isSelf && hasMyUnique && renderCategoryItem('myUnique')}
       {(!areUniqueStarGiftsDisallowed || !areLimitedStarGiftsDisallowed)
         && hasCollectible && renderCategoryItem('collectible')}

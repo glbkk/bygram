@@ -38,12 +38,8 @@ export interface LangPair {
   'BygramPrivacyTitle': undefined;
   'BygramGhostMode': undefined;
   'BygramGhostModeDesc': undefined;
-  'BygramManualGiftTitle': undefined;
-  'BygramManualGiftDesc': undefined;
-  'BygramManualGiftId': undefined;
-  'BygramManualGiftMessage': undefined;
-  'BygramManualGiftAnonymous': undefined;
-  'BygramManualGiftSend': undefined;
+  'BygramArchivedGiftTab': undefined;
+  'BygramArchivedGiftDesc': undefined;
   'BygramLegacyGiftTree': undefined;
   'BygramLegacyGiftHeart': undefined;
   'BygramLegacyGiftNewYearBear': undefined;
@@ -54,8 +50,6 @@ export interface LangPair {
   'BygramLegacyGiftMayBear': undefined;
   'BygramLegacyGiftFootballBear': undefined;
   'BygramLegacyGiftTacticalBear': undefined;
-  'BygramLegacyGiftGoldenCup': undefined;
-  'BygramLegacyGiftBlueCup': undefined;
   'BygramChatPasswordSet': undefined;
   'BygramChatPasswordChange': undefined;
   'BygramChatPasswordRemove': undefined;

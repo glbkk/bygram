@@ -37,12 +37,8 @@
 "BygramPrivacyTitle" = "Приватность";
 "BygramGhostMode" = "Режим призрака";
 "BygramGhostModeDesc" = "Смотреть истории без отправки отметки о просмотре в Telegram";
-"BygramManualGiftTitle" = "Архивные подарки";
-"BygramManualGiftDesc" = "Telegram проверит доступность и покажет актуальную цену перед оплатой.";
-"BygramManualGiftId" = "ID подарка";
-"BygramManualGiftMessage" = "Сообщение (необязательно)";
-"BygramManualGiftAnonymous" = "Скрыть моё имя";
-"BygramManualGiftSend" = "Проверить и отправить";
+"BygramArchivedGiftTab" = "Архивные";
+"BygramArchivedGiftDesc" = "Редкие архивные подарки по 50 звёзд. Доступность подтверждается Telegram перед оплатой.";
 "BygramLegacyGiftTree" = "Новогодняя ёлка";
 "BygramLegacyGiftHeart" = "Сердце на 14 февраля";
 "BygramLegacyGiftNewYearBear" = "Новогодний мишка";
@@ -53,8 +49,6 @@
 "BygramLegacyGiftMayBear" = "Мишка на 1 мая";
 "BygramLegacyGiftFootballBear" = "Мишка-футболист";
 "BygramLegacyGiftTacticalBear" = "Тактический мишка";
-"BygramLegacyGiftGoldenCup" = "Золотой кубок";
-"BygramLegacyGiftBlueCup" = "Синий кубок";
 "BygramChatPasswordSet" = "Установить пароль на чат";
 "BygramChatPasswordChange" = "Изменить пароль чата";
 "BygramChatPasswordRemove" = "Удалить пароль";

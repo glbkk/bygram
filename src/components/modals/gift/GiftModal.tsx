@@ -21,7 +21,12 @@ import { getUserFullName } from '../../../global/helpers';
 import { getPeerTitle, isApiPeerChat, isApiPeerUser } from '../../../global/helpers/peers';
 import { selectPeer, selectTabState, selectUserFullInfo } from '../../../global/selectors';
 import buildClassName from '../../../util/buildClassName';
-import { NEXT_ARROW_REPLACEMENT } from '../../../util/localization/format';
+import {
+  BYGRAM_LEGACY_GIFT_PRICE,
+  BYGRAM_LEGACY_GIFTS,
+  getBygramLegacyGiftImageUrl,
+} from '../../../util/bygramLegacyGifts';
+import { formatStarsAsIcon, NEXT_ARROW_REPLACEMENT } from '../../../util/localization/format';
 import { throttle } from '../../../util/schedulers';
 import { REM } from '../../common/helpers/mediaDimensions';
 
@@ -38,16 +43,14 @@ import SafeLink from '../../common/SafeLink';
 import Button from '../../ui/Button';
 import Checkbox from '../../ui/Checkbox';
 import InfiniteScroll from '../../ui/InfiniteScroll';
-import InputText from '../../ui/InputText';
 import Modal from '../../ui/Modal';
-import TextArea from '../../ui/TextArea';
 import Transition from '../../ui/Transition';
 import GiftComposer from './GiftComposer';
 import GiftItemPremium from './GiftItemPremium';
 import GiftItemStar from './GiftItemStar';
 import GiftModalResaleScreen from './GiftModalResaleScreen';
 import GiftResaleFilters from './GiftResaleFilters';
-import StarGiftCategoryList from './StarGiftCategoryList';
+import StarGiftCategoryList, { type GiftCatalogCategory } from './StarGiftCategoryList';
 
 import styles from './GiftModal.module.scss';
 
@@ -79,21 +82,6 @@ const INTERSECTION_THROTTLE = 200;
 const SCROLL_THROTTLE = 200;
 const AVATAR_SPARKLES_CENTER_SHIFT = [0, -50] as const;
 const CATEGORY_LIST_STICKY_TOP = 3.5 * REM;
-const LEGACY_GIFT_OPTIONS = [
-  { id: '5922558454332916696', emoji: '🎄', titleKey: 'BygramLegacyGiftTree' },
-  { id: '5801108895304779062', emoji: '❤️', titleKey: 'BygramLegacyGiftHeart' },
-  { id: '5956217000635139069', emoji: '🧸', titleKey: 'BygramLegacyGiftNewYearBear' },
-  { id: '5800655655995968830', emoji: '🧸', titleKey: 'BygramLegacyGiftValentineBear' },
-  { id: '5866352046986232958', emoji: '🧸', titleKey: 'BygramLegacyGiftMarchBear' },
-  { id: '5935895822435615975', emoji: '🤡', titleKey: 'BygramLegacyGiftClownBear' },
-  { id: '5969796561943660080', emoji: '🐣', titleKey: 'BygramLegacyGiftEasterBear' },
-  { id: '6026193266406327981', emoji: '🔨', titleKey: 'BygramLegacyGiftMayBear' },
-  { id: '5974210632977745012', emoji: '⚽️', titleKey: 'BygramLegacyGiftFootballBear' },
-  { id: '6046178578163303744', emoji: '🪖', titleKey: 'BygramLegacyGiftTacticalBear' },
-  { id: '6046499901846586791', emoji: '🏆', titleKey: 'BygramLegacyGiftGoldenCup' },
-  { id: '6050827940390765935', emoji: '🏆', titleKey: 'BygramLegacyGiftBlueCup' },
-] as const;
-
 const runThrottledForScroll = throttle((cb) => cb(), SCROLL_THROTTLE, true);
 
 const GiftModal: FC<OwnProps & StateProps> = ({
@@ -144,10 +132,7 @@ const GiftModal: FC<OwnProps & StateProps> = ({
   const [shouldShowMainScreenHeader, setShouldShowMainScreenHeader] = useState(false);
   const [isMainScreenHeaderForStarGifts, setIsMainScreenHeaderForStarGifts] = useState(false);
   const [isGiftScreenHeaderForStarGifts, setIsGiftScreenHeaderForStarGifts] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<StarGiftCategory>('all');
-  const [manualGiftId, setManualGiftId] = useState('');
-  const [manualGiftMessage, setManualGiftMessage] = useState('');
-  const [shouldHideManualGiftName, setShouldHideManualGiftName] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<GiftCatalogCategory>('all');
   const [isCategoryListPinned, pinCategoryList, unpinCategoryList] = useFlag(false);
   const [wasStarsOnlyToggleShown, markStarsOnlyToggleShown, resetStarsOnlyToggleShown] = useFlag(false);
   const triggerSparklesRef = useRef<(() => void) | undefined>();
@@ -289,6 +274,10 @@ const GiftModal: FC<OwnProps & StateProps> = ({
       return lang('StarGiftDescriptionCollectibles');
     }
 
+    if (selectedCategory === 'archived') {
+      return lang('BygramArchivedGiftDesc');
+    }
+
     return lang('StarGiftDescription', {
       user: getUserFullName(user)!,
     }, { withNodes: true, withMarkdown: true });
@@ -358,6 +347,33 @@ const GiftModal: FC<OwnProps & StateProps> = ({
   });
 
   function renderStarGifts() {
+    if (selectedCategory === 'archived') {
+      return (
+        <div className={styles.starGiftsContainer}>
+          {BYGRAM_LEGACY_GIFTS.map(({ id, titleKey }) => (
+            <button
+              key={id}
+              type="button"
+              className={styles.archivedGiftCard}
+              aria-label={`${lang(titleKey)}, ${BYGRAM_LEGACY_GIFT_PRICE} звёзд`}
+              onClick={() => handleArchivedGiftClick(id)}
+            >
+              <img
+                className={styles.archivedGiftImage}
+                src={getBygramLegacyGiftImageUrl(id)}
+                alt=""
+                loading="lazy"
+              />
+              <span className={styles.archivedGiftTitle}>{lang(titleKey)}</span>
+              <span className={styles.archivedGiftPrice}>
+                {formatStarsAsIcon(lang, BYGRAM_LEGACY_GIFT_PRICE, { asFont: true })}
+              </span>
+            </button>
+          ))}
+        </div>
+      );
+    }
+
     if (selectedCategory === 'myUnique') {
       return (
         <InfiniteScroll
@@ -452,7 +468,7 @@ const GiftModal: FC<OwnProps & StateProps> = ({
     );
   }
 
-  const onCategoryChanged = useLastCallback((category: StarGiftCategory) => {
+  const onCategoryChanged = useLastCallback((category: GiftCatalogCategory) => {
     setSelectedCategory(category);
   });
 
@@ -492,26 +508,12 @@ const GiftModal: FC<OwnProps & StateProps> = ({
     });
   });
 
-  const handleManualGiftIdChange = useLastCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setManualGiftId(e.target.value.replace(/\D/g, ''));
-  });
-
-  const handleManualGiftMessageChange = useLastCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setManualGiftMessage(e.target.value);
-  });
-
-  const handleLegacyGiftClick = useLastCallback((giftId: string) => {
-    setManualGiftId(giftId);
-  });
-
-  const handleSendManualGift = useLastCallback(() => {
-    if (!manualGiftId || !renderingModal?.forPeerId) return;
+  const handleArchivedGiftClick = useLastCallback((giftId: string) => {
+    if (!renderingModal?.forPeerId) return;
 
     sendStarGiftById({
-      giftId: manualGiftId,
+      giftId,
       peerId: renderingModal.forPeerId,
-      message: manualGiftMessage ? { text: manualGiftMessage } : undefined,
-      shouldHideName: shouldHideManualGiftName || undefined,
     });
   });
 
@@ -562,6 +564,7 @@ const GiftModal: FC<OwnProps & StateProps> = ({
               areLimitedStarGiftsDisallowed={areLimitedStarGiftsDisallowed}
               isSelf={isSelf}
               hasMyUnique={Boolean(myUniqueGiftIds?.length)}
+              hasArchived
               isPinned={isCategoryListPinned}
               onCategoryChanged={onCategoryChanged}
             />
@@ -572,44 +575,6 @@ const GiftModal: FC<OwnProps & StateProps> = ({
             >
               {renderStarGifts()}
             </Transition>
-            <div className={styles.manualGiftSection}>
-              <h3 className={styles.manualGiftTitle}>{lang('BygramManualGiftTitle')}</h3>
-              <p className={styles.manualGiftDescription}>{lang('BygramManualGiftDesc')}</p>
-              <div className={styles.legacyGiftGrid}>
-                {LEGACY_GIFT_OPTIONS.map(({ id, emoji, titleKey }) => (
-                  <button
-                    key={id}
-                    type="button"
-                    className={buildClassName(styles.legacyGiftCard, manualGiftId === id && styles.legacyGiftSelected)}
-                    onClick={() => handleLegacyGiftClick(id)}
-                  >
-                    <span className={styles.legacyGiftEmoji}>{emoji}</span>
-                    <span className={styles.legacyGiftName}>{lang(titleKey)}</span>
-                    <span className={styles.legacyGiftId}>{id}</span>
-                  </button>
-                ))}
-              </div>
-              <InputText
-                value={manualGiftId}
-                label={lang('BygramManualGiftId')}
-                inputMode="numeric"
-                onChange={handleManualGiftIdChange}
-              />
-              <TextArea
-                className={styles.manualGiftMessage}
-                value={manualGiftMessage}
-                label={lang('BygramManualGiftMessage')}
-                onChange={handleManualGiftMessageChange}
-              />
-              <Checkbox
-                label={lang('BygramManualGiftAnonymous')}
-                checked={shouldHideManualGiftName}
-                onCheck={setShouldHideManualGiftName}
-              />
-              <Button disabled={!manualGiftId} onClick={handleSendManualGift}>
-                {lang('BygramManualGiftSend')}
-              </Button>
-            </div>
           </>
         )}
       </div>
@@ -764,8 +729,9 @@ export default memo(withGlobal<OwnProps>((global, { modal }): Complete<StateProp
   };
 })(GiftModal));
 
-function getCategoryKey(category: StarGiftCategory) {
+function getCategoryKey(category: GiftCatalogCategory) {
   if (category === 'all') return 0;
   if (category === 'myUnique') return 1;
-  return 2;
+  if (category === 'collectible') return 2;
+  return 3;
 }

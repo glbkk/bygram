@@ -11,6 +11,7 @@ import type {
 import { PaymentStep } from '../../../types';
 
 import { DEBUG_PAYMENT_SMART_GLOCAL, STARS_CURRENCY_CODE, TON_CURRENCY_CODE } from '../../../config';
+import { BYGRAM_LEGACY_GIFT_PRICE } from '../../../util/bygramLegacyGifts';
 import { getCurrentTabId } from '../../../util/establishMultitabRole';
 import * as langProvider from '../../../util/oldLangProvider';
 import { getStripeError } from '../../../util/payments/stripe';
@@ -192,7 +193,7 @@ addActionHandler('sendStarGiftById', async (global, actions, payload): Promise<v
     message,
     shouldHideName,
   };
-  await payInputStarInvoice(global, inputInvoice, 0, tabId);
+  await payInputStarInvoice(global, inputInvoice, BYGRAM_LEGACY_GIFT_PRICE, tabId);
 });
 
 addActionHandler('buyStarGift', (global, actions, payload): ActionReturnType => {
