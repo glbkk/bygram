@@ -13,6 +13,8 @@ export const BYGRAM_LEGACY_GIFTS = [
   { id: '6046178578163303744', titleKey: 'BygramLegacyGiftTacticalBear' },
 ] as const;
 
+export type BygramLegacyGift = (typeof BYGRAM_LEGACY_GIFTS)[number];
+
 export function getBygramLegacyGiftImageUrl(giftId: string) {
   return `https://cdn.changes.tg/gifts/originals/${giftId}/Original.png`;
 }

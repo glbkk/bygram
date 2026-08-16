@@ -45,6 +45,7 @@ import Checkbox from '../../ui/Checkbox';
 import InfiniteScroll from '../../ui/InfiniteScroll';
 import Modal from '../../ui/Modal';
 import Transition from '../../ui/Transition';
+import ArchivedGiftComposer from './ArchivedGiftComposer';
 import GiftComposer from './GiftComposer';
 import GiftItemPremium from './GiftItemPremium';
 import GiftItemStar from './GiftItemStar';
@@ -111,7 +112,6 @@ const GiftModal: FC<OwnProps & StateProps> = ({
     updateResaleGiftsFilter,
     openGiftTransferConfirmModal,
     setGiftModalSelectedGift,
-    sendStarGiftById,
   } = getActions();
   const dialogRef = useRef<HTMLDivElement>();
   const transitionRef = useRef<HTMLDivElement>();
@@ -133,6 +133,7 @@ const GiftModal: FC<OwnProps & StateProps> = ({
   const [isMainScreenHeaderForStarGifts, setIsMainScreenHeaderForStarGifts] = useState(false);
   const [isGiftScreenHeaderForStarGifts, setIsGiftScreenHeaderForStarGifts] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<GiftCatalogCategory>('all');
+  const [selectedArchivedGiftId, setSelectedArchivedGiftId] = useState<string>();
   const [isCategoryListPinned, pinCategoryList, unpinCategoryList] = useFlag(false);
   const [wasStarsOnlyToggleShown, markStarsOnlyToggleShown, resetStarsOnlyToggleShown] = useFlag(false);
   const triggerSparklesRef = useRef<(() => void) | undefined>();
@@ -186,8 +187,11 @@ const GiftModal: FC<OwnProps & StateProps> = ({
     observe: observeIntersection,
   } = useIntersectionObserver({ rootRef: scrollerRef, throttleMs: INTERSECTION_THROTTLE, isDisabled: !isOpen });
 
-  const isResaleScreen = Boolean(selectedResaleGift) && !selectedGift;
-  const isGiftScreen = Boolean(selectedGift);
+  const selectedArchivedGift = BYGRAM_LEGACY_GIFTS.find(({ id }) => id === selectedArchivedGiftId);
+  const isRegularGiftScreen = Boolean(selectedGift);
+  const isArchivedGiftScreen = Boolean(selectedArchivedGift);
+  const isGiftScreen = isRegularGiftScreen || isArchivedGiftScreen;
+  const isResaleScreen = Boolean(selectedResaleGift) && !isGiftScreen;
   const shouldShowHeader = isResaleScreen || isGiftScreen || shouldShowMainScreenHeader;
   const isHeaderForStarGifts = isGiftScreen ? isGiftScreenHeaderForStarGifts : isMainScreenHeaderForStarGifts;
 
@@ -204,13 +208,16 @@ const GiftModal: FC<OwnProps & StateProps> = ({
     if (!isOpen) {
       setShouldShowMainScreenHeader(false);
       setGiftModalSelectedGift({ gift: undefined });
+      setSelectedArchivedGiftId(undefined);
       setSelectedCategory('all');
     }
   }, [isOpen]);
 
   useEffect(() => {
-    setIsGiftScreenHeaderForStarGifts(Boolean(selectedGift && 'id' in selectedGift));
-  }, [selectedGift]);
+    setIsGiftScreenHeaderForStarGifts(Boolean(
+      selectedArchivedGift || (selectedGift && 'id' in selectedGift),
+    ));
+  }, [selectedArchivedGift, selectedGift]);
 
   const handleScroll = useLastCallback((e: React.UIEvent<HTMLDivElement>) => {
     if (isGiftScreen) return;
@@ -474,6 +481,7 @@ const GiftModal: FC<OwnProps & StateProps> = ({
 
   const handleCloseModal = useLastCallback(() => {
     setGiftModalSelectedGift({ gift: undefined });
+    setSelectedArchivedGiftId(undefined);
     resetResaleGifts();
     closeGiftModal();
   });
@@ -484,7 +492,11 @@ const GiftModal: FC<OwnProps & StateProps> = ({
       return;
     }
     if (isGiftScreen) {
-      setGiftModalSelectedGift({ gift: undefined });
+      if (isArchivedGiftScreen) {
+        setSelectedArchivedGiftId(undefined);
+      } else {
+        setGiftModalSelectedGift({ gift: undefined });
+      }
       return;
     }
     handleCloseModal();
@@ -509,12 +521,7 @@ const GiftModal: FC<OwnProps & StateProps> = ({
   });
 
   const handleArchivedGiftClick = useLastCallback((giftId: string) => {
-    if (!renderingModal?.forPeerId) return;
-
-    sendStarGiftById({
-      giftId,
-      peerId: renderingModal.forPeerId,
-    });
+    setSelectedArchivedGiftId(giftId);
   });
 
   const isStarsOnly = Boolean(resaleFilter?.starsOnly);
@@ -672,10 +679,16 @@ const GiftModal: FC<OwnProps & StateProps> = ({
               onGiftClick={handleGiftClick}
             />
           )}
-        {isGiftScreen && renderingModal?.forPeerId && (
+        {isRegularGiftScreen && selectedGift && renderingModal?.forPeerId && (
           <GiftComposer
             gift={selectedGift}
             giftByStars={giftsByStars.get(selectedGift)}
+            peerId={renderingModal.forPeerId}
+          />
+        )}
+        {isArchivedGiftScreen && selectedArchivedGift && renderingModal?.forPeerId && (
+          <ArchivedGiftComposer
+            gift={selectedArchivedGift}
             peerId={renderingModal.forPeerId}
           />
         )}
