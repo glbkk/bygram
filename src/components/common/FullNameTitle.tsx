@@ -18,6 +18,7 @@ import {
 import { isApiPeerUser } from '../../global/helpers/peers';
 import buildClassName from '../../util/buildClassName';
 import buildStyle from '../../util/buildStyle';
+import { getBygramUserEmoji } from '../../util/bygramUserEmoji';
 import { copyTextToClipboard } from '../../util/clipboard';
 import stopEvent from '../../util/stopEvent';
 import renderText from './helpers/renderText';
@@ -88,6 +89,7 @@ const FullNameTitle = ({
   const customPeer = 'isCustomPeer' in peer ? peer : undefined;
   const isUser = realPeer && isApiPeerUser(realPeer);
   const title = realPeer && (isUser ? getUserFullName(realPeer) : getChatTitle(oldLang, realPeer));
+  const bygramUserEmoji = isUser ? getBygramUserEmoji(realPeer.id) : undefined;
   const isPremium = (isUser && realPeer.isPremium) || customPeer?.isPremium;
   const canShowEmojiStatus = withEmojiStatus && !isSavedMessages;
   const emojiStatus = realPeer?.emojiStatus
@@ -152,6 +154,7 @@ const FullNameTitle = ({
         )}
         onClick={handleTitleClick}
       >
+        {bygramUserEmoji && <span className={styles.bygramUserEmoji} aria-hidden>{bygramUserEmoji}</span>}
         {isScrolling ? <Marquee paused={isScrollingPaused}>{renderedTitle}</Marquee> : renderedTitle}
       </h3>
       {!iconElement && peer && (

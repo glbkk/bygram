@@ -1,11 +1,9 @@
 import { memo, useMemo } from '../../../lib/teact/teact';
-import { getActions } from '../../../global';
 
 import type { ApiUser } from '../../../api/types';
 import type { AccountInfo, CustomPeer } from '../../../types';
 
 import { temporarilySuspendCacheUpdate } from '../../../global/cache';
-import { getCurrentMaxAccountCount, getCurrentProdAccountCount } from '../../../global/helpers';
 import { IS_SAFARI } from '../../../util/browser/windowEnvironment';
 import { getAccountSlotUrl } from '../../../util/multiaccount';
 import { REM } from '../../common/helpers/mediaDimensions';
@@ -21,29 +19,19 @@ import MenuSeparator from '../../ui/MenuSeparator';
 
 type OwnProps = {
   currentUser: ApiUser;
-  totalLimit: number;
   onSelectCurrent?: VoidFunction;
 };
 
-const NOTIFICATION_DURATION = 7000;
-
 const AccountMenuItems = ({
   currentUser,
-  totalLimit,
   onSelectCurrent,
 }: OwnProps) => {
-  const { showNotification } = getActions();
   const lang = useLang();
   const accounts = useMultiaccountInfo(currentUser);
-
-  const currentCount = getCurrentProdAccountCount();
-  const maxCount = getCurrentMaxAccountCount();
 
   const currentAccountInfo = useMemo(() => {
     return Object.values(accounts).find((account) => account.userId === currentUser.id);
   }, [accounts, currentUser.id]);
-
-  const shouldShowLimit = currentCount >= maxCount;
 
   const handleAccountClick = useLastCallback((account: AccountInfo) => {
     if (account.userId === currentUser.id) {
@@ -56,24 +44,11 @@ const AccountMenuItems = ({
   });
 
   const handleNewAccountClick = useLastCallback(() => {
-    if (shouldShowLimit) {
-      showNotification({
-        title: lang('PremiumLimitAccountsTitle'),
-        message: currentUser.isPremium ? lang('PremiumLimitAccounts') : lang('PremiumLimitAccountsNoPremium'),
-        duration: NOTIFICATION_DURATION,
-      });
-      return;
-    }
-
     if (IS_SAFARI) temporarilySuspendCacheUpdate();
   });
 
   const newAccountUrl = useMemo(() => {
     if (!Object.values(accounts).length) {
-      return undefined;
-    }
-
-    if (currentCount === totalLimit) {
       return undefined;
     }
 
@@ -83,7 +58,7 @@ const AccountMenuItems = ({
     }
 
     return getAccountSlotUrl(freeIndex, true);
-  }, [accounts, currentCount, totalLimit]);
+  }, [accounts]);
 
   return (
     <>
@@ -127,7 +102,7 @@ const AccountMenuItems = ({
         <MenuItem
           icon="add"
           rel="noopener" // Allow referrer to be passed
-          href={!shouldShowLimit ? newAccountUrl : undefined}
+          href={newAccountUrl}
           onClick={handleNewAccountClick}
         >
           {lang('MenuAddAccount')}

@@ -7,6 +7,7 @@ import {
 
 import { ARCHIVED_FOLDER_ID } from '../../config';
 import { areDeepEqual } from '../../util/areDeepEqual';
+import { mergeBygramLocalPinnedIds } from '../../util/bygramLocalPins';
 import {
   areSortedArraysEqual, buildCollectionByKey, omit, omitUndefined, pick,
 } from '../../util/iteratees';
@@ -371,7 +372,7 @@ export function updateChatListSecondaryInfo<T extends GlobalState>(
       ...(info.orderedPinnedIds && {
         orderedPinnedIds: {
           ...global.chats.orderedPinnedIds,
-          [type]: info.orderedPinnedIds,
+          [type]: mergeBygramLocalPinnedIds(type, info.orderedPinnedIds),
         },
       }),
       totalCount: {

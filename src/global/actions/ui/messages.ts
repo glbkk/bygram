@@ -12,6 +12,7 @@ import {
 } from '../../../config';
 import { cancelScrollBlockingAnimation, isAnimatingScroll } from '../../../util/animateScroll';
 import { IS_TOUCH_ENV } from '../../../util/browser/windowEnvironment';
+import { requestBygramChatUnlock } from '../../../util/bygramChatPasswordDialog';
 import { copyHtmlToClipboard } from '../../../util/clipboard';
 import { getCurrentTabId } from '../../../util/establishMultitabRole';
 import { compact, findLast } from '../../../util/iteratees';
@@ -1168,12 +1169,14 @@ addActionHandler('updateSharePreparedMessageModalSendArgs', async (global, actio
   setGlobal(global);
 });
 
-addActionHandler('openQuickPreview', (global, actions, payload): ActionReturnType => {
+addActionHandler('openQuickPreview', async (global, actions, payload): Promise<void> => {
   const { id: chatId, threadId, tabId = getCurrentTabId() } = payload;
+  if (!await requestBygramChatUnlock(chatId)) return;
 
-  return updateTabState(global, {
+  global = updateTabState(global, {
     quickPreview: { chatId, threadId },
   }, tabId);
+  setGlobal(global);
 });
 
 addActionHandler('closeQuickPreview', (global, actions, payload): ActionReturnType => {

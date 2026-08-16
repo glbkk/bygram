@@ -106,7 +106,7 @@ export const INITIAL_SHARED_STATE: SharedState = {
     shouldReplaceTextShortcuts: true,
     performance: INITIAL_PERFORMANCE_STATE_MAX,
     shouldSkipBrowserCloseConfirmation: false,
-    language: 'en',
+    language: 'ru',
     timeFormat: '24h',
     wasTimeFormatSetManually: false,
     isConnectionStatusMinimized: true,

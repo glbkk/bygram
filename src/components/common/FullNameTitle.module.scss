@@ -25,6 +25,12 @@
   }
 }
 
+.bygramUserEmoji {
+  flex: 0 0 auto;
+  margin-inline-end: 0.25rem;
+  filter: saturate(1.08);
+}
+
 .statusTransitionSlide {
   display: flex;
   align-items: center;

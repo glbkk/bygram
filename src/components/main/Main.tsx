@@ -35,6 +35,7 @@ import { selectSharedSettings } from '../../global/selectors/sharedState';
 import { IS_TAURI } from '../../util/browser/globalEnvironment';
 import { IS_ANDROID, IS_MAC_OS, IS_WAVE_TRANSFORM_SUPPORTED } from '../../util/browser/windowEnvironment';
 import buildClassName from '../../util/buildClassName';
+import { lockBygramChats } from '../../util/bygramChatSecurity';
 import { waitForTransitionEnd } from '../../util/cssAnimationEndListeners';
 import { processDeepLink } from '../../util/deeplink';
 import { Bundles, loadBundle } from '../../util/moduleLoader';
@@ -73,6 +74,7 @@ import ReactionPicker from '../middle/message/reactions/ReactionPicker.async';
 import MessageListHistoryHandler from '../middle/MessageListHistoryHandler';
 import MiddleColumn from '../middle/MiddleColumn';
 import AudioPlayer from '../middle/panes/AudioPlayer';
+import BygramChatPasswordModal from '../modals/BygramChatPasswordModal';
 import ModalContainer from '../modals/ModalContainer';
 import PaymentModal from '../payment/PaymentModal.async';
 import ReceiptModal from '../payment/ReceiptModal.async';
@@ -560,6 +562,7 @@ const Main = ({
   );
 
   const handleBlur = useLastCallback(() => {
+    lockBygramChats();
     onTabFocusChange({ isBlurred: true });
   });
 
@@ -633,6 +636,7 @@ const Main = ({
       <Dialogs />
       <AudioPlayer noUi />
       <ModalContainer />
+      <BygramChatPasswordModal />
       <HistoryCalendar isOpen={isHistoryCalendarOpen} />
       <StickerSetModal
         isOpen={Boolean(openedStickerSetShortName)}

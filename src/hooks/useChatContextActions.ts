@@ -10,6 +10,8 @@ import { getCanDeleteChat, isChatArchived, isChatChannel, isChatGroup } from '..
 import { selectThreadReadState } from '../global/selectors/threads';
 import { IS_TAURI } from '../util/browser/globalEnvironment';
 import { IS_OPEN_IN_NEW_TAB_SUPPORTED } from '../util/browser/windowEnvironment';
+import { openBygramChatPasswordManager } from '../util/bygramChatPasswordDialog';
+import { hasBygramChatPassword } from '../util/bygramChatSecurity';
 import { isUserId } from '../util/entities/ids';
 import { buildCollectionByCallback, compact } from '../util/iteratees';
 import useSelector, { useShallowSelector } from './data/useSelector';
@@ -62,6 +64,7 @@ const useChatContextActions = ({
 
   const { isSelf } = user || {};
   const isServiceNotifications = user?.id === SERVICE_NOTIFICATIONS_USER_ID;
+  const hasChatPassword = Boolean(chat && hasBygramChatPassword(chat.id));
 
   const topicsReadStateSelector = useCallback((global: GlobalState) => {
     if (!chat?.id) return undefined;
@@ -146,6 +149,12 @@ const useChatContextActions = ({
         handler: togglePinned,
       };
 
+    const actionChatPassword = !isSavedDialog ? {
+      title: lang(hasChatPassword ? 'BygramChatPasswordChange' : 'BygramChatPasswordSet'),
+      icon: 'lock',
+      handler: () => openBygramChatPasswordManager(chat.id),
+    } satisfies MenuItemContextAction : undefined;
+
     const actionDelete = deleteTitle ? {
       title: deleteTitle,
       icon: 'delete',
@@ -214,6 +223,7 @@ const useChatContextActions = ({
       actionMarkAsRead,
       actionMarkAsUnread,
       actionPin,
+      actionChatPassword,
       !isSelf && actionMute,
       !isSelf && !isServiceNotifications && !isInFolder && actionArchive,
       actionReport,
@@ -222,7 +232,7 @@ const useChatContextActions = ({
   }, [
     chat, isPreview, lang, isSavedDialog, isPinned, deleteTitle, handleDelete, canChangeFolder,
     handleChatFolderChange, isMuted, handleUnmute, handleMute, isInSearch, chatReadState, topicsReadStates,
-    handleReport, user, folderId, isSelf, isServiceNotifications, currentUserId,
+    handleReport, user, folderId, isSelf, isServiceNotifications, currentUserId, hasChatPassword,
   ]);
 
   return preparedActions;

@@ -2,6 +2,7 @@ import type { ProfileTabType } from '../../../types';
 import type { ActionReturnType, GlobalState } from '../../types';
 import { MAIN_THREAD_ID } from '../../../api/types';
 
+import { requestBygramChatUnlock } from '../../../util/bygramChatPasswordDialog';
 import { getCurrentTabId } from '../../../util/establishMultitabRole';
 import { createMessageHashUrl } from '../../../util/routing';
 import { addActionHandler, execAfterActions, getGlobal, setGlobal } from '../../index';
@@ -126,8 +127,11 @@ addActionHandler('openPreviousChat', (global, actions, payload): ActionReturnTyp
   return updateCurrentMessageList(global, undefined, undefined, undefined, undefined, undefined, tabId);
 });
 
-addActionHandler('openChatWithInfo', (global, actions, payload): ActionReturnType => {
+addActionHandler('openChatWithInfo', async (global, actions, payload): Promise<void> => {
   const { profileTab, forceScrollProfileTab, isOwnProfile, tabId = getCurrentTabId(), ...rest } = payload;
+
+  if (rest.id && !await requestBygramChatUnlock(rest.id)) return;
+  global = getGlobal();
 
   const currentMessageList = selectCurrentMessageList(global, tabId);
   const isSameMessageList = currentMessageList?.chatId === rest.id
@@ -139,8 +143,11 @@ addActionHandler('openChatWithInfo', (global, actions, payload): ActionReturnTyp
   actions.openChat({ ...rest, tabId });
 });
 
-addActionHandler('openThreadWithInfo', (global, actions, payload): ActionReturnType => {
+addActionHandler('openThreadWithInfo', async (global, actions, payload): Promise<void> => {
   const { profileTab, forceScrollProfileTab, isOwnProfile, tabId = getCurrentTabId(), ...rest } = payload;
+
+  if (rest.chatId && !await requestBygramChatUnlock(rest.chatId)) return;
+  global = getGlobal();
 
   const currentMessageList = selectCurrentMessageList(global, tabId);
   const isSameMessageList = currentMessageList?.chatId === rest.chatId

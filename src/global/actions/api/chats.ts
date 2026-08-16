@@ -33,6 +33,13 @@ import {
   TOPICS_SLICE,
   TOPICS_SLICE_SECOND_LOAD,
 } from '../../../config';
+import { requestBygramChatUnlock } from '../../../util/bygramChatPasswordDialog';
+import {
+  addBygramLocalPinnedId,
+  getBygramLocalPinnedIds,
+  mergeBygramLocalPinnedIds,
+  removeBygramLocalPinnedId,
+} from '../../../util/bygramLocalPins';
 import { copyTextToClipboard } from '../../../util/clipboard';
 import { formatShareText, processDeepLink } from '../../../util/deeplink';
 import { isDeepLink } from '../../../util/deepLinkParser';
@@ -215,11 +222,13 @@ function abortChatRequestsForCurrentChat<T extends GlobalState>(
   }
 }
 
-addActionHandler('openChat', (global, actions, payload): ActionReturnType => {
+addActionHandler('openChat', async (global, actions, payload): Promise<void> => {
   const {
     id, type, noForumTopicPanel, shouldReplaceHistory, shouldReplaceLast,
     tabId = getCurrentTabId(),
   } = payload;
+
+  if (id && !await requestBygramChatUnlock(id)) return;
 
   actions.processOpenChatOrThread({
     chatId: id,
@@ -303,6 +312,12 @@ addActionHandler('openThread', async (global, actions, payload): Promise<void> =
   let threadId: ThreadId | undefined;
   let loadingChatId: string;
   let loadingThreadId: ThreadId;
+
+  const passwordChatId = !payload.isComments
+    && getIsSavedDialog(payload.chatId, payload.threadId, global.currentUserId)
+    ? String(payload.threadId)
+    : payload.isComments ? payload.originChannelId : payload.chatId;
+  if (passwordChatId && !await requestBygramChatUnlock(passwordChatId)) return;
 
   if (!isComments) {
     loadingChatId = payload.chatId;
@@ -1217,14 +1232,43 @@ addActionHandler('toggleChatPinned', (global, actions, payload): ActionReturnTyp
     }
   } else {
     const listType = selectChatListType(global, id);
-    const isPinned = selectIsChatPinned(global, id, listType === 'archived' ? ARCHIVED_FOLDER_ID : undefined);
+    const pinListType: ChatListType = listType === 'archived' ? 'archived' : 'active';
+    const isPinned = selectIsChatPinned(global, id, pinListType === 'archived' ? ARCHIVED_FOLDER_ID : undefined);
 
-    const ids = global.chats.orderedPinnedIds[listType === 'archived' ? 'archived' : 'active'];
+    const ids = global.chats.orderedPinnedIds[pinListType] || [];
+    const localPinnedIds = getBygramLocalPinnedIds(pinListType);
+    const isLocallyPinned = localPinnedIds.includes(id);
+    const serverPinnedIds = ids.filter((pinnedId) => !localPinnedIds.includes(pinnedId));
+
+    if (isLocallyPinned) {
+      removeBygramLocalPinnedId(pinListType, id);
+      global = {
+        ...global,
+        chats: {
+          ...global.chats,
+          orderedPinnedIds: {
+            ...global.chats.orderedPinnedIds,
+            [pinListType]: mergeBygramLocalPinnedIds(pinListType, serverPinnedIds),
+          },
+        },
+      };
+      setGlobal(global);
+      return;
+    }
+
     if ((ids?.length || 0) >= limit && !isPinned) {
-      actions.openLimitReachedModal({
-        limit: 'dialogFolderPinned',
-        tabId,
-      });
+      addBygramLocalPinnedId(pinListType, id);
+      global = {
+        ...global,
+        chats: {
+          ...global.chats,
+          orderedPinnedIds: {
+            ...global.chats.orderedPinnedIds,
+            [pinListType]: mergeBygramLocalPinnedIds(pinListType, serverPinnedIds),
+          },
+        },
+      };
+      setGlobal(global);
       return;
     }
     void callApi('toggleChatPinned', { chat, shouldBePinned: !isPinned });
@@ -1265,14 +1309,43 @@ addActionHandler('toggleSavedDialogPinned', (global, actions, payload): ActionRe
 
   const isPinned = selectIsChatPinned(global, id, SAVED_FOLDER_ID);
 
-  const ids = global.chats.orderedPinnedIds.saved;
-  if ((ids?.length || 0) >= limit && !isPinned) {
-    actions.openLimitReachedModal({
-      limit: 'savedDialogsPinned',
-      tabId,
-    });
+  const ids = global.chats.orderedPinnedIds.saved || [];
+  const localPinnedIds = getBygramLocalPinnedIds('saved');
+  const isLocallyPinned = localPinnedIds.includes(id);
+  const serverPinnedIds = ids.filter((pinnedId) => !localPinnedIds.includes(pinnedId));
+
+  if (isLocallyPinned) {
+    removeBygramLocalPinnedId('saved', id);
+    global = {
+      ...global,
+      chats: {
+        ...global.chats,
+        orderedPinnedIds: {
+          ...global.chats.orderedPinnedIds,
+          saved: mergeBygramLocalPinnedIds('saved', serverPinnedIds),
+        },
+      },
+    };
+    setGlobal(global);
     return;
   }
+
+  if (ids.length >= limit && !isPinned) {
+    addBygramLocalPinnedId('saved', id);
+    global = {
+      ...global,
+      chats: {
+        ...global.chats,
+        orderedPinnedIds: {
+          ...global.chats.orderedPinnedIds,
+          saved: mergeBygramLocalPinnedIds('saved', serverPinnedIds),
+        },
+      },
+    };
+    setGlobal(global);
+    return;
+  }
+
   void callApi('toggleSavedDialogPinned', { chat, shouldBePinned: !isPinned });
 });
 

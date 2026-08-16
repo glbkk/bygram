@@ -88,6 +88,10 @@ const LEGACY_GIFT_OPTIONS = [
   { id: '5935895822435615975', emoji: '🤡', titleKey: 'BygramLegacyGiftClownBear' },
   { id: '5969796561943660080', emoji: '🐣', titleKey: 'BygramLegacyGiftEasterBear' },
   { id: '6026193266406327981', emoji: '🔨', titleKey: 'BygramLegacyGiftMayBear' },
+  { id: '5974210632977745012', emoji: '⚽️', titleKey: 'BygramLegacyGiftFootballBear' },
+  { id: '6046178578163303744', emoji: '🪖', titleKey: 'BygramLegacyGiftTacticalBear' },
+  { id: '6046499901846586791', emoji: '🏆', titleKey: 'BygramLegacyGiftGoldenCup' },
+  { id: '6050827940390765935', emoji: '🏆', titleKey: 'BygramLegacyGiftBlueCup' },
 ] as const;
 
 const runThrottledForScroll = throttle((cb) => cb(), SCROLL_THROTTLE, true);
