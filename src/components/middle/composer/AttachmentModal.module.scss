@@ -258,6 +258,32 @@
   font-size: 2rem;
 }
 
+.roundVideoProcessing {
+  position: absolute;
+  z-index: 5;
+  inset: 0;
+
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: center;
+
+  padding: 2rem;
+  border-radius: inherit;
+
+  font-weight: 500;
+  color: var(--color-text);
+  text-align: center;
+
+  background: var(--color-background);
+  backdrop-filter: blur(0.75rem);
+
+  :global(.Loading) {
+    height: auto;
+  }
+}
+
 :global {
   .CustomSendMenu {
     bottom: 2.25rem;

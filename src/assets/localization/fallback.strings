@@ -1,6 +1,10 @@
 "Month1" = "January";
 "BygramSettings" = "bygram";
 "BygramSettingsDesc" = "Локальный архив и защита сообщений";
+"BygramSendAsRoundVideo" = "Отправить как кружок";
+"BygramRoundVideoProcessing" = "Подготовка кружка…";
+"BygramRoundVideoTooLong" = "Для кружка выберите видео не длиннее 1 минуты";
+"BygramRoundVideoFailed" = "Не удалось подготовить кружок";
 "BygramArchiveTitle" = "Архив сообщений";
 "BygramLocalArchive" = "Локальный архив сообщений";
 "BygramLocalArchiveDesc" = "Сохранять текст и метаданные полученных сообщений в IndexedDB";

@@ -8,9 +8,14 @@ export type Result = {
 
 export type CameraFacingMode = 'user' | 'environment';
 
+export type CameraSwitchResult = {
+  facingMode: CameraFacingMode;
+  previewStream: MediaStream;
+};
+
 export type ActiveVideoRecording = {
   previewStream: MediaStream;
-  switchCamera: () => Promise<CameraFacingMode>;
+  switchCamera: () => Promise<CameraSwitchResult>;
   stop: () => Promise<Result>;
   cancel: () => void;
   pause: () => Promise<void>;

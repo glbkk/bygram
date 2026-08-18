@@ -142,7 +142,9 @@ const useVideoRecording = () => {
 
     setIsSwitchingCamera(true);
     try {
-      setCameraFacingMode(await active.switchCamera());
+      const result = await active.switchCamera();
+      setPreviewStream(result.previewStream);
+      setCameraFacingMode(result.facingMode);
     } catch (err) {
       showNotification({ message: { key: 'VideoMessageRecordError' } });
       // eslint-disable-next-line no-console

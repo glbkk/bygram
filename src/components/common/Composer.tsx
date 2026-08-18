@@ -139,6 +139,7 @@ import { MEMO_EMPTY_ARRAY } from '../../util/memo';
 import { getServerTime } from '../../util/serverTime';
 import stopEvent from '../../util/stopEvent';
 import { getUtf8Length } from '../../util/textFormat';
+import { prepareRoundVideo } from '../../util/videoRecording/prepareRoundVideo';
 import windowSize from '../../util/windowSize';
 import applyIosAutoCapitalizationFix from '../middle/composer/helpers/applyIosAutoCapitalizationFix';
 import buildAttachment, {
@@ -1553,20 +1554,28 @@ const Composer = ({
       const ttlSeconds = isViewOnceEnabled ? ONE_TIME_MEDIA_TTL_SECONDS : undefined;
       if (record && record.durationMs >= MIN_ROUND_VIDEO_RECORDING_TIME) {
         const { blob, duration } = record;
-        currentAttachments = [await buildAttachment(
-          VIDEO_RECORDING_FILENAME,
-          blob,
-          {
-            isRoundVideo: true,
-            ttlSeconds,
-            // Telegram requires square metadata for DocumentAttributeVideo.roundMessage.
-            quick: {
-              width: ROUND_VIDEO_RECORDING_SIZE,
-              height: ROUND_VIDEO_RECORDING_SIZE,
-              duration,
+        showNotification({ message: { key: 'BygramRoundVideoProcessing' } });
+        try {
+          const roundBlob = await prepareRoundVideo(blob);
+          currentAttachments = [await buildAttachment(
+            VIDEO_RECORDING_FILENAME,
+            roundBlob,
+            {
+              isRoundVideo: true,
+              ttlSeconds,
+              quick: {
+                width: ROUND_VIDEO_RECORDING_SIZE,
+                height: ROUND_VIDEO_RECORDING_SIZE,
+                duration,
+              },
             },
-          },
-        )];
+          )];
+        } catch (err) {
+          showNotification({ message: { key: 'BygramRoundVideoFailed' } });
+          // eslint-disable-next-line no-console
+          console.error(err);
+          return;
+        }
       }
     }
 

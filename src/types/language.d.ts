@@ -34,6 +34,10 @@ export interface LangPair {
   'BygramExportError': undefined;
   'BygramMessageShot': undefined;
   'BygramMessageShotError': undefined;
+  'BygramSendAsRoundVideo': undefined;
+  'BygramRoundVideoProcessing': undefined;
+  'BygramRoundVideoTooLong': undefined;
+  'BygramRoundVideoFailed': undefined;
   'BygramUnknownSender': undefined;
   'BygramPrivacyTitle': undefined;
   'BygramGhostMode': undefined;

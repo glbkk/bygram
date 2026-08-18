@@ -8,17 +8,25 @@ import { createTimekeeper } from '../voiceRecording';
 import WaveformAnalyser from '../voiceRecording/waveformAnalyser';
 import { createSnapshotRecorder, recordWithMediaRecorder } from './mediaRecorderEngine';
 
-export type { ActiveVideoRecording, CameraFacingMode, Result } from './types';
+export type {
+  ActiveVideoRecording, CameraFacingMode, CameraSwitchResult, Result,
+} from './types';
 
 const FPS = 30;
 const SHOULD_RECORD_CAMERA_DIRECTLY = IS_IOS || IS_SAFARI;
-const VIDEO_CONSTRAINTS: MediaTrackConstraints = {
-  facingMode: 'user',
+const VIDEO_CONSTRAINTS: Omit<MediaTrackConstraints, 'facingMode'> = {
   width: { ideal: 720 },
   height: { ideal: 720 },
   aspectRatio: { ideal: 1 },
   frameRate: { ideal: FPS },
 };
+
+function buildVideoConstraints(facingMode: CameraFacingMode, isExact = false): MediaTrackConstraints {
+  return {
+    ...VIDEO_CONSTRAINTS,
+    facingMode: isExact ? { exact: facingMode } : facingMode,
+  };
+}
 
 const SAMPLE_SIZE = 16;
 const MIN_VISIBLE_LUMINANCE = 10;
@@ -53,8 +61,8 @@ export async function start(
   onTick: (elapsedMs: number) => void,
   onPeak: (peak: number) => void,
 ): Promise<ActiveVideoRecording> {
-  const previewStream = await navigator.mediaDevices.getUserMedia({
-    video: VIDEO_CONSTRAINTS,
+  let previewStream = await navigator.mediaDevices.getUserMedia({
+    video: buildVideoConstraints('user'),
     audio: true,
   });
   let cameraFacingMode: CameraFacingMode = 'user';
@@ -63,6 +71,7 @@ export async function start(
   let isStopped = false;
   let audioContext: AudioContext | undefined;
   let releaseAudioTap: NoneToVoidFunction | undefined;
+  let videoTrackBridge: VideoTrackBridge | undefined;
 
   const videoEl = document.createElement('video');
   videoEl.srcObject = previewStream;
@@ -84,6 +93,7 @@ export async function start(
     void audioContext?.close().catch(() => undefined);
     previewStream.getTracks().forEach((track) => track.stop());
     canvasStream?.getTracks().forEach((track) => track.stop());
+    videoTrackBridge?.release();
     videoEl.pause();
     // eslint-disable-next-line no-null/no-null
     videoEl.srcObject = null;
@@ -106,9 +116,10 @@ export async function start(
     setupAudioTap();
     startDrawing();
 
-    const videoTrack = SHOULD_RECORD_CAMERA_DIRECTLY
-      ? previewStream.getVideoTracks()[0]
-      : canvasStream!.getVideoTracks()[0];
+    if (SHOULD_RECORD_CAMERA_DIRECTLY) {
+      videoTrackBridge = await createVideoTrackBridge(previewStream.getVideoTracks()[0]);
+    }
+    const videoTrack = videoTrackBridge?.outputTrack || canvasStream!.getVideoTracks()[0];
     const audioTrack = previewStream.getAudioTracks()[0];
     engine = recordWithMediaRecorder(videoTrack, audioTrack);
     snapshot = createSnapshotRecorder(videoTrack, audioTrack);
@@ -269,18 +280,34 @@ export async function start(
   return {
     previewStream,
     switchCamera: async () => {
-      if (isStopped) return cameraFacingMode;
-
-      const videoTrack = previewStream.getVideoTracks()[0];
-      if (!videoTrack) throw new Error('Camera track is unavailable');
+      await setupPromise;
+      if (isStopped) return { facingMode: cameraFacingMode, previewStream };
 
       const nextFacingMode: CameraFacingMode = cameraFacingMode === 'user' ? 'environment' : 'user';
-      await videoTrack.applyConstraints({
-        ...VIDEO_CONSTRAINTS,
-        facingMode: { exact: nextFacingMode },
+      const nextStream = await navigator.mediaDevices.getUserMedia({
+        video: buildVideoConstraints(nextFacingMode, true),
+        audio: false,
       });
-      cameraFacingMode = nextFacingMode;
-      return cameraFacingMode;
+      const nextVideoTrack = nextStream.getVideoTracks()[0];
+      if (!nextVideoTrack) {
+        nextStream.getTracks().forEach((track) => track.stop());
+        throw new Error('Replacement camera track is unavailable');
+      }
+
+      const previousVideoTrack = previewStream.getVideoTracks()[0];
+      try {
+        await videoTrackBridge?.replaceTrack(nextVideoTrack);
+        previewStream = new MediaStream([...previewStream.getAudioTracks(), nextVideoTrack]);
+        videoEl.srcObject = previewStream;
+        await videoEl.play();
+        await waitForVisibleFrame(videoEl);
+        previousVideoTrack?.stop();
+        cameraFacingMode = nextFacingMode;
+        return { facingMode: cameraFacingMode, previewStream };
+      } catch (err) {
+        nextVideoTrack.stop();
+        throw err;
+      }
     },
     stop: () => {
       if (stopPromise) {
@@ -355,6 +382,80 @@ export async function start(
     getPlaybackEl: () => playbackVideo,
     destroyPlayback,
   };
+}
+
+type VideoTrackBridge = {
+  outputTrack: MediaStreamTrack;
+  replaceTrack: (track: MediaStreamTrack) => Promise<void>;
+  release: NoneToVoidFunction;
+};
+
+async function createVideoTrackBridge(inputTrack: MediaStreamTrack): Promise<VideoTrackBridge> {
+  const source = new RTCPeerConnection();
+  const sink = new RTCPeerConnection();
+  const sender = source.addTrack(inputTrack, new MediaStream([inputTrack]));
+  const outputTrackPromise = new Promise<MediaStreamTrack>((resolve) => {
+    sink.addEventListener('track', (event) => resolve(event.track), { once: true });
+  });
+
+  try {
+    await source.setLocalDescription(await source.createOffer());
+    await waitForIceGathering(source);
+    await sink.setRemoteDescription(source.localDescription!);
+    await sink.setLocalDescription(await sink.createAnswer());
+    await waitForIceGathering(sink);
+    await source.setRemoteDescription(sink.localDescription!);
+    await waitForPeerConnection(source);
+
+    const outputTrack = await outputTrackPromise;
+    return {
+      outputTrack,
+      replaceTrack: (track) => sender.replaceTrack(track),
+      release: () => {
+        outputTrack.stop();
+        source.close();
+        sink.close();
+      },
+    };
+  } catch (err) {
+    source.close();
+    sink.close();
+    throw err;
+  }
+}
+
+function waitForPeerConnection(connection: RTCPeerConnection) {
+  if (connection.connectionState === 'connected') return Promise.resolve();
+
+  return new Promise<void>((resolve, reject) => {
+    const timeoutId = window.setTimeout(() => finish(new Error('Camera bridge connection timed out')), 5000);
+    function finish(error?: Error) {
+      clearTimeout(timeoutId);
+      connection.removeEventListener('connectionstatechange', handleStateChange);
+      if (error) reject(error);
+      else resolve();
+    }
+    function handleStateChange() {
+      if (connection.connectionState === 'connected') finish();
+      if (connection.connectionState === 'failed' || connection.connectionState === 'closed') {
+        finish(new Error('Camera bridge connection failed'));
+      }
+    }
+    connection.addEventListener('connectionstatechange', handleStateChange);
+  });
+}
+
+function waitForIceGathering(connection: RTCPeerConnection) {
+  if (connection.iceGatheringState === 'complete') return Promise.resolve();
+
+  return new Promise<void>((resolve) => {
+    const handleStateChange = () => {
+      if (connection.iceGatheringState !== 'complete') return;
+      connection.removeEventListener('icegatheringstatechange', handleStateChange);
+      resolve();
+    };
+    connection.addEventListener('icegatheringstatechange', handleStateChange);
+  });
 }
 
 async function resolveMediaDuration(media: HTMLVideoElement) {

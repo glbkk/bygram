@@ -12,9 +12,12 @@ import type { RichEditor } from './richEditorTypes';
 import {
   BASE_EMOJI_KEYWORD_LANG,
   EDITABLE_INPUT_MODAL_ID,
+  MAX_ROUND_VIDEO_RECORDING_DURATION,
+  ROUND_VIDEO_RECORDING_SIZE,
   SUPPORTED_AUDIO_CONTENT_TYPES,
   SUPPORTED_PHOTO_CONTENT_TYPES,
   SUPPORTED_VIDEO_CONTENT_TYPES,
+  VIDEO_RECORDING_FILENAME,
 } from '../../../config';
 import { requestMeasure, requestMutation } from '../../../lib/fasterdom/fasterdom';
 import { getAttachmentMediaType } from '../../../global/helpers';
@@ -30,6 +33,7 @@ import { validateFiles } from '../../../util/files';
 import { formatStarsAsIcon } from '../../../util/localization/format';
 import { removeAllSelections } from '../../../util/selection';
 import { openSystemFilesDialog } from '../../../util/systemFilesDialog';
+import { prepareRoundVideo } from '../../../util/videoRecording/prepareRoundVideo';
 import { buildRichMessageFromFormatted, getRichInputAsFormatted } from '../../ui/textInput/richText';
 import buildAttachment from './helpers/buildAttachment';
 import getFilesFromDataTransferItems from './helpers/getFilesFromDataTransferItems';
@@ -46,6 +50,7 @@ import useResizeObserver from '../../../hooks/useResizeObserver';
 
 import Button from '../../ui/Button';
 import DropdownMenu from '../../ui/DropdownMenu';
+import Loading from '../../ui/Loading';
 import MediaEditor from '../../ui/mediaEditor/MediaEditor';
 import MenuItem from '../../ui/MenuItem';
 import Modal from '../../ui/Modal';
@@ -151,6 +156,7 @@ const AttachmentModal = ({
   const {
     addRecentCustomEmoji, addRecentEmoji, updateAttachmentSettings, resetMessageMediaEditorRequest,
     updateShouldSaveAttachmentsCompression, openAiMessageEditorModal, clearAiMessageEditorPendingResult,
+    showNotification,
   } = getActions();
 
   const lang = useLang();
@@ -199,6 +205,7 @@ const AttachmentModal = ({
     attachmentSettings.shouldSendInHighQuality,
   );
   const [renderingShouldSendInHighQuality, setRenderingShouldSendInHighQuality] = useState(shouldSendInHighQuality);
+  const [isConvertingRoundVideo, setIsConvertingRoundVideo] = useState(false);
 
   const isOpen = Boolean(attachments.length);
   const renderingIsOpen = Boolean(renderingAttachments?.length);
@@ -345,7 +352,7 @@ const AttachmentModal = ({
   const sendAttachments = useLastCallback((
     isSilent?: boolean, scheduledAt?: number | true, scheduleRepeatPeriod?: number,
   ) => {
-    if (!isOpen) return;
+    if (!isOpen || isConvertingRoundVideo) return;
 
     const shouldSendScheduled = (shouldSchedule || scheduledAt) && isForMessage && !editingMessage;
     if (shouldSendScheduled) {
@@ -390,6 +397,38 @@ const AttachmentModal = ({
 
   const handleSendClick = useLastCallback(() => {
     sendAttachments();
+  });
+
+  const handleConvertToRoundVideo = useLastCallback(async () => {
+    const attachment = attachments.length === 1 ? attachments[0] : undefined;
+    const duration = attachment?.quick?.duration;
+    if (!attachment?.blob || duration === undefined || attachment.isRoundVideo) return;
+
+    if (duration * 1000 > MAX_ROUND_VIDEO_RECORDING_DURATION) {
+      showNotification({ message: { key: 'BygramRoundVideoTooLong' } });
+      return;
+    }
+
+    setIsConvertingRoundVideo(true);
+    showNotification({ message: { key: 'BygramRoundVideoProcessing' } });
+    try {
+      const blob = await prepareRoundVideo(attachment.blob);
+      const roundAttachment = await buildAttachment(VIDEO_RECORDING_FILENAME, blob, {
+        isRoundVideo: true,
+        quick: {
+          width: ROUND_VIDEO_RECORDING_SIZE,
+          height: ROUND_VIDEO_RECORDING_SIZE,
+          duration,
+        },
+      });
+      onAttachmentsUpdate([roundAttachment]);
+    } catch (err) {
+      showNotification({ message: { key: 'BygramRoundVideoFailed' } });
+      // eslint-disable-next-line no-console
+      console.error(err);
+    } finally {
+      setIsConvertingRoundVideo(false);
+    }
   });
 
   const handleScheduleClick = useLastCallback(() => {
@@ -677,6 +716,13 @@ const AttachmentModal = ({
               )}
               {hasMedia && (
                 <>
+                  {renderingAttachments?.length === 1
+                    && SUPPORTED_VIDEO_CONTENT_TYPES.has(renderingAttachments[0].mimeType)
+                    && !renderingAttachments[0].isRoundVideo && (
+                    <MenuItem icon="round-video" onClick={handleConvertToRoundVideo}>
+                      {lang('BygramSendAsRoundVideo')}
+                    </MenuItem>
+                  )}
                   {
                     canInvertMedia && (!isInvertedMedia ? (
 
@@ -782,6 +828,12 @@ const AttachmentModal = ({
         data-attach-description={lang('AttachmentDragAddItems')}
         data-dropzone
       >
+        {isConvertingRoundVideo && (
+          <div className={styles.roundVideoProcessing}>
+            <Loading />
+            <span>{lang('BygramRoundVideoProcessing')}</span>
+          </div>
+        )}
         <svg className={styles.dropOutlineContainer}>
           <rect className={styles.dropOutline} x="0" y="0" width="100%" height="100%" rx="8" />
         </svg>
@@ -863,6 +915,7 @@ const AttachmentModal = ({
                 className={styles.send}
                 size="smaller"
                 inline
+                disabled={isConvertingRoundVideo}
                 onClick={handleSendClick}
                 onContextMenu={canShowCustomSendMenu ? handleContextMenu : undefined}
                 iconName={!editingMessage && !shouldSchedule && !paidMessagesStars ? 'new-send' : undefined}
