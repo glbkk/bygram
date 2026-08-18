@@ -19,6 +19,8 @@ const useVideoRecording = () => {
   const [isVideoRecordingReady, setIsVideoRecordingReady] = useState(false);
   const [isVideoRecordingPaused, setIsVideoRecordingPaused] = useState(false);
   const [isRecordingFinished, setIsRecordingFinished] = useState(false);
+  const [cameraFacingMode, setCameraFacingMode] = useState<videoRecording.CameraFacingMode>('user');
+  const [isSwitchingCamera, setIsSwitchingCamera] = useState(false);
 
   const activeRecordingRef = useRef<videoRecording.ActiveVideoRecording>();
   const resultPromiseRef = useRef<Promise<videoRecording.Result>>();
@@ -35,6 +37,8 @@ const useVideoRecording = () => {
     setIsVideoRecordingReady(false);
     setIsVideoRecordingPaused(false);
     setIsRecordingFinished(false);
+    setCameraFacingMode('user');
+    setIsSwitchingCamera(false);
   });
 
   const finishRecordingVideo = useLastCallback(() => {
@@ -132,6 +136,22 @@ const useVideoRecording = () => {
     setIsVideoRecordingPaused(false);
   });
 
+  const switchRecordingCamera = useLastCallback(async () => {
+    const active = activeRecordingRef.current;
+    if (!active || !isVideoRecordingReady || isSwitchingCamera || resultPromiseRef.current) return;
+
+    setIsSwitchingCamera(true);
+    try {
+      setCameraFacingMode(await active.switchCamera());
+    } catch (err) {
+      showNotification({ message: { key: 'VideoMessageRecordError' } });
+      // eslint-disable-next-line no-console
+      console.error(err);
+    } finally {
+      setIsSwitchingCamera(false);
+    }
+  });
+
   const stopRecordingVideo = useLastCallback(() => {
     startTokenRef.current += 1;
     const promise = resultPromiseRef.current ?? activeRecordingRef.current?.stop();
@@ -189,12 +209,15 @@ const useVideoRecording = () => {
     discardRecordingVideo,
     pauseRecordingVideo,
     resumeRecordingVideo,
+    switchRecordingCamera,
     activeVideoRecording,
     previewStream,
     isVideoRecordingStarting,
     isVideoRecordingReady,
     isVideoRecordingPaused,
     isRecordingFinished,
+    cameraFacingMode,
+    isSwitchingCamera,
     getProgress,
     subscribeToVideoRecordingPeaks,
   };

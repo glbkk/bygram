@@ -6,8 +6,11 @@ export type Result = {
   height: number;
 };
 
+export type CameraFacingMode = 'user' | 'environment';
+
 export type ActiveVideoRecording = {
   previewStream: MediaStream;
+  switchCamera: () => Promise<CameraFacingMode>;
   stop: () => Promise<Result>;
   cancel: () => void;
   pause: () => Promise<void>;

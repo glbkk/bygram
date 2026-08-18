@@ -1084,7 +1084,10 @@ async function uploadMedia(message: ApiMessage, attachment: ApiAttachment, onPro
     return uploadFile(file, progressCallback);
   };
 
-  const isVideo = SUPPORTED_VIDEO_CONTENT_TYPES.has(mimeType);
+  // Round videos recorded by WebKit must always take the video-document path,
+  // even when Safari reports a non-standard MP4 MIME type.
+  const isVideo = Boolean(isRoundVideo) || SUPPORTED_VIDEO_CONTENT_TYPES.has(mimeType);
+  const uploadMimeType = isRoundVideo ? 'video/mp4' : mimeType;
   const shouldUploadThumb = audio || isVideo || shouldSendAsFile;
 
   const [inputFile, thumb] = await Promise.all(compact([
@@ -1140,7 +1143,7 @@ async function uploadMedia(message: ApiMessage, attachment: ApiAttachment, onPro
 
   return new GramJs.InputMediaUploadedDocument({
     file: inputFile,
-    mimeType,
+    mimeType: uploadMimeType,
     attributes,
     thumb,
     forceFile: shouldSendAsFile,

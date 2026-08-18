@@ -6,6 +6,9 @@ import { requestMutation } from '../../../lib/fasterdom/fasterdom';
 import buildClassName from '../../../util/buildClassName';
 import safePlay from '../../../util/safePlay';
 
+import useLang from '../../../hooks/useLang';
+
+import Icon from '../../common/icons/Icon';
 import Skeleton from '../../ui/placeholder/Skeleton';
 import Portal from '../../ui/Portal';
 
@@ -17,6 +20,9 @@ type OwnProps = {
   isReady?: boolean;
   isPaused?: boolean;
   isFrozen?: boolean;
+  facingMode: 'user' | 'environment';
+  isSwitchingCamera?: boolean;
+  onSwitchCamera: NoneToVoidFunction;
   getProgress: () => number;
   getPlaybackEl?: () => HTMLVideoElement | undefined;
 };
@@ -33,8 +39,10 @@ const POSTER_CAPTURE_PROGRESS = MAX_ROUND_VIDEO_RECORDING_DURATION > POSTER_CAPT
   : 0.5;
 
 const RoundVideoRecorder = ({
-  ref, previewStream, isReady, isPaused, isFrozen, getProgress, getPlaybackEl,
+  ref, previewStream, isReady, isPaused, isFrozen, facingMode, isSwitchingCamera,
+  onSwitchCamera, getProgress, getPlaybackEl,
 }: OwnProps) => {
+  const lang = useLang();
   const videoRef = useRef<HTMLVideoElement>();
   const posterRef = useRef<HTMLCanvasElement>();
   const circleRef = useRef<SVGCircleElement>();
@@ -136,7 +144,11 @@ const RoundVideoRecorder = ({
         />
         <video
           ref={videoRef}
-          className={buildClassName(styles.video, isFrozen && styles.hidden)}
+          className={buildClassName(
+            styles.video,
+            facingMode === 'user' && styles.mirrored,
+            isFrozen && styles.hidden,
+          )}
         />
         <div ref={playbackLayerRef} className={styles.playbackLayer} />
         <div className={buildClassName(styles.waitingMask, isReady && styles.waitingMaskHidden)}>
@@ -155,6 +167,15 @@ const RoundVideoRecorder = ({
             stroke-dashoffset={CIRCUMFERENCE}
           />
         </svg>
+        <button
+          type="button"
+          className={buildClassName(styles.switchCamera, isSwitchingCamera && styles.switchingCamera)}
+          aria-label={lang('VoipFlip')}
+          disabled={!isReady || isPaused || isFrozen || isSwitchingCamera}
+          onClick={onSwitchCamera}
+        >
+          <Icon name="flip" />
+        </button>
       </div>
     </Portal>
   );

@@ -49,6 +49,7 @@ import {
   MAX_UPLOAD_FILEPART_SIZE,
   MIN_ROUND_VIDEO_RECORDING_TIME,
   ONE_TIME_MEDIA_TTL_SECONDS,
+  ROUND_VIDEO_RECORDING_SIZE,
   SCHEDULED_WHEN_ONLINE,
   SEND_MESSAGE_ACTION_INTERVAL,
   SERVICE_NOTIFICATIONS_USER_ID,
@@ -844,12 +845,15 @@ const Composer = ({
     discardRecordingVideo,
     pauseRecordingVideo,
     resumeRecordingVideo,
+    switchRecordingCamera,
     activeVideoRecording,
     previewStream,
     isVideoRecordingStarting,
     isVideoRecordingReady,
     isVideoRecordingPaused,
     isRecordingFinished,
+    cameraFacingMode,
+    isSwitchingCamera,
     getProgress,
     subscribeToVideoRecordingPeaks,
   } = useVideoRecording();
@@ -1548,16 +1552,19 @@ const Composer = ({
       const record = await stopRecordingVideo();
       const ttlSeconds = isViewOnceEnabled ? ONE_TIME_MEDIA_TTL_SECONDS : undefined;
       if (record && record.durationMs >= MIN_ROUND_VIDEO_RECORDING_TIME) {
-        const {
-          blob, duration, width, height,
-        } = record;
+        const { blob, duration } = record;
         currentAttachments = [await buildAttachment(
           VIDEO_RECORDING_FILENAME,
           blob,
           {
             isRoundVideo: true,
             ttlSeconds,
-            quick: { width, height, duration },
+            // Telegram requires square metadata for DocumentAttributeVideo.roundMessage.
+            quick: {
+              width: ROUND_VIDEO_RECORDING_SIZE,
+              height: ROUND_VIDEO_RECORDING_SIZE,
+              duration,
+            },
           },
         )];
       }
@@ -2894,6 +2901,9 @@ const Composer = ({
               isReady={isVideoRecordingReady}
               isPaused={isVideoRecordingPaused}
               isFrozen={isRecordingFinished}
+              facingMode={cameraFacingMode}
+              isSwitchingCamera={isSwitchingCamera}
+              onSwitchCamera={switchRecordingCamera}
               getProgress={getProgress}
               getPlaybackEl={renderedVideoRecording?.getPlaybackEl}
             />

@@ -1,4 +1,6 @@
-import type { ActiveVideoRecording, Result, VideoRecorderEngine } from './types';
+import type {
+  ActiveVideoRecording, CameraFacingMode, Result, VideoRecorderEngine,
+} from './types';
 
 import { ROUND_VIDEO_RECORDING_SIZE } from '../../config';
 import { IS_IOS, IS_SAFARI } from '../browser/windowEnvironment';
@@ -6,7 +8,7 @@ import { createTimekeeper } from '../voiceRecording';
 import WaveformAnalyser from '../voiceRecording/waveformAnalyser';
 import { createSnapshotRecorder, recordWithMediaRecorder } from './mediaRecorderEngine';
 
-export type { ActiveVideoRecording, Result } from './types';
+export type { ActiveVideoRecording, CameraFacingMode, Result } from './types';
 
 const FPS = 30;
 const SHOULD_RECORD_CAMERA_DIRECTLY = IS_IOS || IS_SAFARI;
@@ -55,6 +57,7 @@ export async function start(
     video: VIDEO_CONSTRAINTS,
     audio: true,
   });
+  let cameraFacingMode: CameraFacingMode = 'user';
 
   let rafId: number | undefined;
   let isStopped = false;
@@ -265,6 +268,20 @@ export async function start(
 
   return {
     previewStream,
+    switchCamera: async () => {
+      if (isStopped) return cameraFacingMode;
+
+      const videoTrack = previewStream.getVideoTracks()[0];
+      if (!videoTrack) throw new Error('Camera track is unavailable');
+
+      const nextFacingMode: CameraFacingMode = cameraFacingMode === 'user' ? 'environment' : 'user';
+      await videoTrack.applyConstraints({
+        ...VIDEO_CONSTRAINTS,
+        facingMode: { exact: nextFacingMode },
+      });
+      cameraFacingMode = nextFacingMode;
+      return cameraFacingMode;
+    },
     stop: () => {
       if (stopPromise) {
         return stopPromise;
