@@ -49,7 +49,6 @@ import {
   MAX_UPLOAD_FILEPART_SIZE,
   MIN_ROUND_VIDEO_RECORDING_TIME,
   ONE_TIME_MEDIA_TTL_SECONDS,
-  ROUND_VIDEO_RECORDING_SIZE,
   SCHEDULED_WHEN_ONLINE,
   SEND_MESSAGE_ACTION_INTERVAL,
   SERVICE_NOTIFICATIONS_USER_ID,
@@ -1549,14 +1548,16 @@ const Composer = ({
       const record = await stopRecordingVideo();
       const ttlSeconds = isViewOnceEnabled ? ONE_TIME_MEDIA_TTL_SECONDS : undefined;
       if (record && record.durationMs >= MIN_ROUND_VIDEO_RECORDING_TIME) {
-        const { blob, duration } = record;
+        const {
+          blob, duration, width, height,
+        } = record;
         currentAttachments = [await buildAttachment(
           VIDEO_RECORDING_FILENAME,
           blob,
           {
             isRoundVideo: true,
             ttlSeconds,
-            quick: { width: ROUND_VIDEO_RECORDING_SIZE, height: ROUND_VIDEO_RECORDING_SIZE, duration },
+            quick: { width, height, duration },
           },
         )];
       }

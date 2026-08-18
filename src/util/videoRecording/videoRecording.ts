@@ -1,6 +1,7 @@
 import type { ActiveVideoRecording, Result, VideoRecorderEngine } from './types';
 
 import { ROUND_VIDEO_RECORDING_SIZE } from '../../config';
+import { IS_IOS, IS_SAFARI } from '../browser/windowEnvironment';
 import { createTimekeeper } from '../voiceRecording';
 import WaveformAnalyser from '../voiceRecording/waveformAnalyser';
 import { createSnapshotRecorder, recordWithMediaRecorder } from './mediaRecorderEngine';
@@ -8,10 +9,12 @@ import { createSnapshotRecorder, recordWithMediaRecorder } from './mediaRecorder
 export type { ActiveVideoRecording, Result } from './types';
 
 const FPS = 30;
+const SHOULD_RECORD_CAMERA_DIRECTLY = IS_IOS || IS_SAFARI;
 const VIDEO_CONSTRAINTS: MediaTrackConstraints = {
   facingMode: 'user',
   width: { ideal: 720 },
   height: { ideal: 720 },
+  aspectRatio: { ideal: 1 },
   frameRate: { ideal: FPS },
 };
 
@@ -67,9 +70,9 @@ export async function start(
   canvas.width = ROUND_VIDEO_RECORDING_SIZE;
   canvas.height = ROUND_VIDEO_RECORDING_SIZE;
   const ctx = canvas.getContext('2d')!;
-  const canvasStream = canvas.captureStream(FPS);
+  const canvasStream = SHOULD_RECORD_CAMERA_DIRECTLY ? undefined : canvas.captureStream(FPS);
 
-  const watermarkCanvas = await createWatermarkCanvas();
+  const watermarkCanvas = SHOULD_RECORD_CAMERA_DIRECTLY ? undefined : await createWatermarkCanvas();
 
   const release = () => {
     isStopped = true;
@@ -77,7 +80,7 @@ export async function start(
     releaseAudioTap?.();
     void audioContext?.close().catch(() => undefined);
     previewStream.getTracks().forEach((track) => track.stop());
-    canvasStream.getTracks().forEach((track) => track.stop());
+    canvasStream?.getTracks().forEach((track) => track.stop());
     videoEl.pause();
     // eslint-disable-next-line no-null/no-null
     videoEl.srcObject = null;
@@ -100,10 +103,12 @@ export async function start(
     setupAudioTap();
     startDrawing();
 
-    const canvasVideoTrack = canvasStream.getVideoTracks()[0];
+    const videoTrack = SHOULD_RECORD_CAMERA_DIRECTLY
+      ? previewStream.getVideoTracks()[0]
+      : canvasStream!.getVideoTracks()[0];
     const audioTrack = previewStream.getAudioTracks()[0];
-    engine = recordWithMediaRecorder(canvasVideoTrack, audioTrack);
-    snapshot = createSnapshotRecorder(canvasVideoTrack, audioTrack);
+    engine = recordWithMediaRecorder(videoTrack, audioTrack);
+    snapshot = createSnapshotRecorder(videoTrack, audioTrack);
 
     if (isStopped) {
       snapshot?.finish();
@@ -158,7 +163,7 @@ export async function start(
 
     const sourceWidth = videoEl.videoWidth;
     const sourceHeight = videoEl.videoHeight;
-    if (sourceWidth && sourceHeight) {
+    if (!SHOULD_RECORD_CAMERA_DIRECTLY && sourceWidth && sourceHeight) {
       const side = Math.min(sourceWidth, sourceHeight);
       const offsetX = (sourceWidth - side) / 2;
       const offsetY = (sourceHeight - side) / 2;
@@ -181,7 +186,7 @@ export async function start(
 
       ctx.fillStyle = `rgba(0, 0, 0, ${BACKGROUND_DIM_ALPHA})`;
       ctx.fillRect(0, 0, ROUND_VIDEO_RECORDING_SIZE, ROUND_VIDEO_RECORDING_SIZE);
-      ctx.drawImage(watermarkCanvas, 0, 0);
+      ctx.drawImage(watermarkCanvas!, 0, 0);
 
       ctx.save();
       ctx.beginPath();
@@ -284,12 +289,17 @@ export async function start(
         snapshot?.finish();
         try {
           const blob = await engine.finalize();
+          const videoSettings = previewStream.getVideoTracks()[0]?.getSettings();
           return {
             blob,
             duration: Math.round(durationMs / 1000),
             durationMs,
-            width: ROUND_VIDEO_RECORDING_SIZE,
-            height: ROUND_VIDEO_RECORDING_SIZE,
+            width: SHOULD_RECORD_CAMERA_DIRECTLY
+              ? videoSettings?.width || videoEl.videoWidth || ROUND_VIDEO_RECORDING_SIZE
+              : ROUND_VIDEO_RECORDING_SIZE,
+            height: SHOULD_RECORD_CAMERA_DIRECTLY
+              ? videoSettings?.height || videoEl.videoHeight || ROUND_VIDEO_RECORDING_SIZE
+              : ROUND_VIDEO_RECORDING_SIZE,
           };
         } finally {
           release();

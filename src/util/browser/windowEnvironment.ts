@@ -67,11 +67,10 @@ export const IS_VOICE_RECORDING_SUPPORTED = Boolean(
 export const IS_VIDEO_RECORDING_SUPPORTED = Boolean(
   window.navigator.mediaDevices && 'getUserMedia' in window.navigator.mediaDevices
   && typeof MediaRecorder !== 'undefined'
-  && 'captureStream' in HTMLCanvasElement.prototype
-  // WebKit (Safari and all iOS browsers) canvas.captureStream produces invalid frames / can hang on stop
-  && !IS_SAFARI && !IS_IOS
   && (MediaRecorder.isTypeSupported(VIDEO_RECORDING_MIME_TYPE)
-    || MediaRecorder.isTypeSupported('video/mp4')),
+    || MediaRecorder.isTypeSupported('video/mp4'))
+  // WebKit records the camera stream directly because canvas.captureStream produces invalid frames on iOS.
+  && ((IS_SAFARI || IS_IOS) || 'captureStream' in HTMLCanvasElement.prototype),
 );
 export const IS_EMOJI_SUPPORTED = PLATFORM_ENV && (IS_MAC_OS || IS_IOS) && isLastEmojiVersionSupported();
 
