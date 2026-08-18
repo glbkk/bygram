@@ -9,6 +9,8 @@ import type {
 export const APP_CODE_NAME = 'A';
 export const APP_ENV = import.meta.env.TG_APP_ENV;
 export const APP_NAME = import.meta.env.TG_APP_NAME || `Telegram Web ${APP_CODE_NAME}`;
+export const BYGRAM_DEVICE_MODEL = 'iPhone';
+export const BYGRAM_SYSTEM_VERSION = 'iOS';
 
 export const PRODUCTION_HOSTNAME = 'web.telegram.org';
 export const PRODUCTION_URL = 'https://web.telegram.org/a';
@@ -346,7 +348,7 @@ export const ACCEPTABLE_USERNAME_ERRORS = new Set([USERNAME_PURCHASE_ERROR, 'USE
 export const TME_WEB_DOMAINS = new Set([
   't.me', 'telegram.me', 'telegram.dog', 'web.t.me', 'a.t.me', 'k.t.me', 'z.t.me',
 ]);
-export const WEB_APP_PLATFORM = 'weba';
+export const WEB_APP_PLATFORM = 'ios';
 export const LANG_PACK = 'weba';
 
 export const NSFW_RESTRICTION_REASON = 'sensitive';

@@ -19,7 +19,8 @@ import type {
 
 import {
   APP_CODE_NAME,
-  DEBUG, DEBUG_GRAMJS, IS_TEST, LANG_PACK, TELEGRAM_API_HASH, TELEGRAM_API_ID, UPLOAD_WORKERS,
+  BYGRAM_DEVICE_MODEL, BYGRAM_SYSTEM_VERSION, DEBUG, DEBUG_GRAMJS, IS_TEST, LANG_PACK,
+  TELEGRAM_API_HASH, TELEGRAM_API_ID, UPLOAD_WORKERS,
 } from '../../../config';
 import { pause } from '../../../util/schedulers';
 import { buildWebPage } from '../apiBuilders/messageContent';
@@ -72,9 +73,6 @@ import downloadMediaWithClient, { parseMediaUrl } from './media';
 
 import { ChatAbortController } from '../ChatAbortController';
 
-const DEFAULT_USER_AGENT = 'Unknown UserAgent';
-const DEFAULT_PLATFORM = 'Unknown platform';
-
 GramJsLogger.setLevel(DEBUG_GRAMJS ? 'debug' : 'warn');
 
 const gramJsUpdateEventBuilder = { build: (update: Update) => update };
@@ -92,7 +90,7 @@ export async function init(initialArgs: ApiInitialArgs, onConnected?: NoneToVoid
   }
 
   const {
-    userAgent, platform, sessionData, isWebmSupported, maxBufferSize, webAuthToken, dcId,
+    platform, sessionData, isWebmSupported, maxBufferSize, webAuthToken, dcId,
     mockScenario, shouldForceHttpTransport, shouldAllowHttpTransport,
     shouldDebugExportedSenders, langCode, isTestServerRequested, accountIds,
     hasPasskeySupport,
@@ -109,8 +107,8 @@ export async function init(initialArgs: ApiInitialArgs, onConnected?: NoneToVoid
     TELEGRAM_API_ID,
     TELEGRAM_API_HASH,
     {
-      deviceModel: navigator.userAgent || userAgent || DEFAULT_USER_AGENT,
-      systemVersion: platform || DEFAULT_PLATFORM,
+      deviceModel: BYGRAM_DEVICE_MODEL,
+      systemVersion: BYGRAM_SYSTEM_VERSION,
       appVersion: `${APP_VERSION} ${APP_CODE_NAME}`,
       useWSS: true,
       additionalDcsDisabled: IS_TEST,
