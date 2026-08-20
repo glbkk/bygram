@@ -67,6 +67,7 @@ type BaseOwnProps = {
   noAvatar?: boolean;
   className?: string;
   iconElement?: React.ReactNode;
+  afterElement?: React.ReactNode;
   rightElement?: React.ReactNode;
   onClick?: VoidFunction;
   onEmojiStatusClick?: VoidFunction;
@@ -131,6 +132,7 @@ const PrivateChatInfo = ({
   noAvatar,
   isSynced,
   iconElement,
+  afterElement,
   rightElement,
   onClick,
   onEmojiStatusClick,
@@ -262,6 +264,7 @@ const PrivateChatInfo = ({
             isSavedMessages={isSavedMessages}
             isSavedDialog={isSavedDialog}
             iconElement={iconElement}
+            afterElement={afterElement}
             onEmojiStatusClick={onEmojiStatusClick}
           />
           <RankBadge
@@ -286,6 +289,7 @@ const PrivateChatInfo = ({
         isSavedDialog={isSavedDialog}
         onEmojiStatusClick={onEmojiStatusClick}
         iconElement={iconElement}
+        afterElement={afterElement}
       />
     );
   }

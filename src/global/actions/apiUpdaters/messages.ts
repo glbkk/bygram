@@ -20,6 +20,7 @@ import {
   getBygramSettings,
   markArchivedMessagesDeleted,
 } from '../../../util/bygramArchive';
+import { recordBygramStreakMessage } from '../../../util/bygramStreak';
 import { isUserId } from '../../../util/entities/ids';
 import { getCurrentTabId } from '../../../util/establishMultitabRole';
 import {
@@ -271,6 +272,12 @@ addActionHandler('apiUpdate', (global, actions, update): ActionReturnType => {
       } : message;
 
       void archiveNewMessage(nextMessage);
+      if (isUserId(chatId) && global.currentUserId) {
+        const peerUser = selectUser(global, chatId);
+        if (!peerUser || !isUserBot(peerUser)) {
+          recordBygramStreakMessage(global.currentUserId, nextMessage);
+        }
+      }
 
       global = updateWithLocalMedia(global, chatId, id, true, nextMessage);
       global = updateListedAndViewportIds(global, nextMessage);

@@ -4,7 +4,7 @@ import {
 import { getActions, withGlobal } from '../../global';
 
 import type {
-  ApiChat, ApiSticker, ApiTypingStatus,
+  ApiChat, ApiSticker, ApiTypingStatus, ApiUser,
 } from '../../api/types';
 import type { GlobalState } from '../../global/types';
 import type { Signal } from '../../util/signals';
@@ -16,7 +16,7 @@ import {
   MIN_SCREEN_WIDTH_FOR_STATIC_LEFT_COLUMN,
 } from '../../config';
 import {
-  getIsSavedDialog,
+  getIsSavedDialog, isUserBot,
 } from '../../global/helpers';
 import {
   selectChat,
@@ -28,6 +28,7 @@ import {
   selectPinnedIds,
   selectScheduledIds,
   selectTabState,
+  selectUser,
 } from '../../global/selectors';
 import {
   selectThreadLocalStateParam, selectThreadMessagesCount,
@@ -45,6 +46,7 @@ import useLongPress from '../../hooks/useLongPress';
 import usePreviousDeprecated from '../../hooks/usePreviousDeprecated';
 import useWindowSize from '../../hooks/window/useWindowSize';
 
+import BygramStreakBadge from '../common/BygramStreakBadge';
 import GroupChatInfo from '../common/GroupChatInfo';
 import PrivateChatInfo from '../common/PrivateChatInfo';
 import UnreadCounter from '../common/UnreadCounter';
@@ -85,6 +87,8 @@ type StateProps = {
   isFetchingDifference?: boolean;
   emojiStatusSticker?: ApiSticker;
   emojiStatusSlug?: string;
+  currentUserId?: string;
+  user?: ApiUser;
 };
 
 const MiddleHeader = ({
@@ -108,6 +112,8 @@ const MiddleHeader = ({
   getLoadingPinnedId,
   emojiStatusSticker,
   emojiStatusSlug,
+  currentUserId,
+  user,
   isSavedDialog,
   onFocusPinnedMessage,
 }: OwnProps & StateProps) => {
@@ -309,6 +315,9 @@ const MiddleHeader = ({
               storyViewerOrigin={StoryViewerOrigin.MiddleHeaderAvatar}
               emojiStatusSize={EMOJI_STATUS_SIZE}
               noRtl
+              afterElement={currentUserId && user && !isUserBot(user) && !isChatWithSelf ? (
+                <BygramStreakBadge accountId={currentUserId} peerId={displayChatId} />
+              ) : undefined}
               onEmojiStatusClick={handleUserStatusClick}
             />
           ) : (
@@ -388,6 +397,7 @@ export default memo(withGlobal<OwnProps>(
     } = selectTabState(global);
     const chat = selectChat(global, chatId);
     const peer = selectPeer(global, chatId);
+    const user = isUserId(chatId) ? selectUser(global, chatId) : undefined;
 
     const isSavedDialog = getIsSavedDialog(chatId, threadId, global.currentUserId);
 
@@ -424,6 +434,8 @@ export default memo(withGlobal<OwnProps>(
       emojiStatusSticker,
       emojiStatusSlug,
       isSavedDialog,
+      currentUserId: global.currentUserId,
+      user,
     };
   },
 )(MiddleHeader));

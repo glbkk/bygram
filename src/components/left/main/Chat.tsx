@@ -23,6 +23,7 @@ import { StoryViewerOrigin, type TopicsInfo } from '../../../types';
 import { ALL_FOLDER_ID, UNMUTE_TIMESTAMP } from '../../../config';
 import {
   groupStatefulContent,
+  isUserBot,
   isUserOnline,
 } from '../../../global/helpers';
 import { getIsChatMuted } from '../../../global/helpers/notifications';
@@ -68,6 +69,7 @@ import useShowTransitionDeprecated from '../../../hooks/useShowTransitionDepreca
 import useChatListEntry from './hooks/useChatListEntry';
 
 import Avatar from '../../common/Avatar';
+import BygramStreakBadge from '../../common/BygramStreakBadge';
 import DeleteChatModal from '../../common/DeleteChatModal';
 import FullNameTitle from '../../common/FullNameTitle';
 import Icon from '../../common/icons/Icon';
@@ -467,6 +469,9 @@ const Chat: FC<OwnProps & StateProps> = ({
             isSavedDialog={isSavedDialog}
             observeIntersection={observeIntersection}
             withStatusTextColor={isSelected}
+            afterElement={isUserId(chatId) && user && !user.isSelf && !isUserBot(user) ? (
+              <BygramStreakBadge accountId={currentUserId} peerId={chatId} />
+            ) : undefined}
           />
           {isMuted && !isSavedDialog && <Icon name="muted" />}
           <div className="separator" />

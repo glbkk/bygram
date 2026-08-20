@@ -1,0 +1,37 @@
+.root {
+  display: inline-flex;
+  flex: none;
+  gap: 0.0625rem;
+  align-items: center;
+
+  min-width: 1.75rem;
+  height: 1.25rem;
+  padding: 0 0.3125rem 0 0.1875rem;
+  border: 1px solid rgb(255 126 54 / 35%);
+  border-radius: 0.625rem;
+
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1;
+  color: #f06a25;
+
+  background: linear-gradient(135deg, rgb(255 224 176 / 65%), rgb(255 242 220 / 35%));
+  box-shadow: 0 0.125rem 0.5rem rgb(255 111 35 / 12%);
+
+  :global(.theme-dark) & {
+    border-color: rgb(255 142 72 / 28%);
+    color: #ff9859;
+    background: rgb(255 126 54 / 12%);
+  }
+
+  :global(.selected) & {
+    border-color: rgb(255 255 255 / 35%);
+    color: white;
+    background: rgb(255 255 255 / 18%);
+  }
+}
+
+.flame {
+  font-size: 0.875rem;
+  line-height: 1;
+}

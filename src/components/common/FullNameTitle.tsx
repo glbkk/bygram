@@ -53,6 +53,7 @@ type OwnProps = {
   noLoopLimit?: boolean;
   canCopyTitle?: boolean;
   iconElement?: React.ReactNode;
+  afterElement?: React.ReactNode;
   withStatusTextColor?: boolean;
   onEmojiStatusClick?: NoneToVoidFunction;
   observeIntersection?: ObserveFn;
@@ -73,6 +74,7 @@ const FullNameTitle = ({
   noLoopLimit,
   canCopyTitle,
   iconElement,
+  afterElement,
   isMonoforum,
   monoforumBadgeClassName,
   withStatusTextColor,
@@ -193,6 +195,7 @@ const FullNameTitle = ({
         </>
       )}
       {iconElement}
+      {afterElement}
     </div>
   );
 };
