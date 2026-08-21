@@ -1,10 +1,13 @@
 import { memo, useEffect, useState } from '../../../lib/teact/teact';
-import { getActions } from '../../../global';
+import { getActions, getGlobal } from '../../../global';
 
+import type { ApiSticker } from '../../../api/types';
 import type {
   BygramArchiveStats, BygramMessageBubbleStyle, BygramSettings,
 } from '../../../util/bygramArchive';
+import { ApiMediaFormat } from '../../../api/types';
 
+import { getMediaThumbUri, getStickerMediaHash } from '../../../global/helpers';
 import {
   BYGRAM_GIFT_BUBBLE_THEMES,
   clearBygramArchive,
@@ -12,6 +15,7 @@ import {
   getBygramSettings,
   updateBygramSettings,
 } from '../../../util/bygramArchive';
+import * as mediaLoader from '../../../util/mediaLoader';
 
 import useFlag from '../../../hooks/useFlag';
 import useHistoryBack from '../../../hooks/useHistoryBack';
@@ -19,6 +23,7 @@ import useLang from '../../../hooks/useLang';
 import useLastCallback from '../../../hooks/useLastCallback';
 
 import Island, { IslandDescription, IslandTitle } from '../../gili/layout/Island';
+import StickerPicker from '../../middle/composer/StickerPicker';
 import Checkbox from '../../ui/Checkbox';
 import ConfirmDialog from '../../ui/ConfirmDialog';
 import ListItem from '../../ui/ListItem';
@@ -43,23 +48,53 @@ const BUBBLE_STYLES: Array<{
   background: string;
 }> = [
   { id: 'default', label: 'Обычный', background: 'var(--color-background-own)' },
+  { id: 'plush-pepe', label: 'Plush Pepe', background: BYGRAM_GIFT_BUBBLE_THEMES['plush-pepe']!.background },
   { id: 'homemade-cake', label: 'Домашний торт', background: BYGRAM_GIFT_BUBBLE_THEMES['homemade-cake']!.background },
-  { id: 'jelly-bunny', label: 'Желейный кролик', background: BYGRAM_GIFT_BUBBLE_THEMES['jelly-bunny']!.background },
+  { id: 'jelly-bunny', label: 'Jelly Bunny', background: BYGRAM_GIFT_BUBBLE_THEMES['jelly-bunny']!.background },
+  { id: 'bow-tie', label: 'Bow Tie', background: BYGRAM_GIFT_BUBBLE_THEMES['bow-tie']!.background },
+  { id: 'hanging-star', label: 'Hanging Star', background: BYGRAM_GIFT_BUBBLE_THEMES['hanging-star']!.background },
+  { id: 'trapped-heart', label: 'Trapped Heart', background: BYGRAM_GIFT_BUBBLE_THEMES['trapped-heart']!.background },
+  { id: 'rare-bird', label: 'Rare Bird', background: BYGRAM_GIFT_BUBBLE_THEMES['rare-bird']!.background },
+  { id: 'sharp-tongue', label: 'Sharp Tongue', background: BYGRAM_GIFT_BUBBLE_THEMES['sharp-tongue']!.background },
+  { id: 'nail-bracelet', label: 'Nail Bracelet', background: BYGRAM_GIFT_BUBBLE_THEMES['nail-bracelet']!.background },
+  { id: 'ginger-cookie', label: 'Ginger Cookie', background: BYGRAM_GIFT_BUBBLE_THEMES['ginger-cookie']!.background },
+  { id: 'fresh-socks', label: 'Fresh Socks', background: BYGRAM_GIFT_BUBBLE_THEMES['fresh-socks']!.background },
+  {
+    id: 'liberty-figure', label: 'Liberty Figure', background: BYGRAM_GIFT_BUBBLE_THEMES['liberty-figure']!.background,
+  },
   { id: 'spiced-wine', label: 'Пряное вино', background: BYGRAM_GIFT_BUBBLE_THEMES['spiced-wine']!.background },
   { id: 'santa-hat', label: 'Шапка Санты', background: BYGRAM_GIFT_BUBBLE_THEMES['santa-hat']!.background },
   { id: 'ocean', label: 'Океан', background: 'linear-gradient(145deg, #1687FF, #0066E6)' },
   { id: 'violet', label: 'Фиолетовый', background: 'linear-gradient(145deg, #9B6DFF, #6C45E8)' },
   { id: 'sunset', label: 'Закат', background: 'linear-gradient(145deg, #FF7A59, #E94373)' },
   { id: 'mint', label: 'Мятный', background: 'linear-gradient(145deg, #20BFA9, #078B83)' },
-  { id: 'custom', label: 'Свой цвет', background: '' },
+  { id: 'custom', label: 'Конструктор', background: '' },
 ];
+
+async function loadStickerPreview(sticker: ApiSticker) {
+  const thumbnail = getMediaThumbUri(sticker);
+  if (thumbnail) return thumbnail;
+
+  const mediaUrl = await mediaLoader.fetch(getStickerMediaHash(sticker, 'preview'), ApiMediaFormat.BlobUrl);
+  const response = await fetch(mediaUrl);
+  const blob = await response.blob();
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
 
 function SettingsBygram({ isActive, onReset }: OwnProps) {
   const { showNotification } = getActions();
   const [settings, setSettings] = useState<BygramSettings>(() => getBygramSettings());
   const [stats, setStats] = useState<BygramArchiveStats>(EMPTY_STATS);
+  const [isStickerLoading, setIsStickerLoading] = useState(false);
   const [isClearDialogOpen, openClearDialog, closeClearDialog] = useFlag();
+  const [isStickerPickerOpen, openStickerPicker, closeStickerPicker] = useFlag();
   const lang = useLang();
+  const currentUserId = getGlobal().currentUserId;
 
   useHistoryBack({ isActive, onBack: onReset });
 
@@ -88,6 +123,33 @@ function SettingsBygram({ isActive, onReset }: OwnProps) {
       messageBubbleStyle: 'custom',
       messageBubbleColor: event.currentTarget.value.toUpperCase(),
     }));
+  });
+
+  const handleBubbleEndColorChange = useLastCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    setSettings(updateBygramSettings({
+      messageBubbleStyle: 'custom',
+      messageBubbleColorEnd: event.currentTarget.value.toUpperCase(),
+    }));
+  });
+
+  const handleStickerSelect = useLastCallback(async (sticker: ApiSticker) => {
+    setIsStickerLoading(true);
+    try {
+      const image = await loadStickerPreview(sticker);
+      setSettings(updateBygramSettings({
+        messageBubbleStyle: 'custom',
+        messageBubbleStickerImage: image,
+      }));
+      closeStickerPicker();
+    } catch {
+      showNotification({ message: 'Не удалось загрузить миниатюру стикера' });
+    } finally {
+      setIsStickerLoading(false);
+    }
+  });
+
+  const handleRemoveSticker = useLastCallback(() => {
+    setSettings(updateBygramSettings({ messageBubbleStickerImage: undefined }));
   });
 
   const renderMediaLimit = useLastCallback((index: number) => {
@@ -149,8 +211,11 @@ function SettingsBygram({ isActive, onReset }: OwnProps) {
         <div className={styles.bubbleGrid} role="radiogroup" aria-label={lang('BygramBubbleTitle')}>
           {BUBBLE_STYLES.map(({ id, label, background }) => {
             const isSelected = settings.messageBubbleStyle === id;
-            const previewBackground = id === 'custom' ? settings.messageBubbleColor : background;
-            const giftImage = BYGRAM_GIFT_BUBBLE_THEMES[id]?.image;
+            const previewBackground = id === 'custom' && settings.isMessageBubbleGradientEnabled
+              ? `linear-gradient(145deg, ${settings.messageBubbleColor}, ${settings.messageBubbleColorEnd})`
+              : id === 'custom' ? settings.messageBubbleColor : background;
+            const giftImage = BYGRAM_GIFT_BUBBLE_THEMES[id]?.image
+              || (id === 'custom' ? settings.messageBubbleStickerImage : undefined);
             return (
               <button
                 type="button"
@@ -160,7 +225,15 @@ function SettingsBygram({ isActive, onReset }: OwnProps) {
                 onClick={() => handleBubbleStyleChange(id)}
               >
                 <span className={styles.bubblePreview} style={`background: ${previewBackground}`}>
-                  {giftImage && <img src={giftImage} alt="" className={styles.bubbleGift} />}
+                  {giftImage && (
+                    <img
+                      src={giftImage}
+                      alt=""
+                      className={`${styles.bubbleGift} ${
+                        settings.isMessageBubbleGiftAnimated ? styles.animatedGift : ''
+                      }`}
+                    />
+                  )}
                   <span className={styles.previewLine} />
                   <span className={styles.previewLineShort} />
                 </span>
@@ -170,19 +243,73 @@ function SettingsBygram({ isActive, onReset }: OwnProps) {
           })}
         </div>
         {settings.messageBubbleStyle === 'custom' && (
-          <label className={styles.customColorRow}>
-            <input
-              className={styles.colorInput}
-              type="color"
-              value={settings.messageBubbleColor}
-              aria-label={lang('BygramBubbleCustomColor')}
-              onChange={handleBubbleColorChange}
+          <div className={styles.constructor}>
+            <div className={styles.colorControls}>
+              <label className={styles.colorControl}>
+                <span>Начало фона</span>
+                <input
+                  className={styles.colorInput}
+                  type="color"
+                  value={settings.messageBubbleColor}
+                  aria-label="Начальный цвет пузыря"
+                  onChange={handleBubbleColorChange}
+                />
+              </label>
+              <label className={styles.colorControl}>
+                <span>Конец фона</span>
+                <input
+                  className={styles.colorInput}
+                  type="color"
+                  value={settings.messageBubbleColorEnd}
+                  aria-label="Конечный цвет пузыря"
+                  disabled={!settings.isMessageBubbleGradientEnabled}
+                  onChange={handleBubbleEndColorChange}
+                />
+              </label>
+            </div>
+            <Checkbox
+              label="Градиентный фон"
+              checked={settings.isMessageBubbleGradientEnabled}
+              onCheck={(value) => setSettings(updateBygramSettings({ isMessageBubbleGradientEnabled: value }))}
             />
-            <span className={styles.colorLabel}>
-              <span>{lang('BygramBubbleCustomColor')}</span>
-              <span className={styles.colorValue}>{settings.messageBubbleColor}</span>
-            </span>
-          </label>
+            <div className={styles.stickerActions}>
+              <button
+                type="button"
+                className={styles.constructorButton}
+                onClick={isStickerPickerOpen ? closeStickerPicker : openStickerPicker}
+              >
+                {isStickerPickerOpen
+                  ? 'Закрыть наборы'
+                  : settings.messageBubbleStickerImage ? 'Заменить стикер' : 'Выбрать стикер'}
+              </button>
+              {settings.messageBubbleStickerImage && (
+                <button type="button" className={styles.removeButton} onClick={handleRemoveSticker}>Убрать</button>
+              )}
+            </div>
+            {isStickerPickerOpen && currentUserId && (
+              <div className={styles.stickerPickerShell}>
+                <StickerPicker
+                  className=""
+                  chatId={currentUserId}
+                  idPrefix="bygram-bubble"
+                  isForSelection
+                  loadAndPlay
+                  canSendStickers={false}
+                  noContextMenus
+                  onStickerSelect={handleStickerSelect}
+                />
+                {isStickerLoading && <div className={styles.pickerLoading}>Сохраняю стикер…</div>}
+              </div>
+            )}
+          </div>
+        )}
+        {settings.messageBubbleStyle !== 'default' && (
+          <Checkbox
+            label="Анимация подарка"
+            subLabel="Лёгкое движение без дополнительной нагрузки на чат"
+            checked={settings.isMessageBubbleGiftAnimated}
+            onCheck={(value) => setSettings(updateBygramSettings({ isMessageBubbleGiftAnimated: value }))}
+          />
         )}
       </Island>
       <IslandDescription dir={lang.isRtl ? 'rtl' : undefined}>

@@ -1,9 +1,19 @@
 import type { ApiMessage } from '../api/types';
 
+import bowTieGift from '../assets/bygram/gifts/bow-tie.svg';
+import freshSocksGift from '../assets/bygram/gifts/fresh-socks.svg';
+import gingerCookieGift from '../assets/bygram/gifts/ginger-cookie.svg';
+import hangingStarGift from '../assets/bygram/gifts/hanging-star.svg';
 import homemadeCakeGift from '../assets/bygram/gifts/homemade-cake.svg';
 import jellyBunnyGift from '../assets/bygram/gifts/jelly-bunny.svg';
+import libertyFigureGift from '../assets/bygram/gifts/liberty-figure.svg';
+import nailBraceletGift from '../assets/bygram/gifts/nail-bracelet.svg';
+import plushPepeGift from '../assets/bygram/gifts/plush-pepe.svg';
+import rareBirdGift from '../assets/bygram/gifts/rare-bird.svg';
 import santaHatGift from '../assets/bygram/gifts/santa-hat.svg';
+import sharpTongueGift from '../assets/bygram/gifts/sharp-tongue.svg';
 import spicedWineGift from '../assets/bygram/gifts/spiced-wine.svg';
+import trappedHeartGift from '../assets/bygram/gifts/trapped-heart.svg';
 
 export type BygramSettings = {
   isArchiveEnabled: boolean;
@@ -14,10 +24,17 @@ export type BygramSettings = {
   mediaArchiveLimitMb: number;
   messageBubbleStyle: BygramMessageBubbleStyle;
   messageBubbleColor: string;
+  messageBubbleColorEnd: string;
+  isMessageBubbleGradientEnabled: boolean;
+  isMessageBubbleGiftAnimated: boolean;
+  messageBubbleStickerImage?: string;
 };
 
 export type BygramMessageBubbleStyle = 'default' | 'ocean' | 'violet' | 'sunset' | 'mint'
-  | 'homemade-cake' | 'jelly-bunny' | 'spiced-wine' | 'santa-hat' | 'custom';
+  | 'homemade-cake' | 'jelly-bunny' | 'spiced-wine' | 'santa-hat'
+  | 'plush-pepe' | 'bow-tie' | 'hanging-star' | 'trapped-heart' | 'rare-bird'
+  | 'sharp-tongue' | 'nail-bracelet' | 'ginger-cookie' | 'fresh-socks' | 'liberty-figure'
+  | 'custom';
 
 export const BYGRAM_GIFT_BUBBLE_THEMES: Partial<Record<BygramMessageBubbleStyle, {
   image: string;
@@ -25,6 +42,12 @@ export const BYGRAM_GIFT_BUBBLE_THEMES: Partial<Record<BygramMessageBubbleStyle,
   tail: string;
   text: string;
 }>> = {
+  'plush-pepe': {
+    image: plushPepeGift,
+    background: 'linear-gradient(145deg, #D9FFD5 0%, #70D67E 58%, #2D8C62 100%)',
+    tail: '#2D8C62',
+    text: '#173D31',
+  },
   'homemade-cake': {
     image: homemadeCakeGift,
     background: 'linear-gradient(145deg, #FFF0C7 0%, #FFB28E 58%, #F27A83 100%)',
@@ -36,6 +59,60 @@ export const BYGRAM_GIFT_BUBBLE_THEMES: Partial<Record<BygramMessageBubbleStyle,
     background: 'linear-gradient(145deg, #D8FBFF 0%, #83D8FF 52%, #6B8CFF 100%)',
     tail: '#6B8CFF',
     text: '#15345E',
+  },
+  'bow-tie': {
+    image: bowTieGift,
+    background: 'linear-gradient(145deg, #E9D8FF 0%, #A27AFF 54%, #5B3AC3 100%)',
+    tail: '#5B3AC3',
+    text: '#2F1C68',
+  },
+  'hanging-star': {
+    image: hangingStarGift,
+    background: 'linear-gradient(145deg, #FFF4B8 0%, #FFD45A 55%, #E69A28 100%)',
+    tail: '#E69A28',
+    text: '#5A3B12',
+  },
+  'trapped-heart': {
+    image: trappedHeartGift,
+    background: 'linear-gradient(145deg, #DDF8FF 0%, #8DDDF3 48%, #E75E8D 100%)',
+    tail: '#E75E8D',
+    text: '#3E3155',
+  },
+  'rare-bird': {
+    image: rareBirdGift,
+    background: 'linear-gradient(145deg, #D7FFF6 0%, #63D7CF 48%, #426EDB 100%)',
+    tail: '#426EDB',
+    text: '#143F52',
+  },
+  'sharp-tongue': {
+    image: sharpTongueGift,
+    background: 'linear-gradient(145deg, #FFB1C5 0%, #D94F7D 52%, #6D234E 100%)',
+    tail: '#6D234E',
+    text: '#FFFFFF',
+  },
+  'nail-bracelet': {
+    image: nailBraceletGift,
+    background: 'linear-gradient(145deg, #FFF1B8 0%, #DDB652 52%, #8D6327 100%)',
+    tail: '#8D6327',
+    text: '#493312',
+  },
+  'ginger-cookie': {
+    image: gingerCookieGift,
+    background: 'linear-gradient(145deg, #FFE2B1 0%, #C87935 55%, #75401F 100%)',
+    tail: '#75401F',
+    text: '#FFF8E9',
+  },
+  'fresh-socks': {
+    image: freshSocksGift,
+    background: 'linear-gradient(145deg, #D5F8FF 0%, #62CBEA 48%, #FF718D 100%)',
+    tail: '#FF718D',
+    text: '#24415D',
+  },
+  'liberty-figure': {
+    image: libertyFigureGift,
+    background: 'linear-gradient(145deg, #D7FFF2 0%, #69C9B2 55%, #277A70 100%)',
+    tail: '#277A70',
+    text: '#17453F',
   },
   'spiced-wine': {
     image: spicedWineGift,
@@ -97,6 +174,9 @@ const DEFAULT_SETTINGS: BygramSettings = {
   mediaArchiveLimitMb: 256,
   messageBubbleStyle: 'default',
   messageBubbleColor: '#7C5CFC',
+  messageBubbleColorEnd: '#4E8BFF',
+  isMessageBubbleGradientEnabled: true,
+  isMessageBubbleGiftAnimated: true,
 };
 
 let databasePromise: Promise<IDBDatabase> | undefined;
@@ -130,8 +210,16 @@ function applyMessageBubbleStyle(nextSettings: BygramSettings) {
   };
 
   const giftTheme = BYGRAM_GIFT_BUBBLE_THEMES[nextSettings.messageBubbleStyle];
+  const customStickerImage = nextSettings.messageBubbleStyle === 'custom'
+    ? nextSettings.messageBubbleStickerImage
+    : undefined;
+  const giftImage = giftTheme?.image || customStickerImage;
   root.classList.toggle('bygram-custom-message-bubble', isCustom);
-  root.classList.toggle('bygram-gift-message-bubble', Boolean(giftTheme));
+  root.classList.toggle('bygram-gift-message-bubble', Boolean(giftImage));
+  root.classList.toggle(
+    'bygram-animated-message-bubble',
+    Boolean(giftImage && nextSettings.isMessageBubbleGiftAnimated),
+  );
   if (!isCustom) {
     root.style.removeProperty('--bygram-own-bubble-background');
     root.style.removeProperty('--bygram-own-bubble-tail');
@@ -141,8 +229,12 @@ function applyMessageBubbleStyle(nextSettings: BygramSettings) {
   }
 
   const customColor = normalizeHexColor(nextSettings.messageBubbleColor);
+  const customColorEnd = normalizeHexColor(nextSettings.messageBubbleColorEnd);
+  const customBackground = nextSettings.isMessageBubbleGradientEnabled
+    ? `linear-gradient(145deg, ${customColor} 0%, ${customColorEnd} 100%)`
+    : customColor;
   const selectedStyle = nextSettings.messageBubbleStyle === 'custom'
-    ? { background: customColor, tail: customColor }
+    ? { background: customBackground, tail: nextSettings.isMessageBubbleGradientEnabled ? customColorEnd : customColor }
     : giftTheme || styles[nextSettings.messageBubbleStyle as keyof typeof styles];
   const textColor = giftTheme?.text || (nextSettings.messageBubbleStyle === 'custom'
     ? getContrastTextColor(customColor)
@@ -150,8 +242,8 @@ function applyMessageBubbleStyle(nextSettings: BygramSettings) {
   root.style.setProperty('--bygram-own-bubble-background', selectedStyle.background);
   root.style.setProperty('--bygram-own-bubble-tail', selectedStyle.tail);
   root.style.setProperty('--bygram-own-bubble-text', textColor);
-  if (giftTheme) {
-    root.style.setProperty('--bygram-own-bubble-gift', `url("${giftTheme.image}")`);
+  if (giftImage) {
+    root.style.setProperty('--bygram-own-bubble-gift', `url("${giftImage}")`);
   } else {
     root.style.removeProperty('--bygram-own-bubble-gift');
   }

@@ -63,6 +63,7 @@ type OwnProps = {
     sticker: ApiSticker, isSilent?: boolean, shouldSchedule?: boolean, canUpdateStickerSetsOrder?: boolean,
   ) => void;
   isForEffects?: boolean;
+  isForSelection?: boolean;
 };
 
 type StateProps = {
@@ -103,6 +104,7 @@ const StickerPicker: FC<OwnProps & StateProps> = ({
   idPrefix,
   onStickerSelect,
   isForEffects,
+  isForSelection,
 }) => {
   const {
     loadRecentStickers,
@@ -219,13 +221,14 @@ const StickerPicker: FC<OwnProps & StateProps> = ({
   useEffect(() => {
     if (!loadAndPlay) return;
     loadRecentStickers();
+    if (isForSelection) return;
     if (!canSendStickers) return;
     sendMessageAction({ type: 'chooseSticker' });
-  }, [canSendStickers, loadAndPlay, loadRecentStickers, sendMessageAction]);
+  }, [canSendStickers, isForSelection, loadAndPlay, loadRecentStickers, sendMessageAction]);
 
   const canRenderContents = useAsyncRendering([], SLIDE_TRANSITION_DURATION);
   const shouldRenderContents = areAddedLoaded && canRenderContents
-    && !noPopulatedSets && (canSendStickers || isForEffects);
+    && !noPopulatedSets && (canSendStickers || isForEffects || isForSelection);
 
   useHorizontalScroll(headerRef, !shouldRenderContents || !headerRef.current);
 
@@ -247,7 +250,9 @@ const StickerPicker: FC<OwnProps & StateProps> = ({
 
   const handleStickerSelect = useLastCallback((sticker: ApiSticker, isSilent?: boolean, shouldSchedule?: boolean) => {
     onStickerSelect(sticker, isSilent, shouldSchedule, true);
-    addRecentSticker({ sticker });
+    if (!isForSelection) {
+      addRecentSticker({ sticker });
+    }
   });
 
   const handleStickerUnfave = useLastCallback((sticker: ApiSticker) => {
@@ -259,7 +264,7 @@ const StickerPicker: FC<OwnProps & StateProps> = ({
   });
 
   const handleMouseMove = useLastCallback(() => {
-    if (!canSendStickers) return;
+    if (!canSendStickers || isForSelection) return;
     sendMessageAction({ type: 'chooseSticker' });
   });
 
@@ -337,12 +342,12 @@ const StickerPicker: FC<OwnProps & StateProps> = ({
     !shouldHideTopBorder && styles.headerWithBorder,
   );
 
-  const isLoading = !shouldRenderContents && (canSendStickers || isForEffects) && !noPopulatedSets;
+  const isLoading = !shouldRenderContents && (canSendStickers || isForEffects || isForSelection) && !noPopulatedSets;
 
   return (
     <Transition className={fullClassName} activeKey={isLoading ? 0 : 1} name="fade" shouldCleanup>
       {!shouldRenderContents ? (
-        !canSendStickers && !isForEffects ? (
+        !canSendStickers && !isForEffects && !isForSelection ? (
           <div className={styles.pickerDisabled}>{lang('ErrorSendRestrictedStickersAll')}</div>
         ) : noPopulatedSets ? (
           <div className={styles.pickerDisabled}>{lang('NoStickers')}</div>

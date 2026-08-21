@@ -506,6 +506,24 @@
     }
   }
 
+  .bygram-animated-message-bubble .Message.own &.has-solid-background::after {
+    transform-origin: 50% 65%;
+    animation: bygram-gift-corner-motion 5.2s ease-in-out infinite;
+  }
+
+  @keyframes bygram-gift-corner-motion {
+    0%, 68%, 100% { transform: rotate(0deg) scale(1); }
+    76% { transform: rotate(-7deg) scale(1.06); }
+    84% { transform: rotate(6deg) scale(1.04); }
+    92% { transform: rotate(-3deg) scale(1.02); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bygram-animated-message-bubble .Message.own &.has-solid-background::after {
+      animation: none;
+    }
+  }
+
   &.has-solid-background {
     --surface-breakout-margin: -0.5rem;
 
