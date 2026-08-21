@@ -22,6 +22,7 @@ type OwnProps = {
   isFrozen?: boolean;
   facingMode: 'user' | 'environment';
   isSwitchingCamera?: boolean;
+  isCameraSwitchAvailable?: boolean;
   onSwitchCamera: NoneToVoidFunction;
   getProgress: () => number;
   getPlaybackEl?: () => HTMLVideoElement | undefined;
@@ -40,7 +41,7 @@ const POSTER_CAPTURE_PROGRESS = MAX_ROUND_VIDEO_RECORDING_DURATION > POSTER_CAPT
 
 const RoundVideoRecorder = ({
   ref, previewStream, isReady, isPaused, isFrozen, facingMode, isSwitchingCamera,
-  onSwitchCamera, getProgress, getPlaybackEl,
+  isCameraSwitchAvailable, onSwitchCamera, getProgress, getPlaybackEl,
 }: OwnProps) => {
   const lang = useLang();
   const videoRef = useRef<HTMLVideoElement>();
@@ -171,7 +172,7 @@ const RoundVideoRecorder = ({
           type="button"
           className={buildClassName(styles.switchCamera, isSwitchingCamera && styles.switchingCamera)}
           aria-label={lang('VoipFlip')}
-          disabled={!isReady || isPaused || isFrozen || isSwitchingCamera}
+          disabled={!isReady || !isCameraSwitchAvailable || isPaused || isFrozen || isSwitchingCamera}
           onClick={onSwitchCamera}
         >
           <Icon name="flip" />

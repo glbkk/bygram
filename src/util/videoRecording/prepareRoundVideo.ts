@@ -9,6 +9,10 @@ let loadPromise: Promise<void> | undefined;
 let conversionQueue = Promise.resolve();
 let nextFileId = 0;
 
+const FFMPEG_LOAD_TIMEOUT_MS = 30000;
+const FFMPEG_EXEC_TIMEOUT_MS = 60000;
+const FFMPEG_OPERATION_GRACE_MS = 5000;
+
 export function prepareRoundVideo(blob: Blob): Promise<Blob> {
   const conversion = conversionQueue.then(() => convertToRoundVideo(blob));
   conversionQueue = conversion.then(() => undefined, () => undefined);
@@ -25,7 +29,7 @@ async function convertToRoundVideo(blob: Blob) {
 
   try {
     await instance.writeFile(inputPath, new Uint8Array(await blob.arrayBuffer()));
-    const exitCode = await instance.exec([
+    const exitCode = await withTimeout(instance.exec([
       '-i', inputPath,
       '-t', '60',
       '-map', '0:v:0',
@@ -43,13 +47,18 @@ async function convertToRoundVideo(blob: Blob) {
       '-ar', '48000',
       '-movflags', '+faststart',
       outputPath,
-    ]);
+    ], FFMPEG_EXEC_TIMEOUT_MS), FFMPEG_EXEC_TIMEOUT_MS + FFMPEG_OPERATION_GRACE_MS, () => {
+      resetFFmpeg(instance);
+    });
     if (exitCode !== 0) throw new Error(`Round video conversion failed with code ${exitCode}`);
 
     const output = await instance.readFile(outputPath);
     if (typeof output === 'string') throw new Error('Round video conversion returned invalid data');
     const bytes = new Uint8Array(output);
     return new Blob([bytes.buffer], { type: 'video/mp4' });
+  } catch (err) {
+    resetFFmpeg(instance);
+    throw err;
   } finally {
     await Promise.allSettled([
       instance.deleteFile(inputPath),
@@ -61,8 +70,37 @@ async function convertToRoundVideo(blob: Blob) {
 async function getFFmpeg() {
   if (!ffmpeg) ffmpeg = new FFmpeg();
   if (!loadPromise) {
-    loadPromise = ffmpeg.load({ coreURL, wasmURL }).then(() => undefined);
+    const instance = ffmpeg;
+    loadPromise = withTimeout(instance.load({ coreURL, wasmURL }), FFMPEG_LOAD_TIMEOUT_MS, () => {
+      resetFFmpeg(instance);
+    }).then(() => undefined).catch((err) => {
+      resetFFmpeg(instance);
+      throw err;
+    });
   }
   await loadPromise;
   return ffmpeg;
+}
+
+function resetFFmpeg(instance: FFmpeg) {
+  if (ffmpeg !== instance) return;
+  instance.terminate();
+  ffmpeg = undefined;
+  loadPromise = undefined;
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, onTimeout: NoneToVoidFunction) {
+  return new Promise<T>((resolve, reject) => {
+    const timeoutId = window.setTimeout(() => {
+      onTimeout();
+      reject(new Error('Round video processing timed out'));
+    }, timeoutMs);
+    promise.then((result) => {
+      clearTimeout(timeoutId);
+      resolve(result);
+    }, (error) => {
+      clearTimeout(timeoutId);
+      reject(error);
+    });
+  });
 }

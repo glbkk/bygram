@@ -43,6 +43,8 @@ const BACKGROUND_DIM_ALPHA = 0.1;
 
 const PEAK_TAP_BUFFER_SIZE = 2048;
 const PLAYBACK_DURATION_TIMEOUT_MS = 2000;
+const CAMERA_PREVIEW_TIMEOUT_MS = 5000;
+const CAMERA_BRIDGE_TIMEOUT_MS = 3000;
 
 const WATERMARK_TEXT = 'TELEGRAM';
 const WATERMARK_ALPHA = 0.9;
@@ -107,7 +109,7 @@ export async function start(
   let snapshot: ReturnType<typeof createSnapshotRecorder> | undefined;
 
   const setupPromise = (async () => {
-    await videoEl.play();
+    await withTimeout(videoEl.play(), CAMERA_PREVIEW_TIMEOUT_MS, 'Camera preview timed out');
     await waitForVisibleFrame(videoEl);
     if (isStopped) return;
 
@@ -117,9 +119,17 @@ export async function start(
     startDrawing();
 
     if (SHOULD_RECORD_CAMERA_DIRECTLY) {
-      videoTrackBridge = await createVideoTrackBridge(previewStream.getVideoTracks()[0]);
+      try {
+        videoTrackBridge = await createVideoTrackBridge(previewStream.getVideoTracks()[0]);
+      } catch (err) {
+        // Safari can block local peer connections in some privacy/network configurations.
+        // Recording must still work; only live camera switching becomes unavailable.
+        // eslint-disable-next-line no-console
+        console.warn('Camera switching bridge is unavailable', err);
+      }
     }
-    const videoTrack = videoTrackBridge?.outputTrack || canvasStream!.getVideoTracks()[0];
+    const videoTrack = videoTrackBridge?.outputTrack
+      || (SHOULD_RECORD_CAMERA_DIRECTLY ? previewStream.getVideoTracks()[0] : canvasStream!.getVideoTracks()[0]);
     const audioTrack = previewStream.getAudioTracks()[0];
     engine = recordWithMediaRecorder(videoTrack, audioTrack);
     snapshot = createSnapshotRecorder(videoTrack, audioTrack);
@@ -374,6 +384,7 @@ export async function start(
       snapshot?.resume();
     },
     whenReady: setupPromise,
+    canSwitchCamera: () => Boolean(videoTrackBridge),
     getElapsedMs: () => timekeeper?.getElapsedMs() ?? 0,
     getProfilePeaks: () => analyser.getCurrentPeaks(),
     get getPlaybackMedia() {
@@ -393,6 +404,8 @@ type VideoTrackBridge = {
 async function createVideoTrackBridge(inputTrack: MediaStreamTrack): Promise<VideoTrackBridge> {
   const source = new RTCPeerConnection();
   const sink = new RTCPeerConnection();
+  const sourceIce = forwardIceCandidates(source, sink);
+  const sinkIce = forwardIceCandidates(sink, source);
   const sender = source.addTrack(inputTrack, new MediaStream([inputTrack]));
   const outputTrackPromise = new Promise<MediaStreamTrack>((resolve) => {
     sink.addEventListener('track', (event) => resolve(event.track), { once: true });
@@ -400,24 +413,30 @@ async function createVideoTrackBridge(inputTrack: MediaStreamTrack): Promise<Vid
 
   try {
     await source.setLocalDescription(await source.createOffer());
-    await waitForIceGathering(source);
     await sink.setRemoteDescription(source.localDescription!);
+    await sourceIce.flush();
     await sink.setLocalDescription(await sink.createAnswer());
-    await waitForIceGathering(sink);
     await source.setRemoteDescription(sink.localDescription!);
+    await sinkIce.flush();
     await waitForPeerConnection(source);
 
-    const outputTrack = await outputTrackPromise;
+    const outputTrack = await withTimeout(
+      outputTrackPromise, CAMERA_BRIDGE_TIMEOUT_MS, 'Camera bridge output timed out',
+    );
     return {
       outputTrack,
       replaceTrack: (track) => sender.replaceTrack(track),
       release: () => {
+        sourceIce.release();
+        sinkIce.release();
         outputTrack.stop();
         source.close();
         sink.close();
       },
     };
   } catch (err) {
+    sourceIce.release();
+    sinkIce.release();
     source.close();
     sink.close();
     throw err;
@@ -425,36 +444,72 @@ async function createVideoTrackBridge(inputTrack: MediaStreamTrack): Promise<Vid
 }
 
 function waitForPeerConnection(connection: RTCPeerConnection) {
-  if (connection.connectionState === 'connected') return Promise.resolve();
+  if (isPeerConnectionReady(connection)) return Promise.resolve();
 
   return new Promise<void>((resolve, reject) => {
-    const timeoutId = window.setTimeout(() => finish(new Error('Camera bridge connection timed out')), 5000);
+    let isFinished = false;
+    const timeoutId = window.setTimeout(
+      () => finish(new Error('Camera bridge connection timed out')), CAMERA_BRIDGE_TIMEOUT_MS,
+    );
     function finish(error?: Error) {
+      if (isFinished) return;
+      isFinished = true;
       clearTimeout(timeoutId);
       connection.removeEventListener('connectionstatechange', handleStateChange);
+      connection.removeEventListener('iceconnectionstatechange', handleStateChange);
       if (error) reject(error);
       else resolve();
     }
     function handleStateChange() {
-      if (connection.connectionState === 'connected') finish();
-      if (connection.connectionState === 'failed' || connection.connectionState === 'closed') {
+      if (isPeerConnectionReady(connection)) finish();
+      if (connection.connectionState === 'failed' || connection.connectionState === 'closed'
+        || connection.iceConnectionState === 'failed' || connection.iceConnectionState === 'closed') {
         finish(new Error('Camera bridge connection failed'));
       }
     }
     connection.addEventListener('connectionstatechange', handleStateChange);
+    connection.addEventListener('iceconnectionstatechange', handleStateChange);
+    handleStateChange();
   });
 }
 
-function waitForIceGathering(connection: RTCPeerConnection) {
-  if (connection.iceGatheringState === 'complete') return Promise.resolve();
+function isPeerConnectionReady(connection: RTCPeerConnection) {
+  return connection.connectionState === 'connected'
+    || connection.iceConnectionState === 'connected'
+    || connection.iceConnectionState === 'completed';
+}
 
-  return new Promise<void>((resolve) => {
-    const handleStateChange = () => {
-      if (connection.iceGatheringState !== 'complete') return;
-      connection.removeEventListener('icegatheringstatechange', handleStateChange);
-      resolve();
-    };
-    connection.addEventListener('icegatheringstatechange', handleStateChange);
+function forwardIceCandidates(source: RTCPeerConnection, target: RTCPeerConnection) {
+  const pending: RTCIceCandidate[] = [];
+  const handleCandidate = (event: RTCPeerConnectionIceEvent) => {
+    if (!event.candidate) return;
+    if (!target.remoteDescription) {
+      pending.push(event.candidate);
+      return;
+    }
+    void target.addIceCandidate(event.candidate).catch(() => undefined);
+  };
+
+  source.addEventListener('icecandidate', handleCandidate);
+  return {
+    flush: async () => {
+      const candidates = pending.splice(0);
+      await Promise.all(candidates.map((candidate) => target.addIceCandidate(candidate)));
+    },
+    release: () => source.removeEventListener('icecandidate', handleCandidate),
+  };
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string) {
+  return new Promise<T>((resolve, reject) => {
+    const timeoutId = window.setTimeout(() => reject(new Error(message)), timeoutMs);
+    promise.then((result) => {
+      clearTimeout(timeoutId);
+      resolve(result);
+    }, (error) => {
+      clearTimeout(timeoutId);
+      reject(error);
+    });
   });
 }
 

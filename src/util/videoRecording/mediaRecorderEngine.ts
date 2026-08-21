@@ -17,6 +17,7 @@ const SNAPSHOT_MIME_CANDIDATES = [
 ];
 const SNAPSHOT_TIMESLICE_MS = 250;
 const FLUSH_FALLBACK_TIMEOUT_MS = 1000;
+const FINALIZE_TIMEOUT_MS = 5000;
 
 export function recordWithMediaRecorder(
   videoTrack: MediaStreamTrack, audioTrack: MediaStreamTrack | undefined,
@@ -45,13 +46,26 @@ export function recordWithMediaRecorder(
 
   return {
     finalize: () => new Promise<Blob>((resolve, reject) => {
-      mediaRecorder.onstop = () => resolve(new Blob(chunks, { type: getBaseMimeType() }));
-      mediaRecorder.onerror = reject;
+      let isFinished = false;
+      const finish = (error?: unknown) => {
+        if (isFinished) return;
+        isFinished = true;
+        clearTimeout(timeoutId);
+        mediaRecorder.onstop = undefined as unknown as typeof mediaRecorder.onstop;
+        mediaRecorder.onerror = undefined as unknown as typeof mediaRecorder.onerror;
+        if (error) reject(error);
+        else resolve(new Blob(chunks, { type: getBaseMimeType() }));
+      };
+      const timeoutId = window.setTimeout(
+        () => finish(new Error('Video recording finalization timed out')), FINALIZE_TIMEOUT_MS,
+      );
+      mediaRecorder.onstop = () => finish();
+      mediaRecorder.onerror = (event) => finish(event);
 
       try {
         mediaRecorder.stop();
       } catch (err) {
-        reject(err);
+        finish(err);
       }
     }),
     cancel: () => {

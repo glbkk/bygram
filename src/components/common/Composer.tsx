@@ -855,6 +855,7 @@ const Composer = ({
     isRecordingFinished,
     cameraFacingMode,
     isSwitchingCamera,
+    isCameraSwitchAvailable,
     getProgress,
     subscribeToVideoRecordingPeaks,
   } = useVideoRecording();
@@ -1553,10 +1554,16 @@ const Composer = ({
       const record = await stopRecordingVideo();
       const ttlSeconds = isViewOnceEnabled ? ONE_TIME_MEDIA_TTL_SECONDS : undefined;
       if (record && record.durationMs >= MIN_ROUND_VIDEO_RECORDING_TIME) {
-        const { blob, duration } = record;
-        showNotification({ message: { key: 'BygramRoundVideoProcessing' } });
+        const {
+          blob, duration, width, height,
+        } = record;
         try {
-          const roundBlob = await prepareRoundVideo(blob);
+          const isReadyMp4 = blob.type === 'video/mp4' && width > 0 && height > 0
+            && Math.abs(width - height) / Math.max(width, height) <= 0.05;
+          if (!isReadyMp4) {
+            showNotification({ message: { key: 'BygramRoundVideoProcessing' } });
+          }
+          const roundBlob = isReadyMp4 ? blob : await prepareRoundVideo(blob);
           currentAttachments = [await buildAttachment(
             VIDEO_RECORDING_FILENAME,
             roundBlob,
@@ -2912,6 +2919,7 @@ const Composer = ({
               isFrozen={isRecordingFinished}
               facingMode={cameraFacingMode}
               isSwitchingCamera={isSwitchingCamera}
+              isCameraSwitchAvailable={isCameraSwitchAvailable}
               onSwitchCamera={switchRecordingCamera}
               getProgress={getProgress}
               getPlaybackEl={renderedVideoRecording?.getPlaybackEl}

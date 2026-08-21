@@ -21,6 +21,7 @@ export type ActiveVideoRecording = {
   pause: () => Promise<void>;
   resume: () => void;
   whenReady: Promise<void>;
+  canSwitchCamera: () => boolean;
   getElapsedMs: () => number;
   getProfilePeaks: () => number[];
   getPlaybackMedia?: () => Promise<HTMLVideoElement>;

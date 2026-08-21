@@ -21,6 +21,7 @@ const useVideoRecording = () => {
   const [isRecordingFinished, setIsRecordingFinished] = useState(false);
   const [cameraFacingMode, setCameraFacingMode] = useState<videoRecording.CameraFacingMode>('user');
   const [isSwitchingCamera, setIsSwitchingCamera] = useState(false);
+  const [isCameraSwitchAvailable, setIsCameraSwitchAvailable] = useState(false);
 
   const activeRecordingRef = useRef<videoRecording.ActiveVideoRecording>();
   const resultPromiseRef = useRef<Promise<videoRecording.Result>>();
@@ -39,6 +40,7 @@ const useVideoRecording = () => {
     setIsRecordingFinished(false);
     setCameraFacingMode('user');
     setIsSwitchingCamera(false);
+    setIsCameraSwitchAvailable(false);
   });
 
   const finishRecordingVideo = useLastCallback(() => {
@@ -88,6 +90,7 @@ const useVideoRecording = () => {
 
       recording.whenReady.then(() => {
         if (startTokenRef.current !== token) return;
+        setIsCameraSwitchAvailable(recording.canSwitchCamera());
         setIsVideoRecordingReady(true);
       }, (err: unknown) => {
         if (startTokenRef.current !== token) return;
@@ -220,6 +223,7 @@ const useVideoRecording = () => {
     isRecordingFinished,
     cameraFacingMode,
     isSwitchingCamera,
+    isCameraSwitchAvailable,
     getProgress,
     subscribeToVideoRecordingPeaks,
   };
