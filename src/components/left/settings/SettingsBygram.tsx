@@ -22,6 +22,9 @@ import useHistoryBack from '../../../hooks/useHistoryBack';
 import useLang from '../../../hooks/useLang';
 import useLastCallback from '../../../hooks/useLastCallback';
 
+import AnimatedSticker from '../../common/AnimatedSticker';
+import CustomEmoji from '../../common/CustomEmoji';
+import CustomEmojiPicker from '../../common/CustomEmojiPicker';
 import Island, { IslandDescription, IslandTitle } from '../../gili/layout/Island';
 import StickerPicker from '../../middle/composer/StickerPicker';
 import Checkbox from '../../ui/Checkbox';
@@ -91,6 +94,7 @@ function SettingsBygram({ isActive, onReset }: OwnProps) {
   const [settings, setSettings] = useState<BygramSettings>(() => getBygramSettings());
   const [stats, setStats] = useState<BygramArchiveStats>(EMPTY_STATS);
   const [isStickerLoading, setIsStickerLoading] = useState(false);
+  const [constructorPicker, setConstructorPicker] = useState<'sticker' | 'emoji'>('sticker');
   const [isClearDialogOpen, openClearDialog, closeClearDialog] = useFlag();
   const [isStickerPickerOpen, openStickerPicker, closeStickerPicker] = useFlag();
   const lang = useLang();
@@ -139,6 +143,8 @@ function SettingsBygram({ isActive, onReset }: OwnProps) {
       setSettings(updateBygramSettings({
         messageBubbleStyle: 'custom',
         messageBubbleStickerImage: image,
+        messageBubbleSticker: sticker,
+        messageBubbleCustomEmojiId: undefined,
       }));
       closeStickerPicker();
     } catch {
@@ -148,8 +154,22 @@ function SettingsBygram({ isActive, onReset }: OwnProps) {
     }
   });
 
+  const handleCustomEmojiSelect = useLastCallback((sticker: ApiSticker) => {
+    setSettings(updateBygramSettings({
+      messageBubbleStyle: 'custom',
+      messageBubbleStickerImage: undefined,
+      messageBubbleSticker: undefined,
+      messageBubbleCustomEmojiId: sticker.id,
+    }));
+    closeStickerPicker();
+  });
+
   const handleRemoveSticker = useLastCallback(() => {
-    setSettings(updateBygramSettings({ messageBubbleStickerImage: undefined }));
+    setSettings(updateBygramSettings({
+      messageBubbleStickerImage: undefined,
+      messageBubbleSticker: undefined,
+      messageBubbleCustomEmojiId: undefined,
+    }));
   });
 
   const renderMediaLimit = useLastCallback((index: number) => {
@@ -216,6 +236,14 @@ function SettingsBygram({ isActive, onReset }: OwnProps) {
               : id === 'custom' ? settings.messageBubbleColor : background;
             const giftImage = BYGRAM_GIFT_BUBBLE_THEMES[id]?.image
               || (id === 'custom' ? settings.messageBubbleStickerImage : undefined);
+            const giftAnimation = BYGRAM_GIFT_BUBBLE_THEMES[id]?.animation;
+            const telegramTitle = BYGRAM_GIFT_BUBBLE_THEMES[id]?.telegramTitle;
+            const telegramGiftSticker = telegramTitle && Object.values(getGlobal().starGifts?.byId || {})
+              .find(({ title }) => title?.localeCompare(telegramTitle, undefined, { sensitivity: 'base' }) === 0)
+              ?.sticker;
+            const customEmojiId = id === 'custom' ? settings.messageBubbleCustomEmojiId : undefined;
+            const customSticker = id === 'custom' ? settings.messageBubbleSticker : undefined;
+            const shouldAnimatePreview = isSelected && settings.isMessageBubbleGiftAnimated;
             return (
               <button
                 type="button"
@@ -225,13 +253,49 @@ function SettingsBygram({ isActive, onReset }: OwnProps) {
                 onClick={() => handleBubbleStyleChange(id)}
               >
                 <span className={styles.bubblePreview} style={`background: ${previewBackground}`}>
-                  {giftImage && (
+                  {telegramGiftSticker ? (
+                    <CustomEmoji
+                      className={styles.bubbleGift}
+                      sticker={telegramGiftSticker}
+                      size={29}
+                      isBig
+                      noPlay={!shouldAnimatePreview}
+                      shouldNotLoop={!shouldAnimatePreview}
+                      shouldPreloadPreview
+                    />
+                  ) : giftAnimation && shouldAnimatePreview ? (
+                    <AnimatedSticker
+                      className={styles.bubbleGift}
+                      tgsUrl={giftAnimation}
+                      size={29}
+                      play
+                      isLowPriority
+                    />
+                  ) : customEmojiId ? (
+                    <CustomEmoji
+                      className={styles.bubbleGift}
+                      documentId={customEmojiId}
+                      size={29}
+                      isBig
+                      noPlay={!shouldAnimatePreview}
+                      shouldNotLoop={!shouldAnimatePreview}
+                      shouldPreloadPreview
+                    />
+                  ) : customSticker ? (
+                    <CustomEmoji
+                      className={styles.bubbleGift}
+                      sticker={customSticker}
+                      size={29}
+                      isBig
+                      noPlay={!shouldAnimatePreview}
+                      shouldNotLoop={!shouldAnimatePreview}
+                      shouldPreloadPreview
+                    />
+                  ) : giftImage && (
                     <img
                       src={giftImage}
                       alt=""
-                      className={`${styles.bubbleGift} ${
-                        settings.isMessageBubbleGiftAnimated ? styles.animatedGift : ''
-                      }`}
+                      className={styles.bubbleGift}
                     />
                   )}
                   <span className={styles.previewLine} />
@@ -280,24 +344,57 @@ function SettingsBygram({ isActive, onReset }: OwnProps) {
               >
                 {isStickerPickerOpen
                   ? 'Закрыть наборы'
-                  : settings.messageBubbleStickerImage ? 'Заменить стикер' : 'Выбрать стикер'}
+                  : (settings.messageBubbleStickerImage || settings.messageBubbleCustomEmojiId)
+                    ? 'Заменить декор' : 'Выбрать декор'}
               </button>
-              {settings.messageBubbleStickerImage && (
+              {(settings.messageBubbleStickerImage || settings.messageBubbleCustomEmojiId) && (
                 <button type="button" className={styles.removeButton} onClick={handleRemoveSticker}>Убрать</button>
               )}
             </div>
             {isStickerPickerOpen && currentUserId && (
               <div className={styles.stickerPickerShell}>
-                <StickerPicker
-                  className=""
-                  chatId={currentUserId}
-                  idPrefix="bygram-bubble"
-                  isForSelection
-                  loadAndPlay
-                  canSendStickers={false}
-                  noContextMenus
-                  onStickerSelect={handleStickerSelect}
-                />
+                <div className={styles.pickerTabs} role="tablist" aria-label="Тип декора">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={constructorPicker === 'sticker'}
+                    className={constructorPicker === 'sticker' ? styles.pickerTabActive : undefined}
+                    onClick={() => setConstructorPicker('sticker')}
+                  >
+                    Стикеры
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={constructorPicker === 'emoji'}
+                    className={constructorPicker === 'emoji' ? styles.pickerTabActive : undefined}
+                    onClick={() => setConstructorPicker('emoji')}
+                  >
+                    Premium emoji
+                  </button>
+                </div>
+                <div className={styles.pickerContent}>
+                  {constructorPicker === 'sticker' ? (
+                    <StickerPicker
+                      className=""
+                      chatId={currentUserId}
+                      idPrefix="bygram-bubble"
+                      isForSelection
+                      loadAndPlay
+                      canSendStickers={false}
+                      noContextMenus
+                      onStickerSelect={handleStickerSelect}
+                    />
+                  ) : (
+                    <CustomEmojiPicker
+                      chatId={currentUserId}
+                      idPrefix="bygram-bubble-emoji"
+                      loadAndPlay
+                      noAddButton
+                      onCustomEmojiSelect={handleCustomEmojiSelect}
+                    />
+                  )}
+                </div>
                 {isStickerLoading && <div className={styles.pickerLoading}>Сохраняю стикер…</div>}
               </div>
             )}

@@ -486,41 +486,35 @@
     background: var(--bygram-own-bubble-background);
   }
 
-  .bygram-gift-message-bubble .Message.own &.has-solid-background {
+  .bygram-gift-message-bubble .Message.own &.has-solid-background,
+  .bygram-gift-message-bubble .Message.own &.has-background {
     padding-inline-end: 2.25rem;
-
-    &::after {
-      content: "";
-
-      pointer-events: none;
-      position: absolute;
-      z-index: 2;
-      top: -0.55rem;
-      right: -0.35rem;
-
-      width: 2.3rem;
-      height: 2.3rem;
-
-      background: var(--bygram-own-bubble-gift) center / contain no-repeat;
-      filter: drop-shadow(0 0.125rem 0.15rem rgba(0, 0, 0, 0.22));
-    }
   }
 
-  .bygram-animated-message-bubble .Message.own &.has-solid-background::after {
-    transform-origin: 50% 65%;
-    animation: bygram-gift-corner-motion 5.2s ease-in-out infinite;
-  }
+  .bygram-bubble-decoration {
+    --custom-emoji-size: 2.875rem;
+    --custom-emoji-border-radius: 0.625rem;
 
-  @keyframes bygram-gift-corner-motion {
-    0%, 68%, 100% { transform: rotate(0deg) scale(1); }
-    76% { transform: rotate(-7deg) scale(1.06); }
-    84% { transform: rotate(6deg) scale(1.04); }
-    92% { transform: rotate(-3deg) scale(1.02); }
-  }
+    pointer-events: none;
+    position: absolute;
+    z-index: 2;
+    top: -0.625rem;
+    right: -0.4375rem;
 
-  @media (prefers-reduced-motion: reduce) {
-    .bygram-animated-message-bubble .Message.own &.has-solid-background::after {
-      animation: none;
+    overflow: hidden;
+    width: 2.875rem;
+    height: 2.875rem;
+    border-radius: 0.625rem;
+
+    filter: drop-shadow(0 0.125rem 0.15rem rgba(0, 0, 0, 0.22));
+
+    > img,
+    > .AnimatedSticker,
+    > .custom-emoji {
+      display: block;
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: contain;
     }
   }
 

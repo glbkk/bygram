@@ -1,19 +1,30 @@
-import type { ApiMessage } from '../api/types';
+import type { ApiMessage, ApiSticker } from '../api/types';
 
-import bowTieGift from '../assets/bygram/gifts/bow-tie.svg';
-import freshSocksGift from '../assets/bygram/gifts/fresh-socks.svg';
-import gingerCookieGift from '../assets/bygram/gifts/ginger-cookie.svg';
-import hangingStarGift from '../assets/bygram/gifts/hanging-star.svg';
+import bowTieGiftAnimation from '../assets/bygram/gifts/bow-tie.tgs';
+import bowTieGift from '../assets/bygram/gifts/bow-tie.webp';
+import freshSocksGiftAnimation from '../assets/bygram/gifts/fresh-socks.tgs';
+import freshSocksGift from '../assets/bygram/gifts/fresh-socks.webp';
+import gingerCookieGiftAnimation from '../assets/bygram/gifts/ginger-cookie.tgs';
+import gingerCookieGift from '../assets/bygram/gifts/ginger-cookie.webp';
+import hangingStarGiftAnimation from '../assets/bygram/gifts/hanging-star.tgs';
+import hangingStarGift from '../assets/bygram/gifts/hanging-star.webp';
 import homemadeCakeGift from '../assets/bygram/gifts/homemade-cake.svg';
-import jellyBunnyGift from '../assets/bygram/gifts/jelly-bunny.svg';
-import libertyFigureGift from '../assets/bygram/gifts/liberty-figure.svg';
-import nailBraceletGift from '../assets/bygram/gifts/nail-bracelet.svg';
-import plushPepeGift from '../assets/bygram/gifts/plush-pepe.svg';
-import rareBirdGift from '../assets/bygram/gifts/rare-bird.svg';
+import jellyBunnyGiftAnimation from '../assets/bygram/gifts/jelly-bunny.tgs';
+import jellyBunnyGift from '../assets/bygram/gifts/jelly-bunny.webp';
+import libertyFigureGiftAnimation from '../assets/bygram/gifts/liberty-figure.tgs';
+import libertyFigureGift from '../assets/bygram/gifts/liberty-figure.webp';
+import nailBraceletGiftAnimation from '../assets/bygram/gifts/nail-bracelet.tgs';
+import nailBraceletGift from '../assets/bygram/gifts/nail-bracelet.webp';
+import plushPepeGiftAnimation from '../assets/bygram/gifts/plush-pepe.tgs';
+import plushPepeGift from '../assets/bygram/gifts/plush-pepe.webp';
+import rareBirdGiftAnimation from '../assets/bygram/gifts/rare-bird.tgs';
+import rareBirdGift from '../assets/bygram/gifts/rare-bird.webp';
 import santaHatGift from '../assets/bygram/gifts/santa-hat.svg';
-import sharpTongueGift from '../assets/bygram/gifts/sharp-tongue.svg';
+import sharpTongueGiftAnimation from '../assets/bygram/gifts/sharp-tongue.tgs';
+import sharpTongueGift from '../assets/bygram/gifts/sharp-tongue.webp';
 import spicedWineGift from '../assets/bygram/gifts/spiced-wine.svg';
-import trappedHeartGift from '../assets/bygram/gifts/trapped-heart.svg';
+import trappedHeartGiftAnimation from '../assets/bygram/gifts/trapped-heart.tgs';
+import trappedHeartGift from '../assets/bygram/gifts/trapped-heart.webp';
 
 export type BygramSettings = {
   isArchiveEnabled: boolean;
@@ -28,6 +39,8 @@ export type BygramSettings = {
   isMessageBubbleGradientEnabled: boolean;
   isMessageBubbleGiftAnimated: boolean;
   messageBubbleStickerImage?: string;
+  messageBubbleSticker?: ApiSticker;
+  messageBubbleCustomEmojiId?: string;
 };
 
 export type BygramMessageBubbleStyle = 'default' | 'ocean' | 'violet' | 'sunset' | 'mint'
@@ -38,12 +51,16 @@ export type BygramMessageBubbleStyle = 'default' | 'ocean' | 'violet' | 'sunset'
 
 export const BYGRAM_GIFT_BUBBLE_THEMES: Partial<Record<BygramMessageBubbleStyle, {
   image: string;
+  animation?: string;
+  telegramTitle?: string;
   background: string;
   tail: string;
   text: string;
 }>> = {
   'plush-pepe': {
     image: plushPepeGift,
+    animation: plushPepeGiftAnimation,
+    telegramTitle: 'Plush Pepe',
     background: 'linear-gradient(145deg, #D9FFD5 0%, #70D67E 58%, #2D8C62 100%)',
     tail: '#2D8C62',
     text: '#173D31',
@@ -56,60 +73,80 @@ export const BYGRAM_GIFT_BUBBLE_THEMES: Partial<Record<BygramMessageBubbleStyle,
   },
   'jelly-bunny': {
     image: jellyBunnyGift,
+    animation: jellyBunnyGiftAnimation,
+    telegramTitle: 'Jelly Bunny',
     background: 'linear-gradient(145deg, #D8FBFF 0%, #83D8FF 52%, #6B8CFF 100%)',
     tail: '#6B8CFF',
     text: '#15345E',
   },
   'bow-tie': {
     image: bowTieGift,
+    animation: bowTieGiftAnimation,
+    telegramTitle: 'Bow Tie',
     background: 'linear-gradient(145deg, #E9D8FF 0%, #A27AFF 54%, #5B3AC3 100%)',
     tail: '#5B3AC3',
     text: '#2F1C68',
   },
   'hanging-star': {
     image: hangingStarGift,
+    animation: hangingStarGiftAnimation,
+    telegramTitle: 'Hanging Star',
     background: 'linear-gradient(145deg, #FFF4B8 0%, #FFD45A 55%, #E69A28 100%)',
     tail: '#E69A28',
     text: '#5A3B12',
   },
   'trapped-heart': {
     image: trappedHeartGift,
+    animation: trappedHeartGiftAnimation,
+    telegramTitle: 'Trapped Heart',
     background: 'linear-gradient(145deg, #DDF8FF 0%, #8DDDF3 48%, #E75E8D 100%)',
     tail: '#E75E8D',
     text: '#3E3155',
   },
   'rare-bird': {
     image: rareBirdGift,
+    animation: rareBirdGiftAnimation,
+    telegramTitle: 'Rare Bird',
     background: 'linear-gradient(145deg, #D7FFF6 0%, #63D7CF 48%, #426EDB 100%)',
     tail: '#426EDB',
     text: '#143F52',
   },
   'sharp-tongue': {
     image: sharpTongueGift,
+    animation: sharpTongueGiftAnimation,
+    telegramTitle: 'Sharp Tongue',
     background: 'linear-gradient(145deg, #FFB1C5 0%, #D94F7D 52%, #6D234E 100%)',
     tail: '#6D234E',
     text: '#FFFFFF',
   },
   'nail-bracelet': {
     image: nailBraceletGift,
+    animation: nailBraceletGiftAnimation,
+    telegramTitle: 'Nail Bracelet',
     background: 'linear-gradient(145deg, #FFF1B8 0%, #DDB652 52%, #8D6327 100%)',
     tail: '#8D6327',
     text: '#493312',
   },
   'ginger-cookie': {
     image: gingerCookieGift,
+    animation: gingerCookieGiftAnimation,
+    telegramTitle: 'Ginger Cookie',
     background: 'linear-gradient(145deg, #FFE2B1 0%, #C87935 55%, #75401F 100%)',
     tail: '#75401F',
     text: '#FFF8E9',
   },
   'fresh-socks': {
     image: freshSocksGift,
+    animation: freshSocksGiftAnimation,
+    telegramTitle: 'Fresh Socks',
     background: 'linear-gradient(145deg, #D5F8FF 0%, #62CBEA 48%, #FF718D 100%)',
     tail: '#FF718D',
     text: '#24415D',
   },
   'liberty-figure': {
     image: libertyFigureGift,
+    animation: libertyFigureGiftAnimation,
+    telegramTitle: 'Liberty Figure',
     background: 'linear-gradient(145deg, #D7FFF2 0%, #69C9B2 55%, #277A70 100%)',
     tail: '#277A70',
     text: '#17453F',
@@ -181,6 +218,7 @@ const DEFAULT_SETTINGS: BygramSettings = {
 
 let databasePromise: Promise<IDBDatabase> | undefined;
 let settings = loadSettings();
+const settingsListeners = new Set<(nextSettings: BygramSettings) => void>();
 
 applyMessageBubbleStyle(settings);
 
@@ -193,7 +231,15 @@ export function updateBygramSettings(patch: Partial<BygramSettings>) {
   applyMessageBubbleStyle(settings);
   localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
   void runTransaction(SETTINGS_STORE, 'readwrite', (store) => requestAsPromise(store.put(settings, SETTINGS_KEY)));
+  settingsListeners.forEach((listener) => listener(settings));
   return settings;
+}
+
+export function subscribeBygramSettings(listener: (nextSettings: BygramSettings) => void) {
+  settingsListeners.add(listener);
+  return () => {
+    settingsListeners.delete(listener);
+  };
 }
 
 function applyMessageBubbleStyle(nextSettings: BygramSettings) {
@@ -215,10 +261,13 @@ function applyMessageBubbleStyle(nextSettings: BygramSettings) {
     : undefined;
   const giftImage = giftTheme?.image || customStickerImage;
   root.classList.toggle('bygram-custom-message-bubble', isCustom);
-  root.classList.toggle('bygram-gift-message-bubble', Boolean(giftImage));
+  root.classList.toggle(
+    'bygram-gift-message-bubble',
+    Boolean(giftImage || nextSettings.messageBubbleCustomEmojiId || nextSettings.messageBubbleSticker),
+  );
   root.classList.toggle(
     'bygram-animated-message-bubble',
-    Boolean(giftImage && nextSettings.isMessageBubbleGiftAnimated),
+    Boolean((giftImage || nextSettings.messageBubbleCustomEmojiId) && nextSettings.isMessageBubbleGiftAnimated),
   );
   if (!isCustom) {
     root.style.removeProperty('--bygram-own-bubble-background');

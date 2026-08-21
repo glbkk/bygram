@@ -191,6 +191,7 @@ import InputText from '../../ui/InputText';
 import Album from './Album';
 import AnimatedCustomEmoji from './AnimatedCustomEmoji';
 import AnimatedEmoji from './AnimatedEmoji';
+import BygramBubbleDecoration from './BygramBubbleDecoration';
 import CommentButton from './CommentButton';
 import Contact from './Contact';
 import ContextMenuContainer from './ContextMenuContainer.async';
@@ -2009,6 +2010,9 @@ const Message = ({
           style={contentStyle}
           dir="auto"
         >
+          {isOwn && (
+            contentClassName.includes('has-solid-background') || contentClassName.includes('has-background')
+          ) && <BygramBubbleDecoration isVisible />}
           {asForwarded && !isInDocumentGroupNotFirst && (
             <>
               {shouldRenderSenderName() && renderSenderName()}
