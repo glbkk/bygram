@@ -308,6 +308,8 @@ function MiddleColumn({
 
   const middleColumnRef = useRef<HTMLDivElement>();
   const isViewportAnimatingRef = useRef(false);
+  const previousViewportHeightRef = useRef<number>();
+  const shouldKeepBottomAfterKeyboardRef = useRef(false);
   const getIsKeyboardAnimating = useLastCallback(() => isViewportAnimatingRef.current);
 
   const syncFooterSlide = useLastCallback((footer: HTMLElement) => {
@@ -394,9 +396,29 @@ function MiddleColumn({
 
       const keyboardHeight = document.documentElement.clientHeight - visualViewport.height;
       const isFixNeeded = keyboardHeight > 120;
+      const previousHeight = previousViewportHeightRef.current || visualViewport.height;
+      const viewportShrink = Math.max(0, previousHeight - visualViewport.height);
+      previousViewportHeightRef.current = visualViewport.height;
+      const scroller = middleColumnRef.current?.querySelector<HTMLElement>('.MessageList');
+      const bottomDistance = scroller
+        ? scroller.scrollHeight - scroller.scrollTop - scroller.offsetHeight
+        : Number.POSITIVE_INFINITY;
+
+      if (isFixNeeded && bottomDistance <= viewportShrink + 8) {
+        shouldKeepBottomAfterKeyboardRef.current = true;
+      }
 
       requestMutation(() => {
+        document.documentElement.style.setProperty('--visual-viewport-height', `${visualViewport.height}px`);
+        document.documentElement.style.setProperty('--visual-viewport-offset-top', `${visualViewport.offsetTop}px`);
         document.body.classList.toggle('keyboard-visible', isFixNeeded);
+
+        if (scroller) {
+          requestMeasure(() => {
+            syncMessageListBottomReserve(scroller, false, shouldKeepBottomAfterKeyboardRef.current);
+            shouldKeepBottomAfterKeyboardRef.current = false;
+          });
+        }
 
         requestMeasure(() => {
           if (!isFixNeeded && visualViewport.offsetTop) {
@@ -414,6 +436,8 @@ function MiddleColumn({
     return () => {
       visualViewport.removeEventListener('resize', handleResize);
       document.body.classList.remove('keyboard-visible');
+      previousViewportHeightRef.current = undefined;
+      shouldKeepBottomAfterKeyboardRef.current = false;
     };
   }, [markViewportSettled]);
 

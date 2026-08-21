@@ -6,6 +6,7 @@ import type {
 } from '../../../util/bygramArchive';
 
 import {
+  BYGRAM_GIFT_BUBBLE_THEMES,
   clearBygramArchive,
   getBygramArchiveStats,
   getBygramSettings,
@@ -42,6 +43,10 @@ const BUBBLE_STYLES: Array<{
   background: string;
 }> = [
   { id: 'default', label: 'Обычный', background: 'var(--color-background-own)' },
+  { id: 'homemade-cake', label: 'Домашний торт', background: BYGRAM_GIFT_BUBBLE_THEMES['homemade-cake']!.background },
+  { id: 'jelly-bunny', label: 'Желейный кролик', background: BYGRAM_GIFT_BUBBLE_THEMES['jelly-bunny']!.background },
+  { id: 'spiced-wine', label: 'Пряное вино', background: BYGRAM_GIFT_BUBBLE_THEMES['spiced-wine']!.background },
+  { id: 'santa-hat', label: 'Шапка Санты', background: BYGRAM_GIFT_BUBBLE_THEMES['santa-hat']!.background },
   { id: 'ocean', label: 'Океан', background: 'linear-gradient(145deg, #1687FF, #0066E6)' },
   { id: 'violet', label: 'Фиолетовый', background: 'linear-gradient(145deg, #9B6DFF, #6C45E8)' },
   { id: 'sunset', label: 'Закат', background: 'linear-gradient(145deg, #FF7A59, #E94373)' },
@@ -145,6 +150,7 @@ function SettingsBygram({ isActive, onReset }: OwnProps) {
           {BUBBLE_STYLES.map(({ id, label, background }) => {
             const isSelected = settings.messageBubbleStyle === id;
             const previewBackground = id === 'custom' ? settings.messageBubbleColor : background;
+            const giftImage = BYGRAM_GIFT_BUBBLE_THEMES[id]?.image;
             return (
               <button
                 type="button"
@@ -153,7 +159,11 @@ function SettingsBygram({ isActive, onReset }: OwnProps) {
                 aria-checked={isSelected}
                 onClick={() => handleBubbleStyleChange(id)}
               >
-                <span className={styles.bubblePreview} style={`background: ${previewBackground}`} />
+                <span className={styles.bubblePreview} style={`background: ${previewBackground}`}>
+                  {giftImage && <img src={giftImage} alt="" className={styles.bubbleGift} />}
+                  <span className={styles.previewLine} />
+                  <span className={styles.previewLineShort} />
+                </span>
                 <span className={styles.bubbleName}>{label}</span>
               </button>
             );

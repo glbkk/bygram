@@ -1,5 +1,10 @@
 import type { ApiMessage } from '../api/types';
 
+import homemadeCakeGift from '../assets/bygram/gifts/homemade-cake.svg';
+import jellyBunnyGift from '../assets/bygram/gifts/jelly-bunny.svg';
+import santaHatGift from '../assets/bygram/gifts/santa-hat.svg';
+import spicedWineGift from '../assets/bygram/gifts/spiced-wine.svg';
+
 export type BygramSettings = {
   isArchiveEnabled: boolean;
   isAntiDeleteEnabled: boolean;
@@ -11,7 +16,40 @@ export type BygramSettings = {
   messageBubbleColor: string;
 };
 
-export type BygramMessageBubbleStyle = 'default' | 'ocean' | 'violet' | 'sunset' | 'mint' | 'custom';
+export type BygramMessageBubbleStyle = 'default' | 'ocean' | 'violet' | 'sunset' | 'mint'
+  | 'homemade-cake' | 'jelly-bunny' | 'spiced-wine' | 'santa-hat' | 'custom';
+
+export const BYGRAM_GIFT_BUBBLE_THEMES: Partial<Record<BygramMessageBubbleStyle, {
+  image: string;
+  background: string;
+  tail: string;
+  text: string;
+}>> = {
+  'homemade-cake': {
+    image: homemadeCakeGift,
+    background: 'linear-gradient(145deg, #FFF0C7 0%, #FFB28E 58%, #F27A83 100%)',
+    tail: '#F27A83',
+    text: '#552B36',
+  },
+  'jelly-bunny': {
+    image: jellyBunnyGift,
+    background: 'linear-gradient(145deg, #D8FBFF 0%, #83D8FF 52%, #6B8CFF 100%)',
+    tail: '#6B8CFF',
+    text: '#15345E',
+  },
+  'spiced-wine': {
+    image: spicedWineGift,
+    background: 'linear-gradient(145deg, #B8325D 0%, #74163D 62%, #4B1634 100%)',
+    tail: '#4B1634',
+    text: '#FFF5E4',
+  },
+  'santa-hat': {
+    image: santaHatGift,
+    background: 'linear-gradient(145deg, #FF6570 0%, #D82958 58%, #9D1948 100%)',
+    tail: '#9D1948',
+    text: '#FFFFFF',
+  },
+};
 
 export type BygramMessageVersion = {
   savedAt: number;
@@ -81,7 +119,7 @@ export function updateBygramSettings(patch: Partial<BygramSettings>) {
 function applyMessageBubbleStyle(nextSettings: BygramSettings) {
   const root = document.documentElement;
   const isCustom = nextSettings.messageBubbleStyle !== 'default';
-  const styles: Record<Exclude<BygramMessageBubbleStyle, 'default' | 'custom'>, {
+  const styles: Record<'ocean' | 'violet' | 'sunset' | 'mint', {
     background: string;
     tail: string;
   }> = {
@@ -91,24 +129,32 @@ function applyMessageBubbleStyle(nextSettings: BygramSettings) {
     mint: { background: 'linear-gradient(145deg, #20BFA9 0%, #078B83 100%)', tail: '#078B83' },
   };
 
+  const giftTheme = BYGRAM_GIFT_BUBBLE_THEMES[nextSettings.messageBubbleStyle];
   root.classList.toggle('bygram-custom-message-bubble', isCustom);
+  root.classList.toggle('bygram-gift-message-bubble', Boolean(giftTheme));
   if (!isCustom) {
     root.style.removeProperty('--bygram-own-bubble-background');
     root.style.removeProperty('--bygram-own-bubble-tail');
     root.style.removeProperty('--bygram-own-bubble-text');
+    root.style.removeProperty('--bygram-own-bubble-gift');
     return;
   }
 
   const customColor = normalizeHexColor(nextSettings.messageBubbleColor);
   const selectedStyle = nextSettings.messageBubbleStyle === 'custom'
     ? { background: customColor, tail: customColor }
-    : styles[nextSettings.messageBubbleStyle as keyof typeof styles];
-  const textColor = nextSettings.messageBubbleStyle === 'custom'
+    : giftTheme || styles[nextSettings.messageBubbleStyle as keyof typeof styles];
+  const textColor = giftTheme?.text || (nextSettings.messageBubbleStyle === 'custom'
     ? getContrastTextColor(customColor)
-    : '#FFFFFF';
+    : '#FFFFFF');
   root.style.setProperty('--bygram-own-bubble-background', selectedStyle.background);
   root.style.setProperty('--bygram-own-bubble-tail', selectedStyle.tail);
   root.style.setProperty('--bygram-own-bubble-text', textColor);
+  if (giftTheme) {
+    root.style.setProperty('--bygram-own-bubble-gift', `url("${giftTheme.image}")`);
+  } else {
+    root.style.removeProperty('--bygram-own-bubble-gift');
+  }
 }
 
 function normalizeHexColor(value: string) {

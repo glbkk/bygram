@@ -302,7 +302,9 @@ const Avatar = ({
   const hasMedia = Boolean(isSavedMessages || imgUrl);
 
   const { handleClick, handleMouseDown } = useFastClick((e: ReactMouseEvent<HTMLDivElement, MouseEvent>) => {
-    if (isStoryClickable) {
+    // Alt-click is reserved for opening a chat preview without marking it as read.
+    // Let the event reach the chat-list item instead of opening the avatar story first.
+    if (isStoryClickable && !e.altKey) {
       e.stopPropagation();
 
       openStoryViewer({
