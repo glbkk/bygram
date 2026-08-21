@@ -1,1 +1,61 @@
-m«ëˆ§½©buªàºg§¶ÊÜþëb—ü"Ú0J,Þ¶Å,j›jÇºà7an{¦Š)ßŠW¨¢ë_ŠW›n·š‘ºÞjG§r‡^v‹­¦ën¦)í¢X§zÊ•éà¶î˜7]yÊy×œ¡×¢ž›­†¥¥Ø¬¦V²¶¬™ë,j¢Šzn¶)éº×â•ç^}«¥µú+²×bžŠ.¶›­¢ëiº×â•ç^}«¥µú+²×hº
+import type { IDimensions } from '../types';
+
+import { requestMutation } from '../lib/fasterdom/fasterdom';
+import { IS_IOS } from './browser/windowEnvironment';
+import { throttle } from './schedulers';
+
+const WINDOW_ORIENTATION_CHANGE_THROTTLE_MS = 100;
+const WINDOW_RESIZE_THROTTLE_MS = 250;
+
+let initialHeight = window.innerHeight;
+let currentWindowSize = updateSizes();
+
+const handleResize = throttle(() => {
+  currentWindowSize = updateSizes();
+}, WINDOW_RESIZE_THROTTLE_MS, true);
+
+const handleOrientationChange = throttle(() => {
+  initialHeight = window.innerHeight;
+  handleResize();
+}, WINDOW_ORIENTATION_CHANGE_THROTTLE_MS, false);
+
+window.addEventListener('orientationchange', handleOrientationChange);
+if (IS_IOS) {
+  window.visualViewport?.addEventListener('resize', handleResize);
+  window.visualViewport?.addEventListener('scroll', handleResize);
+} else {
+  window.addEventListener('resize', handleResize);
+}
+
+export function updateSizes(): IDimensions {
+  let height: number;
+  if (IS_IOS) {
+    height = window.visualViewport?.height || window.innerHeight;
+  } else {
+    height = window.innerHeight;
+  }
+
+  requestMutation(() => {
+    const vh = height * 0.01;
+    document.documentElement.style.setProperty('--vh', `${vh}px`);
+    if (IS_IOS) {
+      document.documentElement.style.setProperty('--visual-viewport-height', `${height}px`);
+      document.documentElement.style.setProperty(
+        '--visual-viewport-offset-top',
+        `${window.visualViewport?.offsetTop || 0}px`,
+      );
+    }
+  });
+
+  return {
+    width: window.innerWidth,
+    height,
+  };
+}
+
+const windowSize = {
+  get: () => currentWindowSize,
+  getIsKeyboardVisible: () => initialHeight > currentWindowSize.height,
+};
+
+export default windowSize;

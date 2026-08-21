@@ -1,1 +1,20 @@
-m«ëˆ§½©buªàºg§¶ÊÜþëb—ö©¤-Šö­Š‰Æ¹ªÝ¶Å,j›jÇºà7an{¦Š)ßŠW¨¢ë_ŠW›n·š‘ºÞjG§r‡^v‹­¦ën¦)í¢X§zÊ•éà¶î˜7]yÊy×œ¡×¢ž›­†¥¥Ø¬¦V²¶¬™ë,j¢Šzn¶)éº×â•ç^}«¥µú+²×bžŠ.¶›­¢ëiº×â•ç^}«¥µú+²×hº
+import type { StoryViewerOrigin } from '../types';
+
+const STORY_OPEN_GUARD_MS = 900;
+
+let lastActivationAt = performance.now();
+
+function markActivated() {
+  lastActivationAt = performance.now();
+}
+
+window.addEventListener('pageshow', markActivated);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    markActivated();
+  }
+});
+
+export function canOpenStoryAfterActivation(origin?: StoryViewerOrigin) {
+  return origin === undefined || performance.now() - lastActivationAt >= STORY_OPEN_GUARD_MS;
+}
