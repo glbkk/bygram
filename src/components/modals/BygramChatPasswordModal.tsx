@@ -104,7 +104,14 @@ const BygramChatPasswordModal = () => {
     : isProtected ? lang('BygramChatPasswordRemove') : lang('BygramChatPasswordSet');
 
   return (
-    <Modal className="narrow" isOpen={Boolean(request)} title={title} onClose={handleClose} isSlim>
+    <Modal
+      className={styles.modal}
+      contentClassName={styles.modalContent}
+      isOpen={Boolean(request)}
+      title={title}
+      hasCloseButton
+      onClose={handleClose}
+    >
       <p className={styles.description}>
         {lang(request?.mode === 'unlock' ? 'BygramChatPasswordUnlockDesc' : 'BygramChatPasswordDesc')}
       </p>
@@ -133,7 +140,7 @@ const BygramChatPasswordModal = () => {
           </label>
         )}
         {error && <p className={styles.error}>{error}</p>}
-        <Button type="submit" disabled={!password}>
+        <Button type="submit" fluid disabled={!password}>
           {lang(request?.mode === 'unlock' ? 'BygramChatPasswordOpen' : isProtected
             ? 'BygramChatPasswordRemove' : 'BygramChatPasswordSave')}
         </Button>

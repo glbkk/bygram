@@ -6,7 +6,8 @@ import * as mediaLoader from './mediaLoader';
 
 const WIDTH = 1080;
 const HEIGHT = 1920;
-const MIME_TYPE = 'image/png';
+const MIME_TYPE = 'image/jpeg';
+const JPEG_QUALITY = 0.92;
 
 export type BygramStreakStoryTemplate = 'telegram' | 'aurora' | 'midnight';
 
@@ -47,7 +48,7 @@ export async function createBygramStreakStoryFile(
   drawFooter(context);
 
   const blob = await canvasToBlob(canvas);
-  return new File([blob], `bygram-plane-${days}.png`, { type: MIME_TYPE });
+  return new File([blob], `bygram-plane-${days}.jpg`, { type: MIME_TYPE });
 }
 
 function drawBackground(context: CanvasRenderingContext2D, palette: typeof PALETTES.telegram) {
@@ -274,6 +275,6 @@ function canvasToBlob(canvas: HTMLCanvasElement) {
     canvas.toBlob((blob) => {
       if (blob) resolve(blob);
       else reject(new Error('Canvas export failed'));
-    }, MIME_TYPE);
+    }, MIME_TYPE, JPEG_QUALITY);
   });
 }

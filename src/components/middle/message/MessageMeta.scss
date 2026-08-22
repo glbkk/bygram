@@ -194,13 +194,16 @@
 .bygram-history-list {
   overflow-y: auto;
   max-height: min(60vh, 30rem);
+  margin: 0 -0.75rem;
 }
 
 .bygram-history-version {
-  margin-bottom: 0.5rem;
   padding: 0.75rem;
-  border-radius: var(--border-radius-default);
-  background: var(--color-background-secondary);
+  border-bottom: 0.0625rem solid var(--color-borders);
+
+  &:last-child {
+    border-bottom: 0;
+  }
 }
 
 .bygram-history-date {
@@ -210,7 +213,32 @@
 
 .bygram-history-text {
   margin: 0.25rem 0 0;
+  line-height: 1.35;
   white-space: pre-wrap;
+}
+
+@media (max-width: 600px) {
+  .bygram-history-modal .modal-container {
+    align-items: flex-end;
+  }
+
+  .bygram-history-modal .modal-dialog {
+    width: 100%;
+    max-width: 100% !important;
+    min-height: calc(var(--vh, 1vh) * 45);
+    max-height: calc(var(--vh, 1vh) * 82);
+    margin: 0;
+    border-radius: 1rem 1rem 0 0;
+  }
+
+  .bygram-history-modal .modal-content {
+    max-height: none;
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
+  .bygram-history-modal:not(.open) .modal-dialog {
+    transform: translate3d(0, 6rem, 0);
+  }
 }
 
 .Message:not(.own) {

@@ -35,22 +35,37 @@ import {
 import { addStoryToLocalDb } from '../helpers/localDb';
 import { deserializeBytes } from '../helpers/misc';
 import {
-  dispatchErrorUpdate, handleGramJsUpdate, invokeRequest, uploadFile,
+  dispatchErrorUpdate, invokeRequest, uploadFile,
 } from './client';
 
 export async function publishBygramStreakStory(file: File) {
-  const uploadedFile = await uploadFile(file);
-  const result = await invokeRequest(new GramJs.stories.SendStory({
-    peer: new GramJs.InputPeerSelf(),
-    media: new GramJs.InputMediaUploadedPhoto({ file: uploadedFile }),
-    privacyRules: [new GramJs.InputPrivacyValueAllowContacts()],
-    randomId: generateRandomBigInt(),
-  }), { shouldThrow: true });
+  const peer = new GramJs.InputPeerSelf();
 
-  if (!result) return false;
+  try {
+    const availability = await invokeRequest(new GramJs.stories.CanSendStory({ peer }), { shouldThrow: true });
+    if (!availability || availability.countRemains <= 0) {
+      return { isSuccess: false as const, error: 'STORY_DAILY_LIMIT' };
+    }
 
-  handleGramJsUpdate(result);
-  return true;
+    const uploadedFile = await uploadFile(file);
+    const result = await invokeRequest(new GramJs.stories.SendStory({
+      peer,
+      media: new GramJs.InputMediaUploadedPhoto({ file: uploadedFile }),
+      privacyRules: [new GramJs.InputPrivacyValueAllowContacts()],
+      randomId: generateRandomBigInt(),
+      period: 24 * 60 * 60,
+    }), { shouldThrow: true });
+
+    // invokeRequest already applies the returned Updates object to the client state.
+    return result
+      ? { isSuccess: true as const }
+      : { isSuccess: false as const, error: 'STORY_EMPTY_RESPONSE' };
+  } catch (err: unknown) {
+    const error = err instanceof RPCError
+      ? err.errorMessage
+      : err instanceof Error ? err.message : 'STORY_UNKNOWN_ERROR';
+    return { isSuccess: false as const, error };
+  }
 }
 
 export async function fetchAllStories({

@@ -48,6 +48,7 @@ const BygramStreakBadge = ({ accountId, peerId, shouldOfferMilestone }: OwnProps
   const [customDays, setCustomDays] = useState(() => String(streak?.days || 1));
   const [storyTemplate, setStoryTemplate] = useState<BygramStreakStoryTemplate>('telegram');
   const [isPublishing, setIsPublishing] = useState(false);
+  const [publishError, setPublishError] = useState<string>();
 
   useEffect(() => {
     const update = () => setStreak(getBygramStreak(accountId, peerId));
@@ -80,6 +81,7 @@ const BygramStreakBadge = ({ accountId, peerId, shouldOfferMilestone }: OwnProps
     event.stopPropagation();
     setCustomDays(String(streak?.days || 1));
     setIsMilestone(false);
+    setPublishError(undefined);
     setIsModalOpen(true);
   });
 
@@ -103,15 +105,23 @@ const BygramStreakBadge = ({ accountId, peerId, shouldOfferMilestone }: OwnProps
     }
 
     setCustomDays(String(days));
+    setPublishError(undefined);
     setIsPublishing(true);
     try {
       const file = await createBygramStreakStoryFile(currentUser, peerUser, days, storyTemplate);
-      const isPublished = await callApi('publishBygramStreakStory', file);
-      if (!isPublished) throw new Error('Story publishing failed');
+      const result = await callApi('publishBygramStreakStory', file);
+      if (!result?.isSuccess) {
+        const message = getStoryPublishError(result?.error);
+        setPublishError(message);
+        showNotification({ message });
+        return;
+      }
       setIsModalOpen(false);
       showNotification({ message: 'История опубликована для ваших контактов' });
     } catch {
-      showNotification({ message: 'Не удалось опубликовать историю. Проверьте доступность историй в Telegram.' });
+      const message = 'Не удалось подготовить историю. Попробуйте ещё раз.';
+      setPublishError(message);
+      showNotification({ message });
     } finally {
       setIsPublishing(false);
     }
@@ -136,61 +146,69 @@ const BygramStreakBadge = ({ accountId, peerId, shouldOfferMilestone }: OwnProps
           isOpen
           title={isMilestone ? `Юбилей — ${streak.days} ${pluralizeDays(streak.days)}!` : 'Самолётик bygram'}
           className={styles.modal}
+          contentClassName={styles.modalContent}
           hasCloseButton
           onClose={handleClose}
         >
           <div className={styles.content}>
-            <p className={styles.description}>
-              Самолётик показывает, сколько дней подряд вы оба обмениваетесь сообщениями. Если не общаться сутки,
-              серия исчезнет. Расчёт хранится только на этом устройстве.
-            </p>
-            {currentUser && peerUser && (
-              <div
-                className={`${styles.storyPreview} ${styles[`storyPreview_${storyTemplate}`]}`}
-                aria-label="Предпросмотр истории"
-              >
-                <span className={styles.previewBrand}>bygram</span>
-                <strong>{`У нас уже ${days} ${pluralizeDays(days)}`}</strong>
-                <strong>самолётик в bygram!</strong>
-                <div className={styles.previewPeople}>
-                  <PreviewUser user={currentUser} />
-                  <div className={styles.previewCounter}>
-                    <Icon name="send" />
-                    <b>{days}</b>
-                  </div>
-                  <PreviewUser user={peerUser} />
-                </div>
-              </div>
-            )}
-            <div className={styles.templatePicker} role="radiogroup" aria-label="Шаблон истории">
-              {STORY_TEMPLATES.map(({ id, label: templateLabel }) => (
-                <button
-                  key={id}
-                  type="button"
-                  role="radio"
-                  aria-checked={storyTemplate === id}
-                  className={storyTemplate === id ? styles.templateActive : undefined}
-                  onClick={() => setStoryTemplate(id)}
+            <div className={styles.scrollArea}>
+              <p className={styles.description}>
+                Серия растёт, когда вы оба общаетесь каждый день, и исчезает через сутки без сообщений.
+              </p>
+              {currentUser && peerUser && (
+                <div
+                  className={`${styles.storyPreview} ${styles[`storyPreview_${storyTemplate}`]}`}
+                  aria-label="Предпросмотр истории"
                 >
-                  {templateLabel}
-                </button>
-              ))}
+                  <span className={styles.previewBrand}>bygram</span>
+                  <strong>{`У нас уже ${days} ${pluralizeDays(days)}`}</strong>
+                  <strong>самолётик в bygram!</strong>
+                  <div className={styles.previewPeople}>
+                    <PreviewUser user={currentUser} />
+                    <div className={styles.previewCounter}>
+                      <Icon name="send" />
+                      <b>{days}</b>
+                    </div>
+                    <PreviewUser user={peerUser} />
+                  </div>
+                </div>
+              )}
+              <section className={styles.options}>
+                <span className={styles.sectionLabel}>Оформление</span>
+                <div className={styles.templatePicker} role="radiogroup" aria-label="Шаблон истории">
+                  {STORY_TEMPLATES.map(({ id, label: templateLabel }) => (
+                    <button
+                      key={id}
+                      type="button"
+                      role="radio"
+                      aria-checked={storyTemplate === id}
+                      className={storyTemplate === id ? styles.templateActive : undefined}
+                      onClick={() => setStoryTemplate(id)}
+                    >
+                      {templateLabel}
+                    </button>
+                  ))}
+                </div>
+                <label className={styles.daysField}>
+                  <span>Дней в серии</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={customDays}
+                    aria-label="Число дней серии"
+                    onChange={handleDaysChange}
+                  />
+                </label>
+              </section>
             </div>
-            <label className={styles.daysField}>
-              <span>Число серии для истории</span>
-              <input
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                value={customDays}
-                aria-label="Число дней серии"
-                onChange={handleDaysChange}
-              />
-            </label>
-            <Button fluid isLoading={isPublishing} disabled={isPublishing} onClick={handlePublish}>
-              Выложить историю
-            </Button>
-            <span className={styles.privacy}>Будет опубликовано в Telegram для ваших контактов</span>
+            <div className={styles.footer}>
+              {publishError && <p className={styles.publishError} role="alert">{publishError}</p>}
+              <Button fluid isLoading={isPublishing} disabled={isPublishing} onClick={handlePublish}>
+                Выложить историю
+              </Button>
+              <span className={styles.privacy}>Увидят ваши контакты в Telegram</span>
+            </div>
           </div>
         </Modal>
       )}
@@ -215,6 +233,21 @@ function pluralizeDays(days: number) {
   if (mod10 === 1) return 'день';
   if (mod10 >= 2 && mod10 <= 4) return 'дня';
   return 'дней';
+}
+
+function getStoryPublishError(error?: string) {
+  if (!error) return 'Telegram не ответил на запрос. Проверьте соединение и попробуйте ещё раз.';
+  if (error === 'STORY_DAILY_LIMIT' || error === 'STORIES_TOO_MUCH') {
+    return 'Достигнут дневной лимит историй Telegram.';
+  }
+  if (error === 'PREMIUM_ACCOUNT_REQUIRED') {
+    return 'Для публикации этой истории Telegram требует Premium.';
+  }
+  if (error.startsWith('FLOOD_WAIT') || error.startsWith('STORY_SEND_FLOOD')) {
+    return 'Telegram временно ограничил частые публикации. Попробуйте позже.';
+  }
+  if (error === 'STORY_NOT_MODIFIED') return 'Такая история уже опубликована.';
+  return `Telegram отклонил публикацию: ${error}`;
 }
 
 export default memo(BygramStreakBadge);
