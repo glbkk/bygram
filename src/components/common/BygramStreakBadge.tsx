@@ -204,10 +204,15 @@ const BygramStreakBadge = ({ accountId, peerId, shouldOfferMilestone }: OwnProps
             </div>
             <div className={styles.footer}>
               {publishError && <p className={styles.publishError} role="alert">{publishError}</p>}
-              <Button fluid isLoading={isPublishing} disabled={isPublishing} onClick={handlePublish}>
+              <Button
+                className={styles.publishButton}
+                isLoading={isPublishing}
+                disabled={isPublishing}
+                onClick={handlePublish}
+              >
                 Выложить историю
               </Button>
-              <span className={styles.privacy}>Увидят ваши контакты в Telegram</span>
+              <span className={styles.privacy}>Увидят все пользователи Telegram · 6 часов</span>
             </div>
           </div>
         </Modal>

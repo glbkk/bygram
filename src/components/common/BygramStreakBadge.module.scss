@@ -235,13 +235,13 @@
   > span {
     overflow: hidden;
     min-width: 0;
-
     font-size: 0.875rem;
     font-weight: var(--font-weight-normal);
   }
 
   > input {
     flex: none;
+
     box-sizing: border-box;
     width: 4.5rem;
     min-width: 0;
@@ -318,6 +318,11 @@
   line-height: 1.3;
   color: var(--color-error);
   text-align: center;
+}
+
+.publishButton {
+  width: min(100%, 22.5rem) !important;
+  margin-inline: auto;
 }
 
 .privacy {

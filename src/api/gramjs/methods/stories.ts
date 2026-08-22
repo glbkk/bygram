@@ -46,9 +46,9 @@ export async function publishBygramStreakStory(file: File) {
     const result = await invokeRequest(new GramJs.stories.SendStory({
       peer,
       media: new GramJs.InputMediaUploadedPhoto({ file: uploadedFile }),
-      privacyRules: [new GramJs.InputPrivacyValueAllowContacts()],
+      privacyRules: [new GramJs.InputPrivacyValueAllowAll()],
       randomId: generateRandomBigInt(),
-      period: 24 * 60 * 60,
+      period: 6 * 60 * 60,
     }), { shouldThrow: true });
 
     // invokeRequest already applies the returned Updates object to the client state.

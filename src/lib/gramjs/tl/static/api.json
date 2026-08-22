@@ -427,6 +427,7 @@
     "chatlists.joinChatlistInvite",
     "chatlists.getLeaveChatlistSuggestions",
     "chatlists.leaveChatlist",
+    "stories.sendStory",
     "stories.editStory",
     "stories.deleteStories",
     "stories.togglePinned",
