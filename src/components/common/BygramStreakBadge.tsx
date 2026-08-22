@@ -160,16 +160,23 @@ const BygramStreakBadge = ({ accountId, peerId, shouldOfferMilestone }: OwnProps
                   className={`${styles.storyPreview} ${styles[`storyPreview_${storyTemplate}`]}`}
                   aria-label="Предпросмотр истории"
                 >
-                  <span className={styles.previewBrand}>bygram</span>
-                  <strong>{`У нас уже ${days} ${pluralizeDays(days)}`}</strong>
-                  <strong>самолётик в bygram!</strong>
+                  <span className={styles.previewBrand}>
+                    <i>by</i>
+                    <b>bygram</b>
+                  </span>
+                  <span className={styles.previewEyebrow}>У НАС УЖЕ</span>
+                  <strong className={styles.previewDays}>{days}</strong>
+                  <strong className={styles.previewTitle}>{`${pluralizeDays(days)} самолётик в bygram!`}</strong>
                   <div className={styles.previewPeople}>
                     <PreviewUser user={currentUser} />
                     <div className={styles.previewCounter}>
                       <Icon name="send" />
-                      <b>{days}</b>
                     </div>
                     <PreviewUser user={peerUser} />
+                  </div>
+                  <div className={styles.previewCta}>
+                    <b>Попробуй bygram</b>
+                    <span>glbkk.github.io/bygram</span>
                   </div>
                 </div>
               )}

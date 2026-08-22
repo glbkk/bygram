@@ -7,7 +7,9 @@ import * as mediaLoader from './mediaLoader';
 const WIDTH = 1080;
 const HEIGHT = 1920;
 const MIME_TYPE = 'image/jpeg';
-const JPEG_QUALITY = 0.92;
+const JPEG_QUALITY = 0.95;
+const FONT_FAMILY = '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+const BYGRAM_URL = 'glbkk.github.io/bygram';
 
 export type BygramStreakStoryTemplate = 'telegram' | 'aurora' | 'midnight';
 
@@ -16,11 +18,18 @@ const PALETTES: Record<BygramStreakStoryTemplate, {
   middle: string;
   end: string;
   accent: string;
-  card: string;
+  glow: string;
+  glowSecondary: string;
 }> = {
-  telegram: { start: '#168ACD', middle: '#287FC1', end: '#7059C8', accent: '#247DC0', card: '#0A2545' },
-  aurora: { start: '#19B7C9', middle: '#4288DA', end: '#8B62D3', accent: '#477DD1', card: '#203C72' },
-  midnight: { start: '#0E1621', middle: '#172E47', end: '#35306F', accent: '#58B8F5', card: '#07131F' },
+  telegram: {
+    start: '#071B33', middle: '#126CA8', end: '#6C4FD3', accent: '#2AABEE', glow: '#57C8FF', glowSecondary: '#A980FF',
+  },
+  aurora: {
+    start: '#073A48', middle: '#167E9A', end: '#7D4EC9', accent: '#53D6E5', glow: '#62F0E2', glowSecondary: '#D88CFF',
+  },
+  midnight: {
+    start: '#050A12', middle: '#102A43', end: '#272052', accent: '#58B8F5', glow: '#2AABEE', glowSecondary: '#826DFF',
+  },
 };
 
 export async function createBygramStreakStoryFile(
@@ -36,16 +45,16 @@ export async function createBygramStreakStoryFile(
 
   const palette = PALETTES[template];
   drawBackground(context, palette);
-  const [currentAvatar, peerAvatar] = await Promise.all([
+  const [currentAvatar, peerAvatar, appIcon] = await Promise.all([
     loadAvatar(currentUser),
     loadAvatar(peerUser),
+    loadAppIcon(),
   ]);
 
-  drawBrand(context, palette.accent);
+  drawBrand(context, appIcon);
   drawTitle(context, days);
-  drawUsers(context, currentUser, peerUser, currentAvatar, peerAvatar);
-  drawCounter(context, days, palette.accent);
-  drawFooter(context);
+  drawUsers(context, currentUser, peerUser, currentAvatar, peerAvatar, palette.accent);
+  drawFooter(context, palette.accent);
 
   const blob = await canvasToBlob(canvas);
   return new File([blob], `bygram-plane-${days}.jpg`, { type: MIME_TYPE });
@@ -59,57 +68,67 @@ function drawBackground(context: CanvasRenderingContext2D, palette: typeof PALET
   context.fillStyle = gradient;
   context.fillRect(0, 0, WIDTH, HEIGHT);
 
+  drawGlow(context, 150, 360, 520, palette.glow, 0.34);
+  drawGlow(context, 950, 720, 620, palette.glowSecondary, 0.3);
+  drawGlow(context, 460, 1630, 700, palette.glow, 0.16);
+
   context.save();
-  context.globalAlpha = 0.075;
+  context.globalAlpha = 0.065;
   context.strokeStyle = '#FFFFFF';
-  context.lineWidth = 4;
-  for (let y = 80; y < HEIGHT; y += 190) {
-    for (let x = -80 + (y % 380); x < WIDTH + 120; x += 300) {
+  context.lineWidth = 3;
+  for (let y = 100; y < HEIGHT; y += 230) {
+    for (let x = -120 + (y % 460); x < WIDTH + 140; x += 360) {
       context.save();
       context.translate(x, y);
       context.rotate(-0.34);
-      drawPlane(context, 46);
+      drawPlane(context, 38);
       context.stroke();
       context.restore();
     }
   }
   context.restore();
 
-  context.fillStyle = `${palette.card}38`;
-  roundedRect(context, 72, 370, WIDTH - 144, 1110, 64);
+  roundedRect(context, 48, 48, WIDTH - 96, HEIGHT - 96, 76);
+  context.fillStyle = 'rgba(4, 16, 35, 0.14)';
   context.fill();
-  context.strokeStyle = 'rgba(255, 255, 255, 0.18)';
-  context.lineWidth = 3;
+  context.strokeStyle = 'rgba(255, 255, 255, 0.16)';
+  context.lineWidth = 2;
   context.stroke();
 }
 
-function drawBrand(context: CanvasRenderingContext2D, accent: string) {
-  context.textAlign = 'center';
-  context.fillStyle = 'rgba(255, 255, 255, 0.82)';
-  context.font = '600 34px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-  context.fillText('bygram', WIDTH / 2, 205);
+function drawBrand(context: CanvasRenderingContext2D, appIcon?: HTMLImageElement) {
+  const iconSize = 82;
+  const iconX = 386;
+  const iconY = 185;
+  drawAppIcon(context, appIcon, iconX, iconY, iconSize);
 
-  context.beginPath();
-  context.arc(WIDTH / 2, 285, 44, 0, Math.PI * 2);
+  context.textAlign = 'left';
   context.fillStyle = '#FFFFFF';
-  context.fill();
-  context.save();
-  context.translate(WIDTH / 2, 285);
-  context.rotate(-0.25);
-  context.strokeStyle = accent;
-  context.lineWidth = 7;
-  drawPlane(context, 48);
-  context.stroke();
-  context.restore();
+  context.font = `800 44px ${FONT_FAMILY}`;
+  context.fillText('bygram', iconX + iconSize + 24, iconY + 55);
 }
 
 function drawTitle(context: CanvasRenderingContext2D, days: number) {
   context.textAlign = 'center';
+  context.fillStyle = 'rgba(255, 255, 255, 0.72)';
+  context.font = `700 31px ${FONT_FAMILY}`;
+  drawTrackedText(context, 'У НАС УЖЕ', WIDTH / 2, 365, 8);
+
+  const daysText = String(days);
+  const numberSize = daysText.length >= 5 ? 180 : daysText.length >= 4 ? 208 : 244;
   context.fillStyle = '#FFFFFF';
-  context.font = '800 64px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-  context.fillText(`У нас уже ${days} ${pluralizeDays(days)}`, WIDTH / 2, 535);
-  context.font = '700 58px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-  context.fillText('самолётик в bygram!', WIDTH / 2, 610);
+  context.font = `900 ${numberSize}px ${FONT_FAMILY}`;
+  context.shadowColor = 'rgba(3, 19, 44, 0.24)';
+  context.shadowBlur = 30;
+  context.fillText(daysText, WIDTH / 2, 600, 860);
+  context.shadowBlur = 0;
+
+  context.fillStyle = '#FFFFFF';
+  context.font = `800 50px ${FONT_FAMILY}`;
+  context.fillText(`${pluralizeDays(days)} самолётик в bygram!`, WIDTH / 2, 680, 900);
+  context.fillStyle = 'rgba(255, 255, 255, 0.7)';
+  context.font = `500 28px ${FONT_FAMILY}`;
+  context.fillText('Каждый день — ещё одна глава нашей истории', WIDTH / 2, 735);
 }
 
 function drawUsers(
@@ -118,18 +137,30 @@ function drawUsers(
   peerUser: ApiUser,
   currentAvatar?: HTMLImageElement,
   peerAvatar?: HTMLImageElement,
+  accent = '#2AABEE',
 ) {
-  const leftX = 320;
+  const leftX = 326;
   const rightX = WIDTH - leftX;
-  const avatarY = 905;
+  const avatarY = 970;
+
+  context.save();
+  context.strokeStyle = 'rgba(255, 255, 255, 0.34)';
+  context.lineWidth = 5;
+  context.setLineDash([12, 18]);
+  context.beginPath();
+  context.moveTo(leftX + 155, avatarY);
+  context.bezierCurveTo(500, avatarY - 50, 580, avatarY + 50, rightX - 155, avatarY);
+  context.stroke();
+  context.restore();
+
   drawAvatar(context, currentUser, currentAvatar, leftX, avatarY);
   drawAvatar(context, peerUser, peerAvatar, rightX, avatarY);
+  drawPlaneBadge(context, WIDTH / 2, avatarY, accent);
 
   context.textAlign = 'center';
   context.fillStyle = '#FFFFFF';
-  context.font = '700 38px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-  context.fillText(formatUserLabel(currentUser), leftX, 1075, 350);
-  context.fillText(formatUserLabel(peerUser), rightX, 1075, 350);
+  drawUsernamePill(context, formatUserLabel(currentUser), leftX, 1165);
+  drawUsernamePill(context, formatUserLabel(peerUser), rightX, 1165);
 }
 
 function drawAvatar(
@@ -139,12 +170,15 @@ function drawAvatar(
   x: number,
   y: number,
 ) {
-  const radius = 132;
+  const radius = 142;
   context.save();
+  context.shadowColor = 'rgba(4, 17, 40, 0.36)';
+  context.shadowBlur = 34;
   context.beginPath();
-  context.arc(x, y, radius + 12, 0, Math.PI * 2);
-  context.fillStyle = 'rgba(255, 255, 255, 0.22)';
+  context.arc(x, y, radius + 11, 0, Math.PI * 2);
+  context.fillStyle = 'rgba(255, 255, 255, 0.92)';
   context.fill();
+  context.shadowBlur = 0;
   context.beginPath();
   context.arc(x, y, radius, 0, Math.PI * 2);
   context.clip();
@@ -163,46 +197,147 @@ function drawAvatar(
     context.fillStyle = '#FFFFFF';
     context.textAlign = 'center';
     context.textBaseline = 'middle';
-    context.font = '700 82px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    context.font = `800 86px ${FONT_FAMILY}`;
     context.fillText(getInitials(getUserFullName(user) || ''), x, y + 4);
   }
   context.restore();
 }
 
-function drawCounter(context: CanvasRenderingContext2D, days: number, accent: string) {
-  const x = WIDTH / 2;
-  const y = 905;
+function drawPlaneBadge(context: CanvasRenderingContext2D, x: number, y: number, accent: string) {
   context.beginPath();
-  context.arc(x, y, 112, 0, Math.PI * 2);
+  context.arc(x, y, 86, 0, Math.PI * 2);
   context.fillStyle = '#FFFFFF';
-  context.shadowColor = 'rgba(10, 32, 61, 0.35)';
-  context.shadowBlur = 42;
+  context.shadowColor = 'rgba(4, 17, 40, 0.42)';
+  context.shadowBlur = 36;
   context.fill();
   context.shadowBlur = 0;
 
   context.save();
-  context.translate(x, y - 30);
+  context.translate(x, y);
   context.rotate(-0.25);
-  context.strokeStyle = accent;
-  context.lineWidth = 8;
-  drawPlane(context, 58);
-  context.stroke();
-  context.restore();
-
-  context.textAlign = 'center';
   context.fillStyle = accent;
-  context.font = '800 48px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-  context.fillText(String(days), x, y + 67);
+  drawPlane(context, 43);
+  context.fill();
+  context.restore();
 }
 
-function drawFooter(context: CanvasRenderingContext2D) {
+function drawFooter(context: CanvasRenderingContext2D, accent: string) {
+  const x = 106;
+  const y = 1360;
+  const width = WIDTH - x * 2;
+  const height = 350;
+
+  roundedRect(context, x, y, width, height, 54);
+  context.fillStyle = 'rgba(5, 18, 40, 0.34)';
+  context.fill();
+  context.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+  context.lineWidth = 2;
+  context.stroke();
+
   context.textAlign = 'center';
-  context.fillStyle = 'rgba(255, 255, 255, 0.78)';
-  context.font = '500 32px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-  context.fillText('Общаемся каждый день', WIDTH / 2, 1360);
-  context.fillStyle = 'rgba(255, 255, 255, 0.56)';
-  context.font = '500 27px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-  context.fillText('Серия считается на устройстве', WIDTH / 2, 1410);
+  context.fillStyle = 'rgba(255, 255, 255, 0.68)';
+  context.font = `700 23px ${FONT_FAMILY}`;
+  drawTrackedText(context, 'TELEGRAM, КОТОРЫЙ ТВОЙ', WIDTH / 2, y + 66, 4);
+  context.fillStyle = '#FFFFFF';
+  context.font = `850 54px ${FONT_FAMILY}`;
+  context.fillText('Попробуй bygram', WIDTH / 2, y + 137);
+  context.fillStyle = 'rgba(255, 255, 255, 0.72)';
+  context.font = `500 28px ${FONT_FAMILY}`;
+  context.fillText('Анти-удаление · история правок · свои пузыри', WIDTH / 2, y + 187);
+
+  const pillWidth = 570;
+  const pillHeight = 82;
+  const pillX = (WIDTH - pillWidth) / 2;
+  const pillY = y + 225;
+  roundedRect(context, pillX, pillY, pillWidth, pillHeight, pillHeight / 2);
+  context.fillStyle = '#FFFFFF';
+  context.shadowColor = 'rgba(2, 14, 34, 0.3)';
+  context.shadowBlur = 28;
+  context.fill();
+  context.shadowBlur = 0;
+  context.fillStyle = accent;
+  context.font = `750 27px ${FONT_FAMILY}`;
+  context.fillText(BYGRAM_URL, WIDTH / 2 + 22, pillY + 52);
+  context.save();
+  context.translate(pillX + 54, pillY + pillHeight / 2);
+  context.rotate(-0.25);
+  context.fillStyle = accent;
+  drawPlane(context, 22);
+  context.fill();
+  context.restore();
+}
+
+function drawGlow(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  radius: number,
+  color: string,
+  opacity: number,
+) {
+  const gradient = context.createRadialGradient(x, y, 0, x, y, radius);
+  gradient.addColorStop(0, color);
+  gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  context.save();
+  context.globalAlpha = opacity;
+  context.fillStyle = gradient;
+  context.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+  context.restore();
+}
+
+function drawAppIcon(
+  context: CanvasRenderingContext2D,
+  image: HTMLImageElement | undefined,
+  x: number,
+  y: number,
+  size: number,
+) {
+  context.save();
+  roundedRect(context, x, y, size, size, 22);
+  context.clip();
+  if (image) {
+    context.drawImage(image, x, y, size, size);
+  } else {
+    context.fillStyle = '#08090C';
+    context.fillRect(x, y, size, size);
+    context.fillStyle = '#FFFFFF';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.font = `800 34px ${FONT_FAMILY}`;
+    context.fillText('by', x + size / 2, y + size / 2 + 2);
+  }
+  context.restore();
+}
+
+function drawUsernamePill(context: CanvasRenderingContext2D, label: string, x: number, y: number) {
+  const maxWidth = 330;
+  context.font = `700 31px ${FONT_FAMILY}`;
+  const textWidth = Math.min(maxWidth - 44, context.measureText(label).width);
+  const pillWidth = Math.max(170, textWidth + 44);
+  roundedRect(context, x - pillWidth / 2, y - 42, pillWidth, 64, 32);
+  context.fillStyle = 'rgba(5, 18, 40, 0.28)';
+  context.fill();
+  context.fillStyle = '#FFFFFF';
+  context.textAlign = 'center';
+  context.fillText(label, x, y, maxWidth - 44);
+}
+
+function drawTrackedText(
+  context: CanvasRenderingContext2D,
+  text: string,
+  centerX: number,
+  y: number,
+  spacing: number,
+) {
+  const widths = [...text].map((letter) => context.measureText(letter).width);
+  const totalWidth = widths.reduce((sum, width) => sum + width, 0) + spacing * (text.length - 1);
+  let x = centerX - totalWidth / 2;
+  context.textAlign = 'left';
+  [...text].forEach((letter, index) => {
+    context.fillText(letter, x, y);
+    x += widths[index] + spacing;
+  });
+  context.textAlign = 'center';
 }
 
 function drawPlane(context: CanvasRenderingContext2D, size: number) {
@@ -238,6 +373,14 @@ async function loadAvatar(user: ApiUser) {
   try {
     const url = await mediaLoader.fetch(hash, ApiMediaFormat.BlobUrl);
     return await loadImage(url);
+  } catch {
+    return undefined;
+  }
+}
+
+async function loadAppIcon() {
+  try {
+    return await loadImage(new URL('icon-512x512.png', document.baseURI).href);
   } catch {
     return undefined;
   }
