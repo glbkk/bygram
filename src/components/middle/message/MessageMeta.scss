@@ -218,26 +218,8 @@
 }
 
 @media (max-width: 600px) {
-  .bygram-history-modal .modal-container {
-    align-items: flex-end;
-  }
-
   .bygram-history-modal .modal-dialog {
-    width: 100%;
-    max-width: 100% !important;
     min-height: calc(var(--vh, 1vh) * 45);
-    max-height: calc(var(--vh, 1vh) * 82);
-    margin: 0;
-    border-radius: 1rem 1rem 0 0;
-  }
-
-  .bygram-history-modal .modal-content {
-    max-height: none;
-    padding-bottom: max(1rem, env(safe-area-inset-bottom));
-  }
-
-  .bygram-history-modal:not(.open) .modal-dialog {
-    transform: translate3d(0, 6rem, 0);
   }
 }
 

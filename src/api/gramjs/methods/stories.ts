@@ -42,11 +42,6 @@ export async function publishBygramStreakStory(file: File) {
   const peer = new GramJs.InputPeerSelf();
 
   try {
-    const availability = await invokeRequest(new GramJs.stories.CanSendStory({ peer }), { shouldThrow: true });
-    if (!availability || availability.countRemains <= 0) {
-      return { isSuccess: false as const, error: 'STORY_DAILY_LIMIT' };
-    }
-
     const uploadedFile = await uploadFile(file);
     const result = await invokeRequest(new GramJs.stories.SendStory({
       peer,

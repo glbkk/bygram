@@ -257,7 +257,7 @@ const MessageMeta = ({
       <Modal
         isOpen={isHistoryOpen}
         title={lang('BygramEditHistoryTitle')}
-        className="bygram-history-modal"
+        className="bygram-history-modal mobile-bottom-sheet"
         hasCloseButton
         onClose={closeHistory}
       >

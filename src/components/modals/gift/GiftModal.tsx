@@ -369,7 +369,7 @@ const GiftModal: FC<OwnProps & StateProps> = ({
                 className={styles.archivedGiftImage}
                 src={getBygramLegacyGiftImageUrl(id)}
                 alt=""
-                loading="lazy"
+                decoding="async"
               />
               <span className={styles.archivedGiftTitle}>{lang(titleKey)}</span>
               <span className={styles.archivedGiftPrice}>
@@ -638,7 +638,7 @@ const GiftModal: FC<OwnProps & StateProps> = ({
       isOpen={isOpen}
       isSlim
       contentClassName={styles.content}
-      className={buildClassName(styles.modalDialog, styles.root)}
+      className={buildClassName(styles.root, 'mobile-full-screen')}
       isLowStackPriority
       withBalanceBar
     >

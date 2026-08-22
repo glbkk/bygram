@@ -21,18 +21,6 @@
 }
 
 @media (max-width: 600px) {
-  .root :global(.modal-container) {
-    align-items: flex-end;
-  }
-
-  .root :global(.modal-dialog) {
-    width: 100%;
-    max-width: 100% !important;
-    height: calc(var(--vh, 1vh) * 100);
-    margin: 0;
-    border-radius: 0;
-  }
-
   .transition,
   .content {
     height: 100%;

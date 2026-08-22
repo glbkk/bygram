@@ -145,7 +145,7 @@ const BygramStreakBadge = ({ accountId, peerId, shouldOfferMilestone }: OwnProps
         <Modal
           isOpen
           title={isMilestone ? `Юбилей — ${streak.days} ${pluralizeDays(streak.days)}!` : 'Самолётик bygram'}
-          className={styles.modal}
+          className={`${styles.modal} mobile-full-screen`}
           contentClassName={styles.modalContent}
           hasCloseButton
           onClose={handleClose}

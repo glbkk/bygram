@@ -105,7 +105,7 @@ const BygramChatPasswordModal = () => {
 
   return (
     <Modal
-      className={styles.modal}
+      className={`${styles.modal} mobile-bottom-sheet`}
       contentClassName={styles.modalContent}
       isOpen={Boolean(request)}
       title={title}
