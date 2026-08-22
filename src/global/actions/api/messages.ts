@@ -44,8 +44,10 @@ import {
 import { ensureProtocol, isMixedScriptUrl } from '../../../util/browser/url';
 import { IS_IOS } from '../../../util/browser/windowEnvironment';
 import { getArchivedRetainedMessages } from '../../../util/bygramArchive';
+import { recordBygramStreakMessage } from '../../../util/bygramStreak';
 import { copyTextToClipboardFromPromise } from '../../../util/clipboard';
 import { isDeepLink } from '../../../util/deepLinkParser';
+import { isUserId } from '../../../util/entities/ids';
 import { getCurrentTabId } from '../../../util/establishMultitabRole';
 import {
   areSortedArraysIntersecting,
@@ -1988,6 +1990,13 @@ async function loadViewportMessages<T extends GlobalState>(
   const {
     messages, count, topics,
   } = result;
+
+  if (isUserId(chatId) && currentUserId) {
+    const peerUser = selectUser(global, chatId);
+    if (!peerUser || !isUserBot(peerUser)) {
+      messages.forEach((message) => recordBygramStreakMessage(currentUserId, message));
+    }
+  }
 
   const archivedRetainedRecords = await getArchivedRetainedMessages(chatId).catch(() => []);
 

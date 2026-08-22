@@ -753,6 +753,12 @@ addActionHandler('apiUpdate', (global, actions, update): ActionReturnType => {
       };
 
       const newMessage = selectChatMessage(global, chatId, message.id)!;
+      if (isUserId(chatId) && global.currentUserId) {
+        const peerUser = selectUser(global, chatId);
+        if (!peerUser || !isUserBot(peerUser)) {
+          recordBygramStreakMessage(global.currentUserId, newMessage);
+        }
+      }
       global = updateChatLastMessage(global, chatId, newMessage);
 
       const thread = selectThreadByMessage(global, message);

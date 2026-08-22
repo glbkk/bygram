@@ -316,7 +316,11 @@ const MiddleHeader = ({
               emojiStatusSize={EMOJI_STATUS_SIZE}
               noRtl
               afterElement={currentUserId && user && !isUserBot(user) && !isChatWithSelf ? (
-                <BygramStreakBadge accountId={currentUserId} peerId={displayChatId} />
+                <BygramStreakBadge
+                  accountId={currentUserId}
+                  peerId={displayChatId}
+                  shouldOfferMilestone
+                />
               ) : undefined}
               onEmojiStatusClick={handleUserStatusClick}
             />

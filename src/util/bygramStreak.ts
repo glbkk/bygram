@@ -18,9 +18,9 @@ type StreakRecord = {
 type StreakStore = Record<string, Record<string, StreakRecord>>;
 
 const STORAGE_KEY = 'bygram-chat-streaks-v1';
+const MILESTONE_STORAGE_KEY = 'bygram-chat-streak-milestones-v1';
 const STREAK_CHANGE_EVENT = 'bygram-chat-streak-change';
 const DAY_MS = 24 * 60 * 60 * 1000;
-const MIN_STREAK_DAYS = 3;
 
 export function recordBygramStreakMessage(accountId: string, message: ApiMessage) {
   if (!accountId || message.chatId === accountId || message.content.action || message.date <= 0) return;
@@ -29,7 +29,7 @@ export function recordBygramStreakMessage(accountId: string, message: ApiMessage
   const store = loadStore();
   const accountRecords = store[accountId] || {};
   const current = accountRecords[message.chatId] || { days: {}, lastActivityAt: 0 };
-  const dayKey = getLocalDayKey(messageAt);
+  const dayKey = getDayKey(messageAt);
   const day = current.days[dayKey] || { latestAt: 0 };
 
   if (message.isOutgoing) {
@@ -55,20 +55,40 @@ export function getBygramStreak(accountId?: string, peerId?: string, now = Date.
   const record = loadStore()[accountId]?.[peerId];
   if (!record || now - record.lastActivityAt >= DAY_MS) return undefined;
 
-  const cursor = new Date(now);
-  cursor.setHours(0, 0, 0, 0);
+  let cursor = getUtcDayStart(now);
 
-  if (!isQualifiedDay(record.days[getLocalDayKey(cursor.getTime())])) {
-    cursor.setDate(cursor.getDate() - 1);
+  if (!isQualifiedDay(record.days[getDayKey(cursor)])) {
+    cursor -= DAY_MS;
   }
 
   let days = 0;
-  while (isQualifiedDay(record.days[getLocalDayKey(cursor.getTime())])) {
+  while (isQualifiedDay(record.days[getDayKey(cursor)])) {
     days += 1;
-    cursor.setDate(cursor.getDate() - 1);
+    cursor -= DAY_MS;
   }
 
-  return days >= MIN_STREAK_DAYS ? { days } : undefined;
+  return days ? { days } : undefined;
+}
+
+export function shouldOfferBygramStreakMilestone(accountId: string, peerId: string, days: number) {
+  if (days < 10 || days % 10 !== 0) return false;
+
+  try {
+    const offered = JSON.parse(localStorage.getItem(MILESTONE_STORAGE_KEY) || '{}') as Record<string, number>;
+    return offered[`${accountId}:${peerId}`] !== days;
+  } catch {
+    return true;
+  }
+}
+
+export function markBygramStreakMilestoneOffered(accountId: string, peerId: string, days: number) {
+  try {
+    const offered = JSON.parse(localStorage.getItem(MILESTONE_STORAGE_KEY) || '{}') as Record<string, number>;
+    offered[`${accountId}:${peerId}`] = days;
+    localStorage.setItem(MILESTONE_STORAGE_KEY, JSON.stringify(offered));
+  } catch {
+    // A blocked localStorage must not affect messaging.
+  }
 }
 
 export function subscribeToBygramStreak(
@@ -97,12 +117,17 @@ function isQualifiedDay(activity?: DayActivity) {
   return Boolean(activity?.incoming && activity.outgoing);
 }
 
-function getLocalDayKey(timestamp: number) {
+function getDayKey(timestamp: number) {
   const date = new Date(timestamp);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+function getUtcDayStart(timestamp: number) {
+  const date = new Date(timestamp);
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
 }
 
 function loadStore(): StreakStore {

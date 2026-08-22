@@ -226,6 +226,20 @@ function SettingsBygram({ isActive, onReset }: OwnProps) {
         />
       </Island>
 
+      <IslandTitle>Самолётик</IslandTitle>
+      <Island>
+        <Checkbox
+          label="Серия общения"
+          subLabel="Показывать самолётик и число дней, когда вы общаетесь каждый день"
+          checked={settings.isChatStreakEnabled}
+          onCheck={(value) => handleSettingChange('isChatStreakEnabled', value)}
+        />
+      </Island>
+      <IslandDescription>
+        Серия считается локально по сообщениям, которые bygram успел получить. У собеседника в bygram она
+        рассчитывается по тем же сообщениям независимо.
+      </IslandDescription>
+
       <IslandTitle dir={lang.isRtl ? 'rtl' : undefined}>{lang('BygramBubbleTitle')}</IslandTitle>
       <Island>
         <div className={styles.bubbleGrid} role="radiogroup" aria-label={lang('BygramBubbleTitle')}>

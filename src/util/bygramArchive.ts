@@ -32,6 +32,7 @@ export type BygramSettings = {
   isEditHistoryEnabled: boolean;
   isMediaArchiveEnabled: boolean;
   isGhostModeEnabled: boolean;
+  isChatStreakEnabled: boolean;
   mediaArchiveLimitMb: number;
   messageBubbleStyle: BygramMessageBubbleStyle;
   messageBubbleColor: string;
@@ -208,6 +209,7 @@ const DEFAULT_SETTINGS: BygramSettings = {
   isEditHistoryEnabled: true,
   isMediaArchiveEnabled: false,
   isGhostModeEnabled: false,
+  isChatStreakEnabled: true,
   mediaArchiveLimitMb: 256,
   messageBubbleStyle: 'default',
   messageBubbleColor: '#7C5CFC',

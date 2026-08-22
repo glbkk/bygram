@@ -1,5 +1,6 @@
 import { Api as GramJs } from '../../../lib/gramjs';
 import { RPCError } from '../../../lib/gramjs/errors';
+import { generateRandomBigInt } from '../../../lib/gramjs/Helpers';
 
 import type {
   ApiError,
@@ -33,7 +34,24 @@ import {
 } from '../gramjsBuilders';
 import { addStoryToLocalDb } from '../helpers/localDb';
 import { deserializeBytes } from '../helpers/misc';
-import { dispatchErrorUpdate, invokeRequest } from './client';
+import {
+  dispatchErrorUpdate, handleGramJsUpdate, invokeRequest, uploadFile,
+} from './client';
+
+export async function publishBygramStreakStory(file: File) {
+  const uploadedFile = await uploadFile(file);
+  const result = await invokeRequest(new GramJs.stories.SendStory({
+    peer: new GramJs.InputPeerSelf(),
+    media: new GramJs.InputMediaUploadedPhoto({ file: uploadedFile }),
+    privacyRules: [new GramJs.InputPrivacyValueAllowContacts()],
+    randomId: generateRandomBigInt(),
+  }), { shouldThrow: true });
+
+  if (!result) return false;
+
+  handleGramJsUpdate(result);
+  return true;
+}
 
 export async function fetchAllStories({
   stateHash,
