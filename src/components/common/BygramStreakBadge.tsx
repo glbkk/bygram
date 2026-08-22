@@ -37,6 +37,9 @@ const STORY_TEMPLATES: Array<{ id: BygramStreakStoryTemplate; label: string }> =
   { id: 'telegram', label: 'Telegram' },
   { id: 'aurora', label: 'Аврора' },
   { id: 'midnight', label: 'Ночная' },
+  { id: 'editorial', label: 'Карточки' },
+  { id: 'clouds', label: 'Облака' },
+  { id: 'premium', label: 'Премиум' },
 ];
 
 const BygramStreakBadge = ({ accountId, peerId, shouldOfferMilestone }: OwnProps) => {
@@ -175,7 +178,6 @@ const BygramStreakBadge = ({ accountId, peerId, shouldOfferMilestone }: OwnProps
                     <PreviewUser user={peerUser} />
                   </div>
                   <div className={styles.previewCta}>
-                    <b>Попробуй bygram</b>
                     <span>glbkk.github.io/bygram</span>
                   </div>
                 </div>
