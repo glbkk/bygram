@@ -45,6 +45,7 @@ import Link from '../../ui/Link';
 import ListItem from '../../ui/ListItem';
 import TextArea from '../../ui/TextArea';
 import Chat from '../main/Chat';
+import BygramProfileBannerEditor from './BygramProfileBannerEditor';
 
 import styles from './SettingsEditProfile.module.scss';
 
@@ -347,6 +348,10 @@ const SettingsEditProfile = ({
             disabled={isLoading}
           />
         </IslandOutside>
+        <IslandTitle>Оформление bygram</IslandTitle>
+        <Island>
+          <BygramProfileBannerEditor />
+        </Island>
         <Island>
           <div className="settings-input">
             <InputText

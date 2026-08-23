@@ -44,8 +44,14 @@ import {
   selectUser,
   selectUserFullInfo,
 } from '../../global/selectors';
+import {
+  getBygramChatWallpaperKey,
+  removeBygramCustomizationMedia,
+  saveBygramCustomizationMedia,
+} from '../../util/bygramCustomization';
 import { isUserId } from '../../util/entities/ids';
 import { disableScrolling } from '../../util/scrollLock';
+import { openSystemFilesDialog } from '../../util/systemFilesDialog';
 
 import useAppLayout from '../../hooks/useAppLayout';
 import useFlag from '../../hooks/useFlag';
@@ -104,6 +110,7 @@ export type OwnProps = {
 };
 
 type StateProps = {
+  currentUserId?: string;
   chat?: ApiChat;
   botCommands?: ApiBotCommand[];
   botPrivacyPolicyUrl?: string;
@@ -138,6 +145,7 @@ const CLOSE_MENU_ANIMATION_DURATION = 200;
 
 const HeaderMenuContainer: FC<OwnProps & StateProps> = ({
   chatId,
+  currentUserId,
   threadId,
   isOpen,
   anchor,
@@ -417,6 +425,36 @@ const HeaderMenuContainer: FC<OwnProps & StateProps> = ({
   const handleSearch = useLastCallback(() => {
     onSearchClick();
     closeMenu();
+  });
+
+  const handleChatWallpaperSelect = useLastCallback(() => {
+    closeMenu();
+    if (!currentUserId) return;
+
+    openSystemFilesDialog('image/jpeg,image/png,image/webp,image/avif', (event) => {
+      const file = (event.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      if (file.size > 20 * 1024 * 1024) {
+        showNotification({ message: 'Обои должны быть меньше 20 МБ' });
+        return;
+      }
+
+      saveBygramCustomizationMedia(
+        getBygramChatWallpaperKey(currentUserId, chatId), file, 'gallery',
+      ).then(() => {
+        showNotification({ message: 'Обои чата сохранены' });
+      }).catch(() => {
+        showNotification({ message: 'Не удалось сохранить обои' });
+      });
+    }, true);
+  });
+
+  const handleChatWallpaperRemove = useLastCallback(() => {
+    closeMenu();
+    if (!currentUserId) return;
+    removeBygramCustomizationMedia(getBygramChatWallpaperKey(currentUserId, chatId)).then(() => {
+      showNotification({ message: 'Обои чата удалены' });
+    });
   });
 
   const handleStatisticsClick = useLastCallback(() => {
@@ -739,6 +777,22 @@ const HeaderMenuContainer: FC<OwnProps & StateProps> = ({
           )}
           {!withForumActions && (
             <MenuItem
+              icon="photo"
+              onClick={handleChatWallpaperSelect}
+            >
+              {lang('BygramChatWallpaper')}
+            </MenuItem>
+          )}
+          {!withForumActions && (
+            <MenuItem
+              icon="delete"
+              onClick={handleChatWallpaperRemove}
+            >
+              {lang('BygramChatWallpaperRemove')}
+            </MenuItem>
+          )}
+          {!withForumActions && (
+            <MenuItem
               icon="select"
               onClick={handleSelectMessages}
             >
@@ -901,6 +955,7 @@ export default memo(withGlobal<OwnProps>(
     const chatInfo = selectTabState(global).chatInfo;
 
     return {
+      currentUserId: global.currentUserId,
       chat,
       isMuted: getIsChatMuted(chat, selectNotifyDefaults(global), selectNotifyException(global, chat.id)),
       isPrivate,

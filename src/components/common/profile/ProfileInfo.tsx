@@ -43,6 +43,7 @@ import { selectThreadMessagesCount } from '../../../global/selectors/threads.ts'
 import { IS_TOUCH_ENV } from '../../../util/browser/windowEnvironment';
 import buildClassName from '../../../util/buildClassName';
 import buildStyle from '../../../util/buildStyle';
+import { getBygramProfileBannerKey } from '../../../util/bygramCustomization';
 import { captureEvents, SwipeDirection } from '../../../util/captureEvents';
 import { MEMO_EMPTY_ARRAY } from '../../../util/memo';
 import { resolveTransitionName } from '../../../util/resolveTransitionName';
@@ -51,6 +52,7 @@ import renderText from '../helpers/renderText.tsx';
 
 import { useVtn } from '../../../hooks/animations/useVtn';
 import useIntervalForceUpdate from '../../../hooks/schedulers/useIntervalForceUpdate';
+import useBygramCustomizationMedia from '../../../hooks/useBygramCustomizationMedia';
 import useLang from '../../../hooks/useLang';
 import useLastCallback from '../../../hooks/useLastCallback';
 import useOldLang from '../../../hooks/useOldLang';
@@ -100,6 +102,7 @@ type StateProps = {
   savedGifts?: ApiSavedGifts;
   hasAvatar?: boolean;
   isSystemAccount?: boolean;
+  currentUserId?: string;
 };
 
 const MAX_LEVEL_ICON = 90;
@@ -139,6 +142,7 @@ const ProfileInfo = ({
   savedGifts,
   hasAvatar,
   isSystemAccount,
+  currentUserId,
   onExpand,
 }: OwnProps & StateProps) => {
   const {
@@ -163,6 +167,9 @@ const ProfileInfo = ({
   const prevMediaIndex = usePreviousDeprecated(mediaIndex);
   const prevAvatarOwnerId = usePreviousDeprecated(avatarOwnerId);
   const [hasSlideAnimation, setHasSlideAnimation] = useState(true);
+  const localBanner = useBygramCustomizationMedia(
+    currentUserId === peerId ? getBygramProfileBannerKey(currentUserId) : undefined,
+  );
 
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const isFirst = photos.length <= 1 || currentPhotoIndex === 0;
@@ -492,6 +499,7 @@ const ProfileInfo = ({
         styles.root,
         !isExpanded && styles.minimized,
         isPlain && styles.plain,
+        localBanner && styles.withLocalBanner,
       )}
       style={buildStyle(
         profileColorSet && `--rating-outline-color: ${isExpanded ? 'transparent' : profileColorSet?.bgColors[0]}`,
@@ -500,6 +508,23 @@ const ProfileInfo = ({
       )}
       dir={lang.isRtl ? 'rtl' : undefined}
     >
+      {localBanner && (
+        <div className={styles.localBanner}>
+          {localBanner.isVideo ? (
+            <video
+              src={localBanner.url}
+              autoPlay={canPlayVideo}
+              loop
+              muted
+              playsInline
+              disablePictureInPicture
+            />
+          ) : (
+            <img src={localBanner.url} alt="" draggable={false} />
+          )}
+          <div className={styles.localBannerShade} />
+        </div>
+      )}
       {hasPatternBackground && (
         <RadialPatternBackground
           backgroundColors={profileColorSet?.bgColors}
@@ -666,6 +691,7 @@ export default memo(withGlobal<OwnProps>(
       savedGifts,
       hasAvatar,
       isSystemAccount,
+      currentUserId: global.currentUserId,
     };
   },
 )(ProfileInfo));

@@ -61,6 +61,7 @@ import {
   IS_ANDROID, IS_IOS, IS_SAFARI, IS_TRANSLATION_SUPPORTED, MASK_IMAGE_DISABLED,
 } from '../../util/browser/windowEnvironment';
 import buildClassName from '../../util/buildClassName';
+import { getBygramChatWallpaperKey } from '../../util/bygramCustomization';
 import captureEscKeyListener from '../../util/captureEscKeyListener';
 import { waitForTransitionEnd } from '../../util/cssAnimationEndListeners';
 import { isUserId } from '../../util/entities/ids';
@@ -69,6 +70,7 @@ import getHasMiddleFooter, { getHasFooterActionBar } from './helpers/getHasMiddl
 import { measureFooterContentHeight, syncMessageListBottomReserve } from './helpers/messageListReserves';
 
 import useAppLayout from '../../hooks/useAppLayout';
+import useBygramCustomizationMedia from '../../hooks/useBygramCustomizationMedia';
 import useDebouncedCallback from '../../hooks/useDebouncedCallback';
 import useForceUpdate from '../../hooks/useForceUpdate';
 import useHistoryBack from '../../hooks/useHistoryBack';
@@ -111,6 +113,7 @@ interface OwnProps {
 }
 
 type StateProps = {
+  currentUserId?: string;
   chatId?: string;
   threadId?: ThreadId;
   isComments?: boolean;
@@ -184,6 +187,7 @@ const KEYBOARD_SETTLE_DURATION = 400;
 
 function MiddleColumn({
   leftColumnRef,
+  currentUserId,
   chatId,
   threadId,
   isComments,
@@ -298,6 +302,11 @@ function MiddleColumn({
   const renderingHandleIntersectPinnedMessage = usePrevDuringAnimation(
     chatId ? handleIntersectPinnedMessage : undefined,
     closeAnimationDuration,
+  );
+  const localWallpaper = useBygramCustomizationMedia(
+    currentUserId && renderingChatId
+      ? getBygramChatWallpaperKey(currentUserId, renderingChatId)
+      : undefined,
   );
 
   const prevTransitionKey = usePreviousDeprecated(currentTransitionKey);
@@ -602,6 +611,12 @@ function MiddleColumn({
       {Boolean(renderingChatId && renderingThreadId) && (
         <>
           <div className="messages-layout" onDragEnter={renderingCanPost ? handleDragEnter : undefined}>
+            {localWallpaper && (
+              <div
+                className="bygram-chat-wallpaper"
+                style={`background-image: url(${localWallpaper.url})`}
+              />
+            )}
             <MiddleHeader
               chatId={renderingChatId!}
               threadId={renderingThreadId!}
@@ -646,7 +661,7 @@ function MiddleColumn({
                 isContactRequirePremium={isContactRequirePremium}
                 paidMessagesStars={paidMessagesStars}
                 withBottomShift={withMessageListBottomShift}
-                withDefaultBg={Boolean(!customBackground && !backgroundColor)}
+                withDefaultBg={Boolean(!localWallpaper && !customBackground && !backgroundColor)}
                 onIntersectPinnedMessage={renderingHandleIntersectPinnedMessage}
               />
               <div className={footerClassName}>
@@ -752,6 +767,7 @@ export default memo(withGlobal<OwnProps>(
     const { leftColumnWidth } = global;
 
     const state: StateProps = {
+      currentUserId: global.currentUserId,
       theme,
       customBackground,
       backgroundColor,

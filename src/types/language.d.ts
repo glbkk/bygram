@@ -72,6 +72,8 @@ export interface LangPair {
   'BygramBubbleTitle': undefined;
   'BygramBubbleDesc': undefined;
   'BygramBubbleCustomColor': undefined;
+  'BygramChatWallpaper': undefined;
+  'BygramChatWallpaperRemove': undefined;
   'Month2': undefined;
   'Month3': undefined;
   'Month4': undefined;
