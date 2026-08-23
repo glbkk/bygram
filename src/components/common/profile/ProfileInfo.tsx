@@ -170,6 +170,8 @@ const ProfileInfo = ({
   const localBanner = useBygramCustomizationMedia(
     currentUserId === peerId ? getBygramProfileBannerKey(currentUserId) : undefined,
   );
+  const hasLocalBanner = Boolean(localBanner);
+  const usesCompactProfileLayout = !isExpanded || hasLocalBanner;
 
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const isFirst = photos.length <= 1 || currentPhotoIndex === 0;
@@ -497,13 +499,14 @@ const ProfileInfo = ({
       className={buildClassName(
         'ProfileInfo',
         styles.root,
-        !isExpanded && styles.minimized,
+        usesCompactProfileLayout && styles.minimized,
         isPlain && styles.plain,
-        localBanner && styles.withLocalBanner,
+        hasLocalBanner && styles.withLocalBanner,
       )}
       style={buildStyle(
-        profileColorSet && `--rating-outline-color: ${isExpanded ? 'transparent' : profileColorSet?.bgColors[0]}`,
-        profileColorSet && !isExpanded && `--rating-text-color: ${profileColorSet?.bgColors[0]}`,
+        profileColorSet
+        && `--rating-outline-color: ${usesCompactProfileLayout ? profileColorSet?.bgColors[0] : 'transparent'}`,
+        profileColorSet && usesCompactProfileLayout && `--rating-text-color: ${profileColorSet?.bgColors[0]}`,
         createVtnStyle('profileInfo', true),
       )}
       dir={lang.isRtl ? 'rtl' : undefined}
@@ -525,7 +528,7 @@ const ProfileInfo = ({
           <div className={styles.localBannerShade} />
         </div>
       )}
-      {hasPatternBackground && (
+      {hasPatternBackground && !hasLocalBanner && (
         <RadialPatternBackground
           backgroundColors={profileColorSet?.bgColors}
           patternIcon={backgroundEmoji}
@@ -535,7 +538,7 @@ const ProfileInfo = ({
           yPosition={isPlain ? PATTERN_PLAIN_Y_SHIFT : PATTERN_Y_SHIFT}
         />
       )}
-      {Boolean(pinnedGifts?.length) && (
+      {Boolean(pinnedGifts?.length) && !hasLocalBanner && (
         <ProfilePinnedGifts
           peerId={peerId}
           gifts={pinnedGifts}
@@ -544,7 +547,7 @@ const ProfileInfo = ({
           withGlow={!isPlain}
         />
       )}
-      {isExpanded && (
+      {isExpanded && !hasLocalBanner && (
         <div className={styles.photoWrapper} style={createVtnStyle('photoWrapper', true)}>
           {renderPhotoTabs()}
           {!isForSettings && profilePhotos?.personalPhoto && (
@@ -603,7 +606,7 @@ const ProfileInfo = ({
           )}
         </div>
       )}
-      {!isExpanded && (
+      {usesCompactProfileLayout && (
         <Avatar
           withStory
           storyColors={profileColorSet?.storyColors}
@@ -613,7 +616,7 @@ const ProfileInfo = ({
           peer={peer}
           style={createVtnStyle('avatar', true)}
           storyCircleStyle={createVtnStyle('avatarStoryCircle', true)}
-          onClick={hasAvatar ? handleMinimizedAvatarClick : undefined}
+          onClick={hasAvatar ? (isExpanded ? handleProfilePhotoClick : handleMinimizedAvatarClick) : undefined}
         />
       )}
 

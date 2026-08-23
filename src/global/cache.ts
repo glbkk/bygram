@@ -248,6 +248,7 @@ function migrateSharedCache(
       cacheVersion: SHARED_STATE_CACHE_VERSION,
       settings: {
         ...settings,
+        language: 'ru',
         themes: cachedSettings?.themes
           || (fallbackThemes ? cloneThemeSettings(fallbackThemes) : initialState.settings.themes),
       },

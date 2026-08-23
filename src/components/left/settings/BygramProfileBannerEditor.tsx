@@ -5,6 +5,7 @@ import type { ApiVideo } from '../../../api/types';
 import { ApiMediaFormat } from '../../../api/types';
 
 import { getVideoMediaHash } from '../../../global/helpers';
+import buildClassName from '../../../util/buildClassName';
 import {
   getBygramProfileBannerKey,
   removeBygramCustomizationMedia,
@@ -123,7 +124,8 @@ const BygramProfileBannerEditor = ({ currentUserId }: StateProps) => {
         isOpen={isGifPickerOpen}
         title="Выберите GIF"
         hasCloseButton
-        className={styles.gifModal}
+        className={buildClassName(styles.gifModal, 'mobile-full-screen')}
+        dialogClassName={styles.gifDialog}
         contentClassName={styles.gifModalContent}
         onClose={() => setIsGifPickerOpen(false)}
       >
