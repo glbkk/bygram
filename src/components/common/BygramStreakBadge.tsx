@@ -104,6 +104,11 @@ const BygramStreakBadge = ({ accountId, peerId, shouldOfferMilestone }: OwnProps
     setIsModalOpen(true);
   });
 
+  const handleConstellationMessageOpen = useLastCallback(() => {
+    setIsConstellationOpen(false);
+    setIsModalOpen(false);
+  });
+
   const handleDaysChange = useLastCallback((event: ChangeEvent<HTMLInputElement>) => {
     const value = event.currentTarget.value.replace(/\D/g, '').slice(0, 5);
     setCustomDays(value);
@@ -251,6 +256,7 @@ const BygramStreakBadge = ({ accountId, peerId, shouldOfferMilestone }: OwnProps
         peerId={peerId}
         isOpen={isConstellationOpen}
         onClose={handleConstellationClose}
+        onMessageOpen={handleConstellationMessageOpen}
       />
     </>
   );

@@ -29,9 +29,10 @@ type OwnProps = {
   peerId: string;
   isOpen: boolean;
   onClose: NoneToVoidFunction;
+  onMessageOpen?: NoneToVoidFunction;
 };
 
-const BygramConstellation = ({ accountId, peerId, isOpen, onClose }: OwnProps) => {
+const BygramConstellation = ({ accountId, peerId, isOpen, onClose, onMessageOpen }: OwnProps) => {
   const [days, setDays] = useState<BygramConstellationDay[]>([]);
   const [selectedDay, setSelectedDay] = useState<BygramConstellationDay>();
   const [isLoading, setIsLoading] = useState(false);
@@ -84,7 +85,12 @@ const BygramConstellation = ({ accountId, peerId, isOpen, onClose }: OwnProps) =
 
   const handleOpenMessages = useLastCallback(() => {
     if (!selectedDay?.firstMessageId) return;
-    onClose();
+    setSelectedDay(undefined);
+    if (onMessageOpen) {
+      onMessageOpen();
+    } else {
+      onClose();
+    }
     getActions().focusMessage({ chatId: peerId, messageId: selectedDay.firstMessageId });
   });
 
