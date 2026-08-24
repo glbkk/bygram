@@ -96,6 +96,79 @@
   text-align: center;
 }
 
+.constellationCard {
+  cursor: var(--custom-cursor, pointer);
+
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: center;
+
+  width: min(100%, 22rem);
+  min-height: 3.75rem;
+  margin: 0 auto 0.875rem;
+  padding: 0.5rem 0.75rem 0.5rem 0.625rem;
+  border: 0.0625rem solid color-mix(in srgb, var(--color-primary) 18%, transparent);
+  border-radius: var(--border-radius-default);
+
+  font: inherit;
+  color: var(--color-text);
+  text-align: start;
+
+  background:
+    radial-gradient(circle at 82% 15%, color-mix(in srgb, var(--color-primary) 12%, transparent), transparent 42%),
+    var(--color-background-secondary);
+
+  transition: transform 160ms ease, background-color 160ms ease;
+
+  > span:nth-child(2) {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  strong {
+    font-size: 0.875rem;
+    font-weight: var(--font-weight-semibold);
+  }
+
+  small {
+    margin-top: 0.125rem;
+    font-size: 0.75rem;
+    color: var(--color-text-secondary);
+  }
+
+  &:active {
+    transform: scale(0.985);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+}
+
+.constellationIcon {
+  display: grid;
+  place-items: center;
+
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+
+  color: white;
+
+  background:
+    radial-gradient(circle at 35% 28%, rgb(255 255 255 / 36%), transparent 28%),
+    linear-gradient(145deg, #48a9ee, #7065d8);
+  box-shadow: 0 0.25rem 0.875rem rgb(65 126 210 / 24%);
+}
+
+.constellationArrow {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+
 .storyPreview {
   overflow: hidden;
   display: flex;

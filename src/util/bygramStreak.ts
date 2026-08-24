@@ -1,5 +1,7 @@
 import type { ApiMessage } from '../api/types';
 
+import { bygramConstellationRepository } from './bygramConstellation';
+
 export type BygramStreak = {
   days: number;
 };
@@ -23,7 +25,10 @@ const STREAK_CHANGE_EVENT = 'bygram-chat-streak-change';
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export function recordBygramStreakMessage(accountId: string, message: ApiMessage) {
-  if (!accountId || message.chatId === accountId || message.content.action || message.date <= 0) return;
+  if (!accountId || message.chatId === accountId || message.date <= 0) return;
+  void bygramConstellationRepository.recordMessage(accountId, message);
+
+  if (message.content.action) return;
 
   const messageAt = message.date * 1000;
   const store = loadStore();

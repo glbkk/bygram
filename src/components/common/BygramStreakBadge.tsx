@@ -21,6 +21,7 @@ import useLastCallback from '../../hooks/useLastCallback';
 import Button from '../ui/Button';
 import Modal from '../ui/Modal';
 import Avatar from './Avatar';
+import BygramConstellation from './BygramConstellation';
 import Icon from './icons/Icon';
 
 import styles from './BygramStreakBadge.module.scss';
@@ -47,6 +48,7 @@ const BygramStreakBadge = ({ accountId, peerId, shouldOfferMilestone }: OwnProps
   const [streak, setStreak] = useState(() => getBygramStreak(accountId, peerId));
   const [isEnabled, setIsEnabled] = useState(() => getBygramSettings().isChatStreakEnabled);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isConstellationOpen, setIsConstellationOpen] = useState(false);
   const [isMilestone, setIsMilestone] = useState(false);
   const [customDays, setCustomDays] = useState(() => String(streak?.days || 1));
   const [storyTemplate, setStoryTemplate] = useState<BygramStreakStoryTemplate>('telegram');
@@ -90,6 +92,16 @@ const BygramStreakBadge = ({ accountId, peerId, shouldOfferMilestone }: OwnProps
 
   const handleClose = useLastCallback(() => {
     if (!isPublishing) setIsModalOpen(false);
+  });
+
+  const handleConstellationOpen = useLastCallback(() => {
+    setIsModalOpen(false);
+    setIsConstellationOpen(true);
+  });
+
+  const handleConstellationClose = useLastCallback(() => {
+    setIsConstellationOpen(false);
+    setIsModalOpen(true);
   });
 
   const handleDaysChange = useLastCallback((event: ChangeEvent<HTMLInputElement>) => {
@@ -158,6 +170,14 @@ const BygramStreakBadge = ({ accountId, peerId, shouldOfferMilestone }: OwnProps
               <p className={styles.description}>
                 Серия растёт, когда вы оба общаетесь каждый день, и исчезает через сутки без сообщений.
               </p>
+              <button type="button" className={styles.constellationCard} onClick={handleConstellationOpen}>
+                <span className={styles.constellationIcon}><Icon name="favorite" /></span>
+                <span>
+                  <strong>Наше созвездие</strong>
+                  <small>Один день общения — одна звезда</small>
+                </span>
+                <Icon name="arrow-right" className={styles.constellationArrow} />
+              </button>
               {currentUser && peerUser && (
                 <div
                   className={`${styles.storyPreview} ${styles[`storyPreview_${storyTemplate}`]}`}
@@ -226,6 +246,12 @@ const BygramStreakBadge = ({ accountId, peerId, shouldOfferMilestone }: OwnProps
           </div>
         </Modal>
       )}
+      <BygramConstellation
+        accountId={accountId}
+        peerId={peerId}
+        isOpen={isConstellationOpen}
+        onClose={handleConstellationClose}
+      />
     </>
   );
 };
