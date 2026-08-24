@@ -247,6 +247,7 @@ export function subscribeBygramSettings(listener: (nextSettings: BygramSettings)
 function applyMessageBubbleStyle(nextSettings: BygramSettings) {
   const root = document.documentElement;
   const isCustom = nextSettings.messageBubbleStyle !== 'default';
+  root.classList.toggle('bygram-ghost-mode', nextSettings.isGhostModeEnabled);
   const styles: Record<'ocean' | 'violet' | 'sunset' | 'mint', {
     background: string;
     tail: string;

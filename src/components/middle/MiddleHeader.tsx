@@ -39,6 +39,7 @@ import buildClassName from '../../util/buildClassName';
 import { isUserId } from '../../util/entities/ids';
 
 import useAppLayout from '../../hooks/useAppLayout';
+import useBygramGhostMode from '../../hooks/useBygramGhostMode';
 import useConnectionStatus from '../../hooks/useConnectionStatus';
 import useLang from '../../hooks/useLang';
 import useLastCallback from '../../hooks/useLastCallback';
@@ -54,6 +55,7 @@ import Button from '../ui/Button';
 import Transition from '../ui/Transition';
 import HeaderActions from './HeaderActions';
 
+import './BygramGhostMode.scss';
 import './MiddleHeader.scss';
 
 const BACK_BUTTON_INACTIVE_TIME = 450;
@@ -130,6 +132,7 @@ const MiddleHeader = ({
   } = getActions();
 
   const lang = useLang();
+  const isGhostModeEnabled = useBygramGhostMode();
 
   const isBackButtonActiveRef = useRef(true);
   const { isTablet } = useAppLayout();
@@ -230,6 +233,9 @@ const MiddleHeader = ({
   const { connectionStatusText } = useConnectionStatus(
     lang, connectionState, isSyncing || isFetchingDifference, true,
   );
+  const isGhostChat = isGhostModeEnabled && messageListType === 'thread' && !isChatWithSelf && !isSavedDialog;
+  const isSomeoneTyping = Boolean(typingStatusByPeerId && Object.keys(typingStatusByPeerId).length);
+  const ghostStatus = isGhostChat && !isSomeoneTyping ? 'Просмотр без отметки о прочтении' : undefined;
 
   function renderInfoTitle() {
     if (messagesCount === undefined) {
@@ -284,6 +290,7 @@ const MiddleHeader = ({
         ? lang('Messages', { count: messagesCount }, { pluralValue: messagesCount })
         : lang('SavedMessages'))
       : undefined;
+    const visibleStatus = connectionStatusText || savedMessagesStatus || ghostStatus;
 
     const realChatId = isSavedDialog ? String(threadId) : chatId;
 
@@ -305,7 +312,8 @@ const MiddleHeader = ({
               userId={displayChatId}
               threadId={!isSavedDialog ? threadId : undefined}
               typingStatusByPeerId={typingStatusByPeerId}
-              status={connectionStatusText || savedMessagesStatus}
+              status={visibleStatus}
+              statusIcon={ghostStatus && !connectionStatusText ? 'eye-crossed-outline' : undefined}
               withDots={Boolean(connectionStatusText)}
               withFullInfo={threadId === MAIN_THREAD_ID}
               withMediaViewer={threadId === MAIN_THREAD_ID}
@@ -331,7 +339,8 @@ const MiddleHeader = ({
               threadId={!isSavedDialog ? threadId : undefined}
               typingStatusByPeerId={typingStatusByPeerId}
               withMonoforumStatus={chat?.isMonoforum}
-              status={connectionStatusText || savedMessagesStatus}
+              status={visibleStatus}
+              statusIcon={ghostStatus && !connectionStatusText ? 'eye-crossed-outline' : undefined}
               withDots={Boolean(connectionStatusText)}
               withMediaViewer={threadId === MAIN_THREAD_ID}
               withFullInfo={threadId === MAIN_THREAD_ID}
@@ -368,7 +377,7 @@ const MiddleHeader = ({
 
   return (
     <div
-      className="MiddleHeader"
+      className={buildClassName('MiddleHeader', isGhostChat && 'bygram-ghost-active')}
       ref={componentRef}
       data-tauri-drag-region={IS_TAURI && IS_MAC_OS ? true : undefined}
     >

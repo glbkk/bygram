@@ -198,7 +198,7 @@ const ChatBadge = ({
     );
 
     const unreadCountElement = isUnread ? (
-      <div className={buildClassName(statefulClassName, styles.unread)}>
+      <div className={buildClassName(statefulClassName, styles.unread, 'bygram-ghost-unread-badge')}>
         {!hasUnreadMark && <AnimatedCounter text={formatIntegerCompact(lang, unreadCount!)} />}
       </div>
     ) : undefined;

@@ -43,7 +43,7 @@ import {
 } from '../../../config';
 import { ensureProtocol, isMixedScriptUrl } from '../../../util/browser/url';
 import { IS_IOS } from '../../../util/browser/windowEnvironment';
-import { getArchivedRetainedMessages } from '../../../util/bygramArchive';
+import { getArchivedRetainedMessages, getBygramSettings } from '../../../util/bygramArchive';
 import { recordBygramStreakMessage } from '../../../util/bygramStreak';
 import { copyTextToClipboardFromPromise } from '../../../util/clipboard';
 import { isDeepLink } from '../../../util/deepLinkParser';
@@ -1462,7 +1462,13 @@ addActionHandler('markMessageListRead', (global, actions, payload): ActionReturn
     return undefined;
   }
 
+  if (getBygramSettings().isGhostModeEnabled) {
+    return global;
+  }
+
   runDebouncedForMarkRead(() => {
+    if (getBygramSettings().isGhostModeEnabled) return;
+
     void callApi('markMessageListRead', {
       chat, threadId, maxId,
     });
@@ -1500,6 +1506,8 @@ addActionHandler('markMessageListRead', (global, actions, payload): ActionReturn
 });
 
 addActionHandler('markMessagesRead', (global, actions, payload): ActionReturnType => {
+  if (getBygramSettings().isGhostModeEnabled) return;
+
   const { chatId, messageIds } = payload;
   const chat = selectChat(global, chatId);
   if (!chat) {

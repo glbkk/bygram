@@ -1,0 +1,79 @@
+@layer components {
+  .bygram-ghost-unread-divider .icon {
+    display: none;
+  }
+
+  html.bygram-ghost-mode {
+    --bygram-ghost-accent: #7468e8;
+    --bygram-ghost-accent-soft: color-mix(in srgb, var(--bygram-ghost-accent) 14%, transparent);
+
+    .MiddleHeader.bygram-ghost-active {
+      border: 1px solid color-mix(in srgb, var(--bygram-ghost-accent) 28%, transparent);
+      background:
+        linear-gradient(
+          110deg,
+          color-mix(in srgb, var(--color-background) 94%, var(--bygram-ghost-accent) 6%),
+          var(--color-background) 54%
+        );
+      box-shadow:
+        var(--shadow-pane),
+        0 0 0.875rem var(--bygram-ghost-accent-soft);
+      animation: bygram-ghost-enter 260ms ease-out both;
+
+      .status:not(.online) {
+        color: color-mix(in srgb, var(--bygram-ghost-accent) 78%, var(--color-text));
+      }
+
+      .status-icon {
+        margin-inline-end: 0.25rem;
+        font-size: 0.8125rem;
+      }
+    }
+
+    .bygram-ghost-unread-divider-content {
+      display: inline-flex;
+      gap: 0.3125rem;
+      align-items: center;
+
+      border: 1px solid color-mix(in srgb, var(--bygram-ghost-accent) 34%, transparent);
+
+      color: var(--color-white);
+
+      background:
+        linear-gradient(
+          135deg,
+          color-mix(in srgb, var(--bygram-ghost-accent) 84%, #3a3294),
+          color-mix(in srgb, var(--bygram-ghost-accent) 72%, #536fb4)
+        );
+      box-shadow: 0 0.125rem 0.5rem color-mix(in srgb, var(--bygram-ghost-accent) 22%, transparent);
+
+      .icon {
+        display: inline-block;
+        font-size: 0.75rem;
+      }
+    }
+
+    .bygram-ghost-unread-badge {
+      background:
+        linear-gradient(
+          145deg,
+          color-mix(in srgb, var(--bygram-ghost-accent) 88%, #9b91ff),
+          color-mix(in srgb, var(--bygram-ghost-accent) 82%, #40568f)
+        ) !important;
+      box-shadow: 0 0 0 0.125rem var(--bygram-ghost-accent-soft);
+    }
+  }
+
+  @keyframes bygram-ghost-enter {
+    from {
+      opacity: 0.82;
+      box-shadow: var(--shadow-pane);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html.bygram-ghost-mode .MiddleHeader.bygram-ghost-active {
+      animation: none;
+    }
+  }
+}

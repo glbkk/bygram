@@ -33,6 +33,7 @@ import {
   TOPICS_SLICE,
   TOPICS_SLICE_SECOND_LOAD,
 } from '../../../config';
+import { getBygramSettings } from '../../../util/bygramArchive';
 import { requestBygramChatUnlock } from '../../../util/bygramChatPasswordDialog';
 import {
   addBygramLocalPinnedId,
@@ -1565,6 +1566,8 @@ addActionHandler('markChatUnread', (global, actions, payload): ActionReturnType 
 
 addActionHandler('markChatMessagesRead', async (global, actions, payload): Promise<void> => {
   if (selectIsCurrentUserFrozen(global)) return;
+  if (getBygramSettings().isGhostModeEnabled) return;
+
   const { id } = payload;
 
   if (selectIsCurrentUserFrozen(global)) {

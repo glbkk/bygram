@@ -56,7 +56,11 @@ const ScrollDownButton: FC<OwnProps> = ({
         iconName={icon}
         iconClassName={styles.icon}
       />
-      {Boolean(unreadCount) && <div className={styles.unreadCount}>{formatIntegerCompact(lang, unreadCount)}</div>}
+      {Boolean(unreadCount) && (
+        <div className={buildClassName(styles.unreadCount, 'bygram-ghost-unread-badge')}>
+          {formatIntegerCompact(lang, unreadCount)}
+        </div>
+      )}
       {onReadAll && (
         <Menu
           isOpen={isContextMenuOpen}

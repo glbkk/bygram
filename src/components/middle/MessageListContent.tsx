@@ -211,8 +211,14 @@ const MessageListContent = ({
   const lang = useLang();
 
   const unreadDivider = (
-    <div className={buildClassName(UNREAD_DIVIDER_CLASS, 'local-action-message')} key="unread-messages">
-      <span>{oldLang('UnreadMessages')}</span>
+    <div
+      className={buildClassName(UNREAD_DIVIDER_CLASS, 'local-action-message', 'bygram-ghost-unread-divider')}
+      key="unread-messages"
+    >
+      <span className="bygram-ghost-unread-divider-content">
+        <Icon name="eye-crossed-outline" />
+        {oldLang('UnreadMessages')}
+      </span>
     </div>
   );
   const renderPaidMessageAction = (message: ApiMessage, album?: IAlbum) => {
