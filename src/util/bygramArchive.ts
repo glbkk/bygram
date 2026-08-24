@@ -475,6 +475,24 @@ export async function getBygramArchiveStats(): Promise<BygramArchiveStats> {
   };
 }
 
+export async function getBygramArchiveFirstSavedAt() {
+  return runTransaction(MESSAGE_STORE, 'readonly', (store) => new Promise<number | undefined>((resolve, reject) => {
+    let firstSavedAt: number | undefined;
+    const request = store.openCursor();
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) {
+        resolve(firstSavedAt);
+        return;
+      }
+      const { savedAt } = cursor.value as BygramArchiveRecord;
+      if (savedAt > 0) firstSavedAt = Math.min(firstSavedAt ?? savedAt, savedAt);
+      cursor.continue();
+    };
+  }));
+}
+
 export async function clearBygramArchive() {
   await Promise.all([
     runTransaction(MESSAGE_STORE, 'readwrite', (store) => requestAsPromise(store.clear())),

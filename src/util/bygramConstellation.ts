@@ -1,5 +1,7 @@
 import type { ApiMessage } from '../api/types';
 
+import { getBygramArchiveFirstSavedAt } from './bygramArchive';
+
 export type BygramConstellationDay = {
   key: string;
   pairKey: string;
@@ -36,33 +38,55 @@ export interface BygramConstellationRepository {
 }
 
 const DB_NAME = 'bygram-constellations';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const DAY_STORE = 'days';
 const PAIR_INDEX = 'pairKey';
 const CHANGE_EVENT = 'bygram-constellation-change';
+const FIRST_USE_STORAGE_KEY = 'bygram-first-use-v1';
+const STREAK_STORAGE_KEY = 'bygram-chat-streaks-v1';
+const LEGACY_IMPORT_STORAGE_KEY = 'bygram-constellation-legacy-import-v2';
+const firstUsePromises = new Map<string, Promise<number>>();
 
 class LocalBygramConstellationRepository implements BygramConstellationRepository {
   private databasePromise?: Promise<IDBDatabase>;
 
   async getDays(accountId: string, peerId: string) {
     const pairKey = getPairKey(accountId, peerId);
-    const records = await this.runTransaction('readonly', (store) => requestAsPromise<BygramConstellationDay[]>(
-      store.index(PAIR_INDEX).getAll(IDBKeyRange.only(pairKey)),
-    ));
+    const firstUseDate = getDayKey(await getBygramFirstUseAt(accountId));
+    const records = await this.runTransaction('readwrite', async (store) => {
+      const allRecords = await requestAsPromise<BygramConstellationDay[]>(
+        store.index(PAIR_INDEX).getAll(IDBKeyRange.only(pairKey)),
+      );
+      const eligible = allRecords.filter(({ date }) => date >= firstUseDate).sort(compareDays);
+      const obsolete = allRecords.filter(({ date }) => date < firstUseDate);
+      await Promise.all(obsolete.map(({ key }) => requestAsPromise(store.delete(key))));
+      await Promise.all(eligible.map((day, ordinal) => {
+        if (day.ordinal === ordinal) return Promise.resolve();
+        day.ordinal = ordinal;
+        return requestAsPromise(store.put(day)).then(() => undefined);
+      }));
+      return eligible;
+    });
     return addPlaneStreaks(records.sort((first, second) => first.ordinal - second.ordinal));
   }
 
   async importMessages(accountId: string, peerId: string, messages: ApiMessage[]) {
+    const pairKey = getPairKey(accountId, peerId);
+    if (isLegacyImportComplete(pairKey)) return;
+
+    const firstUseDate = getDayKey(await getBygramFirstUseAt(accountId));
     const validMessages = messages.filter((message) => (
       message.chatId === peerId && message.id > 0 && message.date > 0
+      && getDayKey(message.date * 1000) >= firstUseDate
     ));
-    if (!validMessages.length) return;
 
     await this.runTransaction('readwrite', async (store) => {
-      const pairKey = getPairKey(accountId, peerId);
-      const existing = await requestAsPromise<BygramConstellationDay[]>(
+      const allExisting = await requestAsPromise<BygramConstellationDay[]>(
         store.index(PAIR_INDEX).getAll(IDBKeyRange.only(pairKey)),
       );
+      const existing = allExisting.filter(({ date }) => date >= firstUseDate);
+      await Promise.all(allExisting.filter(({ date }) => date < firstUseDate)
+        .map(({ key }) => requestAsPromise(store.delete(key))));
       const byDate = new Map(existing.map((day) => [day.date, day]));
       let nextOrdinal = existing.reduce((max, day) => Math.max(max, day.ordinal), -1) + 1;
 
@@ -74,15 +98,19 @@ class LocalBygramConstellationRepository implements BygramConstellationRepositor
 
       await Promise.all(Array.from(byDate.values()).map((day) => requestAsPromise(store.put(day))));
     });
+    markLegacyImportComplete(pairKey);
     dispatchChange(accountId, peerId);
   }
 
   async recordMessage(accountId: string, message: ApiMessage) {
     if (!accountId || message.chatId === accountId || message.id <= 0 || message.date <= 0) return;
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
 
     const peerId = message.chatId;
     const pairKey = getPairKey(accountId, peerId);
     const date = getDayKey(message.date * 1000);
+    const firstUseDate = getDayKey(await getBygramFirstUseAt(accountId));
+    if (date < firstUseDate || date !== getDayKey(Date.now())) return;
     await this.runTransaction('readwrite', async (store) => {
       const key = `${pairKey}:${date}`;
       let day = await requestAsPromise<BygramConstellationDay | undefined>(store.get(key));
@@ -101,11 +129,13 @@ class LocalBygramConstellationRepository implements BygramConstellationRepositor
     this.databasePromise ||= new Promise((resolve, reject) => {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
       request.onerror = () => reject(request.error);
-      request.onupgradeneeded = () => {
+      request.onupgradeneeded = (event) => {
         const database = request.result;
         if (!database.objectStoreNames.contains(DAY_STORE)) {
           const store = database.createObjectStore(DAY_STORE, { keyPath: 'key' });
           store.createIndex(PAIR_INDEX, PAIR_INDEX);
+        } else if (event.oldVersion < 2) {
+          request.transaction!.objectStore(DAY_STORE).clear();
         }
       };
       request.onsuccess = () => resolve(request.result);
@@ -133,6 +163,15 @@ class LocalBygramConstellationRepository implements BygramConstellationRepositor
 export const bygramConstellationRepository: BygramConstellationRepository = (
   new LocalBygramConstellationRepository()
 );
+
+export function getBygramFirstUseAt(accountId: string) {
+  const existing = firstUsePromises.get(accountId);
+  if (existing) return existing;
+
+  const promise = resolveBygramFirstUseAt(accountId);
+  firstUsePromises.set(accountId, promise);
+  return promise;
+}
 
 export function subscribeBygramConstellation(
   accountId: string,
@@ -266,6 +305,66 @@ function addPlaneStreaks(days: BygramConstellationDay[]) {
 
 function getPairKey(firstId: string, secondId: string) {
   return [firstId, secondId].sort().join(':');
+}
+
+async function resolveBygramFirstUseAt(accountId: string) {
+  const stored = loadFirstUseStore();
+  if (stored[accountId] > 0) return stored[accountId];
+
+  const firstUseAt = getFirstStreakActivityAt(accountId) || await getBygramArchiveFirstSavedAt() || Date.now();
+  stored[accountId] = firstUseAt;
+  try {
+    localStorage.setItem(FIRST_USE_STORAGE_KEY, JSON.stringify(stored));
+  } catch {
+    // A blocked localStorage must not prevent constellation updates.
+  }
+  return firstUseAt;
+}
+
+function getFirstStreakActivityAt(accountId: string) {
+  try {
+    const streaks = JSON.parse(localStorage.getItem(STREAK_STORAGE_KEY) || '{}') as Record<string, Record<
+      string,
+      { days?: Record<string, { latestAt?: number }> }
+    >>;
+    const timestamps = Object.values(streaks[accountId] || {}).flatMap(({ days }) => (
+      Object.values(days || {}).map(({ latestAt }) => latestAt).filter((value): value is number => Boolean(value))
+    ));
+    return timestamps.length ? Math.min(...timestamps) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function loadFirstUseStore() {
+  try {
+    return JSON.parse(localStorage.getItem(FIRST_USE_STORAGE_KEY) || '{}') as Record<string, number>;
+  } catch {
+    return {};
+  }
+}
+
+function compareDays(first: BygramConstellationDay, second: BygramConstellationDay) {
+  return first.date.localeCompare(second.date);
+}
+
+function isLegacyImportComplete(pairKey: string) {
+  try {
+    const completed = JSON.parse(localStorage.getItem(LEGACY_IMPORT_STORAGE_KEY) || '{}') as Record<string, true>;
+    return completed[pairKey] === true;
+  } catch {
+    return false;
+  }
+}
+
+function markLegacyImportComplete(pairKey: string) {
+  try {
+    const completed = JSON.parse(localStorage.getItem(LEGACY_IMPORT_STORAGE_KEY) || '{}') as Record<string, true>;
+    completed[pairKey] = true;
+    localStorage.setItem(LEGACY_IMPORT_STORAGE_KEY, JSON.stringify(completed));
+  } catch {
+    // A blocked localStorage can only make the safe legacy import repeat.
+  }
 }
 
 function getDayKey(timestamp: number) {

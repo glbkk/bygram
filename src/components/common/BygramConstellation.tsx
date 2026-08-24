@@ -2,7 +2,7 @@ import { memo, useEffect, useState } from '../../lib/teact/teact';
 import { getActions, getGlobal } from '../../global';
 
 import { getUserFullName } from '../../global/helpers';
-import { selectChatMessages, selectUser } from '../../global/selectors';
+import { selectUser } from '../../global/selectors';
 import { getArchivedChatMessages } from '../../util/bygramArchive';
 import {
   type BygramConstellationDay,
@@ -56,11 +56,12 @@ const BygramConstellation = ({ accountId, peerId, isOpen, onClose }: OwnProps) =
     void (async () => {
       try {
         const archived = await getArchivedChatMessages(peerId);
-        const cachedMessages = Object.values(selectChatMessages(getGlobal(), peerId) || {});
         await bygramConstellationRepository.importMessages(
           accountId,
           peerId,
-          [...archived.map(({ message }) => message), ...cachedMessages],
+          archived.filter(({ message, savedAt }) => (
+            isSameLocalDay(message.date * 1000, savedAt)
+          )).map(({ message }) => message),
         );
         if (!isCancelled) await loadDays();
       } finally {
@@ -380,6 +381,14 @@ function getStoryPublishError(error?: string) {
     return 'Telegram временно ограничил частые публикации. Попробуйте позже.';
   }
   return `Telegram отклонил публикацию: ${error}`;
+}
+
+function isSameLocalDay(firstTimestamp: number, secondTimestamp: number) {
+  const first = new Date(firstTimestamp);
+  const second = new Date(secondTimestamp);
+  return first.getFullYear() === second.getFullYear()
+    && first.getMonth() === second.getMonth()
+    && first.getDate() === second.getDate();
 }
 
 export default memo(BygramConstellation);

@@ -74,33 +74,40 @@
     }
 
     body::before {
-      opacity: 0.16;
+      opacity: 0.27;
+      filter: drop-shadow(0 0 0.1875rem color-mix(in srgb, var(--bygram-ghost-accent) 58%, transparent));
       background:
-        radial-gradient(circle at 0 12%, var(--bygram-ghost-accent) 0 0.0625rem, transparent 0.125rem),
-        radial-gradient(circle at 100% 24%, #91b5ff 0 0.05rem, transparent 0.1125rem),
-        radial-gradient(circle at 0 46%, #b6aefb 0 0.05rem, transparent 0.125rem),
-        radial-gradient(circle at 100% 62%, var(--bygram-ghost-accent) 0 0.0625rem, transparent 0.1375rem),
-        radial-gradient(circle at 0 82%, #91b5ff 0 0.05rem, transparent 0.1125rem),
-        radial-gradient(circle at 100% 91%, #b6aefb 0 0.0625rem, transparent 0.1375rem);
-      animation: bygram-ghost-particles 12s ease-in-out infinite alternate;
+        radial-gradient(circle at 0 9%, #b6aefb 0 0.075rem, transparent 0.1625rem),
+        radial-gradient(circle at 100% 17%, #91b5ff 0 0.0625rem, transparent 0.15rem),
+        radial-gradient(circle at 0 29%, var(--bygram-ghost-accent) 0 0.0875rem, transparent 0.175rem),
+        radial-gradient(circle at 100% 40%, #b6aefb 0 0.075rem, transparent 0.1625rem),
+        radial-gradient(circle at 0 53%, #91b5ff 0 0.0625rem, transparent 0.15rem),
+        radial-gradient(circle at 100% 65%, var(--bygram-ghost-accent) 0 0.0875rem, transparent 0.175rem),
+        radial-gradient(circle at 0 76%, #b6aefb 0 0.075rem, transparent 0.1625rem),
+        radial-gradient(circle at 100% 88%, #91b5ff 0 0.0625rem, transparent 0.15rem),
+        radial-gradient(circle at 14% 0, var(--bygram-ghost-accent) 0 0.075rem, transparent 0.1625rem),
+        radial-gradient(circle at 42% 100%, #b6aefb 0 0.0625rem, transparent 0.15rem),
+        radial-gradient(circle at 69% 0, #91b5ff 0 0.075rem, transparent 0.1625rem),
+        radial-gradient(circle at 88% 100%, var(--bygram-ghost-accent) 0 0.0875rem, transparent 0.175rem);
+      animation: bygram-ghost-particles 9s ease-in-out infinite alternate;
     }
 
     body::after {
-      border: 0.0625rem solid color-mix(in srgb, var(--bygram-ghost-accent) 13%, transparent);
+      border: 0.0625rem solid color-mix(in srgb, var(--bygram-ghost-accent) 24%, transparent);
 
-      opacity: 0.3;
+      opacity: 0.48;
       background:
         radial-gradient(
           ellipse at 0 0,
-          color-mix(in srgb, var(--bygram-ghost-accent) 12%, transparent),
-          transparent 28%
+          color-mix(in srgb, var(--bygram-ghost-accent) 18%, transparent),
+          transparent 32%
         ),
-        radial-gradient(ellipse at 100% 100%, color-mix(in srgb, #6f9dff 10%, transparent), transparent 30%);
+        radial-gradient(ellipse at 100% 100%, color-mix(in srgb, #6f9dff 16%, transparent), transparent 34%);
       box-shadow:
-        inset 0 0 1.25rem color-mix(in srgb, var(--bygram-ghost-accent) 7%, transparent),
-        inset 0 0 0.25rem color-mix(in srgb, #b9d4ff 7%, transparent);
+        inset 0 0 1.75rem color-mix(in srgb, var(--bygram-ghost-accent) 12%, transparent),
+        inset 0 0 0.375rem color-mix(in srgb, #b9d4ff 14%, transparent);
 
-      animation: bygram-ghost-perimeter 9s ease-in-out infinite alternate;
+      animation: bygram-ghost-perimeter 7s ease-in-out infinite alternate;
     }
   }
 
@@ -112,20 +119,24 @@
   }
 
   @keyframes bygram-ghost-perimeter {
+    from {
+      opacity: 0.38;
+    }
+
     to {
-      opacity: 0.42;
+      opacity: 0.58;
     }
   }
 
   @keyframes bygram-ghost-particles {
     from {
-      transform: translate3d(0, -0.25rem, 0);
-      opacity: 0.1;
+      transform: translate3d(0, -0.375rem, 0) scale(0.98);
+      opacity: 0.18;
     }
 
     to {
-      transform: translate3d(0, 0.5rem, 0);
-      opacity: 0.22;
+      transform: translate3d(0, 0.625rem, 0) scale(1.01);
+      opacity: 0.34;
     }
   }
 
