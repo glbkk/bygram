@@ -21,6 +21,14 @@ export type BygramConstellationDay = {
   planeMilestone?: number;
 };
 
+export type BygramConstellationPoint = {
+  day: BygramConstellationDay;
+  x: number;
+  y: number;
+  radius: number;
+  phase: number;
+};
+
 export interface BygramConstellationRepository {
   getDays(accountId: string, peerId: string): Promise<BygramConstellationDay[]>;
   importMessages(accountId: string, peerId: string, messages: ApiMessage[]): Promise<void>;
@@ -149,6 +157,37 @@ export function getBygramConstellationSeed(accountId: string, peerId: string) {
   return hash >>> 0;
 }
 
+export function buildBygramConstellationPoints(
+  days: BygramConstellationDay[], seed: number,
+): BygramConstellationPoint[] {
+  const styleRandom = createRandom(seed);
+  const arms = 2 + Math.floor(styleRandom() * 3);
+  const direction = styleRandom() > 0.5 ? 1 : -1;
+  const turn = 0.38 + styleRandom() * 0.16;
+  const flatten = 0.72 + styleRandom() * 0.24;
+  const tilt = styleRandom() * Math.PI * 2;
+
+  return days.map((day) => {
+    const random = createRandom(seed ^ Math.imul(day.ordinal + 1, 0x9E3779B1));
+    const index = day.ordinal + 2;
+    const arm = day.ordinal % arms;
+    const radius = 22 + Math.sqrt(index) * (13 + styleRandom() * 0.015);
+    const angle = direction * (index * turn + arm * Math.PI * 2 / arms) + (random() - 0.5) * 0.48;
+    const spread = 0.62 + random() * 0.7;
+    const rawX = Math.cos(angle) * radius * spread;
+    const rawY = Math.sin(angle) * radius * spread * flatten;
+    const x = rawX * Math.cos(tilt) - rawY * Math.sin(tilt) + (random() - 0.5) * 12;
+    const y = rawX * Math.sin(tilt) + rawY * Math.cos(tilt) + (random() - 0.5) * 12;
+    return {
+      day,
+      x,
+      y,
+      radius: 1.35 + day.significance * 3.1,
+      phase: random() * Math.PI * 2,
+    };
+  });
+}
+
 function createDay(pairKey: string, date: string, ordinal: number): BygramConstellationDay {
   return {
     key: `${pairKey}:${date}`,
@@ -238,6 +277,17 @@ function getDayKey(timestamp: number) {
 
 function dispatchChange(accountId: string, peerId: string) {
   window.dispatchEvent(new CustomEvent(CHANGE_EVENT, { detail: { accountId, peerId } }));
+}
+
+function createRandom(seed: number) {
+  let value = seed >>> 0;
+  return () => {
+    value += 0x6D2B79F5;
+    let next = value;
+    next = Math.imul(next ^ next >>> 15, next | 1);
+    next ^= next + Math.imul(next ^ next >>> 7, next | 61);
+    return ((next ^ next >>> 14) >>> 0) / 4294967296;
+  };
 }
 
 function requestAsPromise<T = IDBValidKey>(request: IDBRequest<T>) {

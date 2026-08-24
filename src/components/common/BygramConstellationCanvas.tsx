@@ -7,13 +7,11 @@ import {
 
 import type { BygramConstellationDay } from '../../util/bygramConstellation';
 
-type StarPoint = {
-  day: BygramConstellationDay;
-  x: number;
-  y: number;
-  radius: number;
-  phase: number;
-};
+import {
+  buildBygramConstellationPoints,
+} from '../../util/bygramConstellation';
+
+type StarPoint = ReturnType<typeof buildBygramConstellationPoints>[number];
 
 type OwnProps = {
   days: BygramConstellationDay[];
@@ -36,7 +34,7 @@ const BygramConstellationCanvas = ({
   days, seed, selectedDate, resetToken, onSelect,
 }: OwnProps) => {
   const canvasRef = useRef<HTMLCanvasElement>();
-  const points = useMemo(() => buildStarPoints(days, seed), [days, seed]);
+  const points = useMemo(() => buildBygramConstellationPoints(days, seed), [days, seed]);
   const pointsRef = useRef(points);
   const viewRef = useRef<ViewState>({ x: 0, y: 0, zoom: 1, targetX: 0, targetY: 0, targetZoom: 1 });
   const pointersRef = useRef(new Map<number, { x: number; y: number }>());
@@ -166,35 +164,6 @@ const BygramConstellationCanvas = ({
   );
 };
 
-function buildStarPoints(days: BygramConstellationDay[], seed: number): StarPoint[] {
-  const styleRandom = createRandom(seed);
-  const arms = 2 + Math.floor(styleRandom() * 3);
-  const direction = styleRandom() > 0.5 ? 1 : -1;
-  const turn = 0.38 + styleRandom() * 0.16;
-  const flatten = 0.72 + styleRandom() * 0.24;
-  const tilt = styleRandom() * Math.PI * 2;
-
-  return days.map((day) => {
-    const random = createRandom(seed ^ Math.imul(day.ordinal + 1, 0x9E3779B1));
-    const index = day.ordinal + 2;
-    const arm = day.ordinal % arms;
-    const radius = 22 + Math.sqrt(index) * (13 + styleRandom() * 0.015);
-    const angle = direction * (index * turn + arm * Math.PI * 2 / arms) + (random() - 0.5) * 0.48;
-    const spread = 0.62 + random() * 0.7;
-    const rawX = Math.cos(angle) * radius * spread;
-    const rawY = Math.sin(angle) * radius * spread * flatten;
-    const x = rawX * Math.cos(tilt) - rawY * Math.sin(tilt) + (random() - 0.5) * 12;
-    const y = rawX * Math.sin(tilt) + rawY * Math.cos(tilt) + (random() - 0.5) * 12;
-    return {
-      day,
-      x,
-      y,
-      radius: 1.35 + day.significance * 3.1,
-      phase: random() * Math.PI * 2,
-    };
-  });
-}
-
 function drawGalaxy(
   context: CanvasRenderingContext2D,
   points: StarPoint[],
@@ -209,7 +178,7 @@ function drawGalaxy(
   const centerX = width / 2 + view.x;
   const centerY = height / 2 + view.y;
   const time = reducedMotion ? 0 : timestamp * 0.001;
-  const hue = 202 + seed % 48;
+  const hue = 202 + seed % 18;
 
   context.save();
   context.globalCompositeOperation = 'lighter';
@@ -219,7 +188,7 @@ function drawGalaxy(
     const second = points[index];
     const distance = Math.hypot(first.x - second.x, first.y - second.y);
     if (distance > 92) continue;
-    context.strokeStyle = `hsla(${hue}, 78%, 76%, ${0.1 * Math.max(0.25, 1 - distance / 92)})`;
+    context.strokeStyle = `hsla(${hue}, 72%, 76%, ${0.08 * Math.max(0.25, 1 - distance / 92)})`;
     context.beginPath();
     context.moveTo(centerX + first.x * view.zoom, centerY + first.y * view.zoom);
     context.lineTo(centerX + second.x * view.zoom, centerY + second.y * view.zoom);
@@ -235,9 +204,9 @@ function drawGalaxy(
     const radius = point.radius * view.zoom * twinkle * (isSelected ? 1.4 : 1);
     const glow = context.createRadialGradient(x, y, 0, x, y, radius * (isSelected ? 6 : 4.2));
     const lightness = 70 + point.day.significance * 18;
-    glow.addColorStop(0, `hsla(${hue + point.phase * 5}, 92%, ${lightness}%, 0.96)`);
-    glow.addColorStop(0.18, `hsla(${hue}, 88%, 72%, ${0.46 + point.day.significance * 0.25})`);
-    glow.addColorStop(1, `hsla(${hue + 28}, 82%, 62%, 0)`);
+    glow.addColorStop(0, `hsla(${hue + point.phase}, 88%, ${lightness}%, 0.96)`);
+    glow.addColorStop(0.18, `hsla(${hue}, 82%, 72%, ${0.38 + point.day.significance * 0.2})`);
+    glow.addColorStop(1, `hsla(${hue + 6}, 76%, 62%, 0)`);
     context.fillStyle = glow;
     context.beginPath();
     context.arc(x, y, radius * (isSelected ? 6 : 4.2), 0, Math.PI * 2);
@@ -248,7 +217,7 @@ function drawGalaxy(
     context.fill();
 
     if (point.day.planeMilestone || point.day.gifts || point.day.premiumGifted) {
-      context.strokeStyle = `hsla(${hue + 36}, 90%, 82%, 0.72)`;
+      context.strokeStyle = `hsla(${hue + 12}, 86%, 82%, 0.66)`;
       context.lineWidth = 0.7;
       context.beginPath();
       context.arc(x, y, radius * 2.25, 0, Math.PI * 2);
@@ -305,17 +274,6 @@ function selectNearestPoint(
     }
   });
   onSelect(nearest?.day);
-}
-
-function createRandom(seed: number) {
-  let value = seed >>> 0;
-  return () => {
-    value += 0x6D2B79F5;
-    let next = value;
-    next = Math.imul(next ^ next >>> 15, next | 1);
-    next ^= next + Math.imul(next ^ next >>> 7, next | 61);
-    return ((next ^ next >>> 14) >>> 0) / 4294967296;
-  };
 }
 
 function getDistance(first: { x: number; y: number }, second: { x: number; y: number }) {

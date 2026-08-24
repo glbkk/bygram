@@ -2,7 +2,7 @@ import { memo, useEffect, useState } from '../../lib/teact/teact';
 import { getActions, getGlobal } from '../../global';
 
 import { getUserFullName } from '../../global/helpers';
-import { selectUser } from '../../global/selectors';
+import { selectChatMessages, selectUser } from '../../global/selectors';
 import { getArchivedChatMessages } from '../../util/bygramArchive';
 import {
   type BygramConstellationDay,
@@ -10,10 +10,14 @@ import {
   getBygramConstellationSeed,
   subscribeBygramConstellation,
 } from '../../util/bygramConstellation';
+import { createBygramConstellationStoryFile } from '../../util/bygramConstellationStory';
+import { callApi } from '../../api/gramjs';
 
 import useLastCallback from '../../hooks/useLastCallback';
 
+import Button from '../ui/Button';
 import Modal from '../ui/Modal';
+import Spinner from '../ui/Spinner';
 import Avatar from './Avatar';
 import BygramConstellationCanvas from './BygramConstellationCanvas';
 import Icon from './icons/Icon';
@@ -32,6 +36,12 @@ const BygramConstellation = ({ accountId, peerId, isOpen, onClose }: OwnProps) =
   const [selectedDay, setSelectedDay] = useState<BygramConstellationDay>();
   const [isLoading, setIsLoading] = useState(false);
   const [resetToken, setResetToken] = useState(0);
+  const [isShareOpen, setIsShareOpen] = useState(false);
+  const [isStoryPreparing, setIsStoryPreparing] = useState(false);
+  const [isStoryPublishing, setIsStoryPublishing] = useState(false);
+  const [storyFile, setStoryFile] = useState<File>();
+  const [storyPreviewUrl, setStoryPreviewUrl] = useState<string>();
+  const [storyError, setStoryError] = useState<string>();
 
   const loadDays = useLastCallback(async () => {
     setDays(await bygramConstellationRepository.getDays(accountId, peerId));
@@ -46,10 +56,11 @@ const BygramConstellation = ({ accountId, peerId, isOpen, onClose }: OwnProps) =
     void (async () => {
       try {
         const archived = await getArchivedChatMessages(peerId);
+        const cachedMessages = Object.values(selectChatMessages(getGlobal(), peerId) || {});
         await bygramConstellationRepository.importMessages(
           accountId,
           peerId,
-          archived.map(({ message }) => message),
+          [...archived.map(({ message }) => message), ...cachedMessages],
         );
         if (!isCancelled) await loadDays();
       } finally {
@@ -66,10 +77,69 @@ const BygramConstellation = ({ accountId, peerId, isOpen, onClose }: OwnProps) =
     };
   }, [accountId, isOpen, loadDays, peerId]);
 
+  useEffect(() => () => {
+    if (storyPreviewUrl) URL.revokeObjectURL(storyPreviewUrl);
+  }, [storyPreviewUrl]);
+
   const handleOpenMessages = useLastCallback(() => {
     if (!selectedDay?.firstMessageId) return;
     onClose();
     getActions().focusMessage({ chatId: peerId, messageId: selectedDay.firstMessageId });
+  });
+
+  const handleOpenShare = useLastCallback(async () => {
+    if (!days.length) return;
+    const global = getGlobal();
+    const currentUser = selectUser(global, accountId);
+    const peerUser = selectUser(global, peerId);
+    if (!currentUser || !peerUser) {
+      getActions().showNotification({ message: 'Не удалось загрузить данные пользователей' });
+      return;
+    }
+
+    setStoryFile(undefined);
+    setStoryPreviewUrl(undefined);
+    setStoryError(undefined);
+    setIsShareOpen(true);
+    setIsStoryPreparing(true);
+    try {
+      const file = await createBygramConstellationStoryFile(
+        currentUser, peerUser, days, getBygramConstellationSeed(accountId, peerId),
+      );
+      setStoryFile(file);
+      setStoryPreviewUrl(URL.createObjectURL(file));
+    } catch {
+      setStoryError('Не удалось подготовить изображение созвездия. Попробуйте ещё раз.');
+    } finally {
+      setIsStoryPreparing(false);
+    }
+  });
+
+  const handleCloseShare = useLastCallback(() => {
+    if (!isStoryPublishing) setIsShareOpen(false);
+  });
+
+  const handlePublishStory = useLastCallback(async () => {
+    if (!storyFile || isStoryPublishing) return;
+    setStoryError(undefined);
+    setIsStoryPublishing(true);
+    try {
+      const result = await callApi('publishBygramStreakStory', storyFile);
+      if (!result?.isSuccess) {
+        const message = getStoryPublishError(result?.error);
+        setStoryError(message);
+        getActions().showNotification({ message });
+        return;
+      }
+      setIsShareOpen(false);
+      getActions().showNotification({ message: 'Созвездие опубликовано на 6 часов' });
+    } catch {
+      const message = 'Не удалось опубликовать историю. Проверьте соединение.';
+      setStoryError(message);
+      getActions().showNotification({ message });
+    } finally {
+      setIsStoryPublishing(false);
+    }
   });
 
   const global = getGlobal();
@@ -87,16 +157,20 @@ const BygramConstellation = ({ accountId, peerId, isOpen, onClose }: OwnProps) =
       onClose={onClose}
     >
       <div className={styles.root}>
-        <div className={styles.ambient} />
         <div className={styles.people}>
           {currentUser && <Avatar peer={currentUser} size={32} />}
-          <span className={styles.connectionLine} />
           {peerUser && <Avatar peer={peerUser} size={32} />}
           <div className={styles.peopleText}>
             <strong>{days.length ? `${days.length} ${pluralizeStars(days.length)}` : 'Созвездие общения'}</strong>
             <span>{formatPeople(currentUser, peerUser)}</span>
           </div>
         </div>
+        {days.length > 0 && (
+          <button type="button" className={styles.shareButton} onClick={handleOpenShare}>
+            <Icon name="forward" />
+            В историю
+          </button>
+        )}
 
         <div className={styles.canvasWrap}>
           {days.length > 0 && (
@@ -149,6 +223,42 @@ const BygramConstellation = ({ accountId, peerId, isOpen, onClose }: OwnProps) =
         {selectedDay && (
           <DayMemory day={selectedDay} onOpenMessages={handleOpenMessages} onClose={() => setSelectedDay(undefined)} />
         )}
+        {isShareOpen && (
+          <div className={styles.shareBackdrop} onClick={handleCloseShare}>
+            <section
+              className={styles.shareSheet}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Опубликовать созвездие"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <header className={styles.shareHeader}>
+                <div>
+                  <strong>Созвездие в истории</strong>
+                  <span>Предпросмотр публикации</span>
+                </div>
+                <button type="button" aria-label="Закрыть" onClick={handleCloseShare}>
+                  <Icon name="close" />
+                </button>
+              </header>
+              <div className={styles.storyPreview}>
+                {storyPreviewUrl && <img src={storyPreviewUrl} alt="Предпросмотр истории с созвездием" />}
+                {isStoryPreparing && <Spinner />}
+                {!isStoryPreparing && !storyPreviewUrl && <Icon name="favorite" />}
+              </div>
+              {storyError && <p className={styles.storyError} role="alert">{storyError}</p>}
+              <Button
+                className={styles.publishStoryButton}
+                isLoading={isStoryPublishing}
+                disabled={!storyFile || isStoryPreparing || isStoryPublishing}
+                onClick={handlePublishStory}
+              >
+                Выложить историю
+              </Button>
+              <span className={styles.storyPrivacy}>Все пользователи Telegram · 6 часов · не в профиле</span>
+            </section>
+          </div>
+        )}
       </div>
     </Modal>
   );
@@ -198,7 +308,7 @@ function DayMemory({
       <button type="button" className={styles.memoryClose} aria-label="Закрыть" onClick={onClose}>
         <Icon name="close" />
       </button>
-      <span className={styles.memoryEyebrow}>ДЕНЬ В СОЗВЕЗДИИ</span>
+      <span className={styles.memoryEyebrow}>Воспоминание</span>
       <strong className={styles.memoryDate}>{formatDate(day.date)}</strong>
       <div className={styles.memoryRows}>
         {rows.filter(Boolean).map(({ icon, text }) => (
@@ -258,6 +368,18 @@ function pluralizeVoice(value: number) {
 
 function pluralizeRounds(value: number) {
   return getPlural(value, 'кружок', 'кружка', 'кружков');
+}
+
+function getStoryPublishError(error?: string) {
+  if (!error) return 'Telegram не ответил. Проверьте соединение и попробуйте ещё раз.';
+  if (error === 'STORY_DAILY_LIMIT' || error === 'STORIES_TOO_MUCH') {
+    return 'Достигнут дневной лимит историй Telegram.';
+  }
+  if (error === 'PREMIUM_ACCOUNT_REQUIRED') return 'Для публикации Telegram требует Premium.';
+  if (error.startsWith('FLOOD_WAIT') || error.startsWith('STORY_SEND_FLOOD')) {
+    return 'Telegram временно ограничил частые публикации. Попробуйте позже.';
+  }
+  return `Telegram отклонил публикацию: ${error}`;
 }
 
 export default memo(BygramConstellation);

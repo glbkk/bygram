@@ -63,14 +63,29 @@
       box-shadow: 0 0 0 0.125rem var(--bygram-ghost-accent-soft);
     }
 
+    body::before,
     body::after {
       pointer-events: none;
       content: '';
 
       position: fixed;
-      z-index: 2147483000;
+      z-index: var(--z-scroll-notch);
       inset: 0;
+    }
 
+    body::before {
+      opacity: 0.16;
+      background:
+        radial-gradient(circle at 0 12%, var(--bygram-ghost-accent) 0 0.0625rem, transparent 0.125rem),
+        radial-gradient(circle at 100% 24%, #91b5ff 0 0.05rem, transparent 0.1125rem),
+        radial-gradient(circle at 0 46%, #b6aefb 0 0.05rem, transparent 0.125rem),
+        radial-gradient(circle at 100% 62%, var(--bygram-ghost-accent) 0 0.0625rem, transparent 0.1375rem),
+        radial-gradient(circle at 0 82%, #91b5ff 0 0.05rem, transparent 0.1125rem),
+        radial-gradient(circle at 100% 91%, #b6aefb 0 0.0625rem, transparent 0.1375rem);
+      animation: bygram-ghost-particles 12s ease-in-out infinite alternate;
+    }
+
+    body::after {
       border: 0.0625rem solid color-mix(in srgb, var(--bygram-ghost-accent) 13%, transparent);
 
       opacity: 0.3;
@@ -102,11 +117,24 @@
     }
   }
 
+  @keyframes bygram-ghost-particles {
+    from {
+      transform: translate3d(0, -0.25rem, 0);
+      opacity: 0.1;
+    }
+
+    to {
+      transform: translate3d(0, 0.5rem, 0);
+      opacity: 0.22;
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     html.bygram-ghost-mode .MiddleHeader.bygram-ghost-active {
       animation: none;
     }
 
+    html.bygram-ghost-mode body::before,
     html.bygram-ghost-mode body::after {
       animation: none;
     }

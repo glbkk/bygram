@@ -29,7 +29,6 @@ import renderKeyboardButtonText from '../composer/helpers/renderKeyboardButtonTe
 
 import useDerivedState from '../../../hooks/useDerivedState';
 import useEnsureMessage from '../../../hooks/useEnsureMessage';
-import { useFastClick } from '../../../hooks/useFastClick';
 import useFlag from '../../../hooks/useFlag';
 import useFrozenProps from '../../../hooks/useFrozenProps';
 import useLang from '../../../hooks/useLang';
@@ -180,8 +179,8 @@ const HeaderPinnedMessage = ({
     openThread({ chatId: renderingChatId, threadId: renderingThreadId, type: 'pinned' });
   });
 
-  const handleMessageClick = useLastCallback((e: React.MouseEvent<HTMLElement, MouseEvent>): void => {
-    const nextMessageId = e.shiftKey && Array.isArray(renderingPinnedMessageIds)
+  const focusPinnedMessage = useLastCallback((shouldCycle = false): void => {
+    const nextMessageId = shouldCycle && Array.isArray(renderingPinnedMessageIds)
       ? renderingPinnedMessageIds[cycleRestrict(
         renderingPinnedMessageIds.length, renderingPinnedMessageIds.indexOf(renderingPinnedMessageId!) - 2,
       )]
@@ -195,9 +194,17 @@ const HeaderPinnedMessage = ({
     }
   });
 
-  const [noHoverColor, markNoHoverColor, unmarkNoHoverColor] = useFlag();
+  const handleMessageClick = useLastCallback((e: React.MouseEvent<HTMLElement, MouseEvent>): void => {
+    focusPinnedMessage(e.shiftKey);
+  });
 
-  const { handleClick, handleMouseDown } = useFastClick(handleMessageClick);
+  const handleMessageKeyDown = useLastCallback((e: React.KeyboardEvent<HTMLElement>): void => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    focusPinnedMessage();
+  });
+
+  const [noHoverColor, markNoHoverColor, unmarkNoHoverColor] = useFlag();
 
   if (!shouldRender || !renderingPinnedMessage) return undefined;
 
@@ -252,8 +259,10 @@ const HeaderPinnedMessage = ({
       />
       <div
         className={buildClassName(styles.pinnedMessage, noHoverColor && styles.noHover)}
-        onClick={handleClick}
-        onMouseDown={handleMouseDown}
+        role="button"
+        tabIndex={0}
+        onClick={handleMessageClick}
+        onKeyDown={handleMessageKeyDown}
         dir={lang.isRtl ? 'rtl' : undefined}
       >
         <PinnedMessageNavigation
