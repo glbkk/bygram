@@ -2,6 +2,8 @@ import type { ChangeEvent, MouseEvent as ReactMouseEvent } from 'react';
 import { memo, useEffect, useState } from '../../lib/teact/teact';
 import { getActions, getGlobal } from '../../global';
 
+import type { BygramStreakStoryTemplate } from '../../util/bygramStreakStory';
+
 import { getMainUsername, getUserFullName } from '../../global/helpers';
 import { selectUser } from '../../global/selectors';
 import { getBygramSettings, subscribeBygramSettings } from '../../util/bygramArchive';
@@ -11,9 +13,6 @@ import {
   shouldOfferBygramStreakMilestone,
   subscribeToBygramStreak,
 } from '../../util/bygramStreak';
-import {
-  type BygramStreakStoryTemplate, createBygramStreakStoryFile,
-} from '../../util/bygramStreakStory';
 import { callApi } from '../../api/gramjs';
 
 import useLastCallback from '../../hooks/useLastCallback';
@@ -21,7 +20,7 @@ import useLastCallback from '../../hooks/useLastCallback';
 import Button from '../ui/Button';
 import Modal from '../ui/Modal';
 import Avatar from './Avatar';
-import BygramConstellation from './BygramConstellation';
+import BygramConstellation from './BygramConstellation.async';
 import Icon from './icons/Icon';
 
 import styles from './BygramStreakBadge.module.scss';
@@ -55,21 +54,25 @@ const BygramStreakBadge = ({ accountId, peerId, shouldOfferMilestone }: OwnProps
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string>();
 
+  useEffect(() => subscribeBygramSettings((settings) => {
+    setIsEnabled(settings.isChatStreakEnabled);
+  }), []);
+
+  // This badge is mounted once per chat list row, so the per-chat subscription and its refresh timer stay
+  // unarmed while the feature is off — otherwise a long chat list pays for dozens of idle minute timers.
   useEffect(() => {
+    if (!isEnabled) return undefined;
+
     const update = () => setStreak(getBygramStreak(accountId, peerId));
     update();
 
     const unsubscribe = subscribeToBygramStreak(accountId, peerId, update);
-    const unsubscribeSettings = subscribeBygramSettings((settings) => {
-      setIsEnabled(settings.isChatStreakEnabled);
-    });
     const interval = window.setInterval(update, UPDATE_INTERVAL);
     return () => {
       unsubscribe();
-      unsubscribeSettings();
       window.clearInterval(interval);
     };
-  }, [accountId, peerId]);
+  }, [accountId, isEnabled, peerId]);
 
   useEffect(() => {
     if (!isEnabled || !shouldOfferMilestone || !streak
@@ -128,6 +131,8 @@ const BygramStreakBadge = ({ accountId, peerId, shouldOfferMilestone }: OwnProps
     setPublishError(undefined);
     setIsPublishing(true);
     try {
+      // Loaded on demand: the story renderer is only needed once the user actually publishes
+      const { createBygramStreakStoryFile } = await import('../../util/bygramStreakStory');
       const file = await createBygramStreakStoryFile(currentUser, peerUser, days, storyTemplate);
       const result = await callApi('publishBygramStreakStory', file);
       if (!result?.isSuccess) {

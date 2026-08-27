@@ -301,7 +301,7 @@
     color: var(--color-white);
 
     background: rgba(0, 0, 0, 0.2);
-    backdrop-filter: blur(50px);
+    backdrop-filter: blur(var(--panel-blur-radius));
     /* stylelint-disable-next-line plugin/whole-pixel */
     outline: 1.5px solid var(--color-background);
   }

@@ -2219,6 +2219,23 @@ const Message = ({
   );
 };
 
+// The member list is scanned once per rendered message on every global update, which is O(members ×
+// messages) in large groups. The index is keyed by the array identity held in `chatFullInfo`, so it is
+// rebuilt only when the member list itself changes.
+const memberIndexes = new WeakMap<ApiChatMember[], Map<string, ApiChatMember>>();
+
+function selectMemberByUserId(members: ApiChatMember[] | undefined, userId: string) {
+  if (!members) return undefined;
+
+  let index = memberIndexes.get(members);
+  if (!index) {
+    index = new Map(members.map((member) => [member.userId, member]));
+    memberIndexes.set(members, index);
+  }
+
+  return index.get(userId);
+}
+
 export default memo(withGlobal<OwnProps>(
   (global, ownProps): Complete<StateProps> => {
     const {
@@ -2262,7 +2279,7 @@ export default memo(withGlobal<OwnProps>(
     const botSender = viaBotId ? selectUser(global, viaBotId) : undefined;
     const guestFromSender = guestChatViaId ? selectPeer(global, guestChatViaId) : undefined;
     const senderChatMember = sender?.id
-      ? (adminMembersById?.[sender?.id] || members?.find((member) => member.userId === sender?.id))
+      ? (adminMembersById?.[sender.id] || selectMemberByUserId(members, sender.id))
       : undefined;
 
     const { replyToMsgId, replyToPeerId, replyFrom } = getMessageReplyInfo(message) || {};

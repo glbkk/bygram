@@ -272,7 +272,8 @@ export const EMOJI_IMG_REGEX = /<img[^>]+alt="([^"]+)"(?![^>]*data-document-id)[
 export const BASE_EMOJI_KEYWORD_LANG = 'en';
 
 export const MENU_TRANSITION_DURATION = 200;
-export const SLIDE_TRANSITION_DURATION = 450;
+// Must track `--slide-transition` so deferred content mounts exactly when the slide settles
+export const SLIDE_TRANSITION_DURATION = 240;
 
 export const BIRTHDAY_NUMBERS_SET = 'FestiveFontEmoji';
 export const RESTRICTED_EMOJI_SET = 'RestrictedEmoji';

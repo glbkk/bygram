@@ -19,10 +19,17 @@ const handleOrientationChange = throttle(() => {
   handleResize();
 }, WINDOW_ORIENTATION_CHANGE_THROTTLE_MS, false);
 
+// The iOS keyboard animates over roughly 300ms and `visualViewport` reports it at most once per frame.
+// Throttling that stream makes the composer visibly step behind the keyboard, so it runs unthrottled
+// and relies on `requestMutation` inside `updateSizes` to coalesce the CSS variable writes per frame.
+const handleVisualViewportChange = () => {
+  currentWindowSize = updateSizes();
+};
+
 window.addEventListener('orientationchange', handleOrientationChange);
 if (IS_IOS) {
-  window.visualViewport?.addEventListener('resize', handleResize);
-  window.visualViewport?.addEventListener('scroll', handleResize);
+  window.visualViewport?.addEventListener('resize', handleVisualViewportChange);
+  window.visualViewport?.addEventListener('scroll', handleVisualViewportChange);
 } else {
   window.addEventListener('resize', handleResize);
 }

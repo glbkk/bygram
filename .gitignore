@@ -2,6 +2,14 @@ dist/build-stats.json
 node_modules
 .cache
 .env
+
+# ByGram ships serverless: the local Node server variant never belongs in this repo
+server/
+.env.server
+dev/createBygramLanCertificate.sh
+dev/runBygramLan.sh
+_legacy-server-variant/
+
 src/lib/gramjs/build/
 build-contest/
 tests/

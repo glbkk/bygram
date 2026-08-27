@@ -30,6 +30,9 @@ const sendCollapseLatches = new WeakMap<HTMLElement, SendCollapseLatch>();
 
 const pendingTopGrowthByScroller = new WeakMap<HTMLElement, number>();
 
+// Last reserve handed to `applyMessageListBottomInset`, so scroll-time readers can skip re-measuring it
+const appliedBottomReserves = new WeakMap<HTMLElement, number>();
+
 export function consumePendingTopGrowth(scroller: HTMLElement) {
   const value = pendingTopGrowthByScroller.get(scroller) || 0;
   pendingTopGrowthByScroller.delete(scroller);
@@ -84,10 +87,22 @@ function disarmSendCollapseReserve(scroller: HTMLElement) {
   sendCollapseLatches.delete(scroller);
 }
 
+// Measuring the live reserve costs a `getComputedStyle` plus several `offsetHeight` reads, which is far
+// too much for the bottom-snap check that runs on every scroll event. The footer is watched by a
+// ResizeObserver that re-syncs the reserve on any size change, so readers reuse the last applied value
+// and only keep the class-based fast paths live.
+function getAppliedMessageListBottomReserve(scroller: HTMLElement) {
+  if (scroller.classList.contains(SELECT_MODE_CLASS)) return getSettledBottomReserve();
+  if (scroller.classList.contains(NO_FOOTER_CLASS)) return 0;
+
+  const applied = appliedBottomReserves.get(scroller);
+  return applied !== undefined ? applied : getMessageListBottomReserve(scroller);
+}
+
 export function getEffectiveMessageListBottomReserve(scroller: HTMLElement) {
   return isSendCollapsePhaseActive(scroller)
     ? getSettledBottomReserve()
-    : getMessageListBottomReserve(scroller);
+    : getAppliedMessageListBottomReserve(scroller);
 }
 
 export function buildTopStackCacheKey(chatId: string, threadId: number | string, messageListType: string) {
@@ -120,6 +135,8 @@ export function getMessageListTopReserve(scroller: HTMLElement) {
 }
 
 export function applyMessageListBottomInset(scroller: HTMLElement, bottomReserve: number) {
+  appliedBottomReserves.set(scroller, bottomReserve);
+
   const inset = bottomReserve > 0 ? `${bottomReserve}px` : '';
   const fade = bottomReserve > 0 ? `${Math.max(bottomReserve - MESSAGE_LIST_COMPOSER_GAP, 0)}px` : '';
   const avatarBottom = bottomReserve > 0 ? `${bottomReserve + AVATAR_OFFSET}px` : '';

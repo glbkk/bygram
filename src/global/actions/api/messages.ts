@@ -64,7 +64,9 @@ import { parseTranslationCacheKey } from '../../../util/keys/translationKey';
 import { getTranslationFn, type RegularLangFnParameters } from '../../../util/localization';
 import { formatStarsAsText } from '../../../util/localization/format';
 import { oldTranslate } from '../../../util/oldLangProvider';
-import { debounce, onTickEnd, rafPromise } from '../../../util/schedulers';
+import {
+  debounce, onTickEnd, rafPromise, throttle,
+} from '../../../util/schedulers';
 import { getServerTime } from '../../../util/serverTime';
 import { callApi, cancelApiProgress } from '../../../api/gramjs';
 import { prepareByProtoOutgoingText } from '../../../byproto/outgoing';
@@ -186,6 +188,34 @@ import { deleteMessages, updateWithLocalMedia } from '../apiUpdaters/messages';
 const AUTOLOGIN_TOKEN_KEY = 'autologin_token';
 
 const uploadProgressCallbacks = new Map<MessageKey, ApiOnProgress>();
+
+// Upload progress arrives once per uploaded chunk, so a single file can produce dozens of ticks.
+// Every `setGlobal` re-runs the state mapping of each mounted message, which visibly costs frames while
+// scrolling during a send, so ticks are coalesced per message key. Completion clears the state on its own.
+const UPLOAD_PROGRESS_THROTTLE_MS = 150;
+
+const pendingUploadProgress = new Map<MessageKey, number>();
+
+const flushUploadProgress = throttle(() => {
+  if (!pendingUploadProgress.size) return;
+
+  let global = getGlobal();
+  pendingUploadProgress.forEach((progress, messageKey) => {
+    global = updateUploadByMessageKey(global, messageKey, progress);
+  });
+  pendingUploadProgress.clear();
+  setGlobal(global);
+}, UPLOAD_PROGRESS_THROTTLE_MS, true);
+
+function scheduleUploadProgress(messageKey: MessageKey, progress: number) {
+  pendingUploadProgress.set(messageKey, progress);
+  flushUploadProgress();
+}
+
+// Drops any tick still queued for the key so a trailing flush cannot resurrect a stale progress value
+function finalizeUploadProgress(messageKey: MessageKey) {
+  pendingUploadProgress.delete(messageKey);
+}
 
 const runDebouncedForMarkRead = debounce((cb) => cb(), 500, false);
 
@@ -800,9 +830,7 @@ addActionHandler('editMessage', (global, actions, payload): ActionReturnType => 
       uploadProgressCallbacks.set(messageKey, progressCallback!);
     }
 
-    global = getGlobal();
-    global = updateUploadByMessageKey(global, messageKey, progress);
-    setGlobal(global);
+    scheduleUploadProgress(messageKey, progress);
   } : undefined;
 
   const { chatId, threadId, type: messageListType } = messageList;
@@ -839,6 +867,7 @@ addActionHandler('editMessage', (global, actions, payload): ActionReturnType => 
     }, progressCallback);
 
     if (progressCallback && currentMessageKey) {
+      finalizeUploadProgress(currentMessageKey);
       global = getGlobal();
       global = updateUploadByMessageKey(global, currentMessageKey, undefined);
       setGlobal(global);
@@ -2232,12 +2261,11 @@ async function sendMessage<T extends GlobalState>(global: T, params: SendMessage
       uploadProgressCallbacks.set(messageKey, progressCallback!);
     }
 
-    global = getGlobal();
-    global = updateUploadByMessageKey(global, messageKey, progress);
-    setGlobal(global);
+    scheduleUploadProgress(messageKey, progress);
   } : undefined;
   await callApi('sendMessage', params, progressCallback);
   if (progressCallback && currentMessageKey) {
+    finalizeUploadProgress(currentMessageKey);
     global = getGlobal();
     global = updateUploadByMessageKey(global, currentMessageKey, undefined);
     setGlobal(global);

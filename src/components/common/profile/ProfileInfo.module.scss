@@ -424,7 +424,7 @@
 
   opacity: 0.8;
   background: var(--blured-background-color);
-  backdrop-filter: blur(100px);
+  backdrop-filter: blur(var(--panel-blur-radius));
 
   transition: 150ms filter ease-in;
 

@@ -153,7 +153,7 @@
 
     body:not(.no-menu-blur) & {
       background: var(--color-background-compact-menu);
-      backdrop-filter: blur(25px);
+      backdrop-filter: blur(var(--menu-blur-radius));
     }
   }
 
