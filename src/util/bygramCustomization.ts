@@ -3,7 +3,7 @@ import { MAIN_IDB_STORE } from './browser/idb';
 export type BygramCustomizationMedia = {
   blob: Blob;
   mimeType: string;
-  source: 'gallery' | 'telegram-gif';
+  source: 'gallery' | 'telegram-gif' | 'byproto';
   updatedAt: number;
 };
 

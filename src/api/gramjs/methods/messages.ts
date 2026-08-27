@@ -648,7 +648,14 @@ export async function sendMessage(
   }
 
   const localMessage = params.localMessage || await sendMessageLocal(params);
-  return localMessage ? sendApiMessage(params, localMessage, onProgress) : undefined;
+  const apiParams = params.networkEntities !== undefined || params.networkText !== undefined
+    ? {
+      ...params,
+      text: params.networkText ?? params.text,
+      entities: params.networkEntities ?? params.entities,
+    }
+    : params;
+  return localMessage ? sendApiMessage(apiParams, localMessage, onProgress) : undefined;
 }
 
 const groupedUploads: Record<string, {
@@ -830,6 +837,8 @@ export async function editMessage({
   message,
   text,
   entities,
+  networkText,
+  networkEntities,
   richMessage,
   attachment,
   noWebPage,
@@ -838,6 +847,8 @@ export async function editMessage({
   message: ApiMessage;
   text: string;
   entities?: ApiMessageEntity[];
+  networkText?: string;
+  networkEntities?: ApiMessageEntity[];
   richMessage?: ApiInputRichMessage;
   attachment?: ApiAttachment;
   noWebPage?: boolean;
@@ -881,10 +892,10 @@ export async function editMessage({
       mediaUpdate = await uploadMedia(message, attachment, onProgress!);
     }
 
-    const mtpEntities = entities && entities.map(buildMtpMessageEntity);
+    const mtpEntities = (networkEntities ?? entities)?.map(buildMtpMessageEntity);
 
     await invokeRequest(new GramJs.messages.EditMessage({
-      message: richMessage ? undefined : text,
+      message: richMessage ? undefined : networkText ?? text,
       entities: richMessage ? undefined : mtpEntities,
       richMessage: inputRichMessage,
       media: mediaUpdate,

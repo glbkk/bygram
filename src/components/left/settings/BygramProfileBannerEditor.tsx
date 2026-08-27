@@ -2,9 +2,11 @@ import { memo, useState } from '../../../lib/teact/teact';
 import { getActions, withGlobal } from '../../../global';
 
 import type { ApiVideo } from '../../../api/types';
+import type { ThreadId } from '../../../types';
 import { ApiMediaFormat } from '../../../api/types';
 
 import { getVideoMediaHash } from '../../../global/helpers';
+import { selectCurrentMessageList } from '../../../global/selectors';
 import buildClassName from '../../../util/buildClassName';
 import {
   getBygramProfileBannerKey,
@@ -13,6 +15,8 @@ import {
 } from '../../../util/bygramCustomization';
 import * as mediaLoader from '../../../util/mediaLoader';
 import { openSystemFilesDialog } from '../../../util/systemFilesDialog';
+import { createByProtoProfileBannerEnvelope } from '../../../byproto/outgoing';
+import buildAttachment from '../../middle/composer/helpers/buildAttachment';
 
 import useBygramCustomizationMedia from '../../../hooks/useBygramCustomizationMedia';
 import useLastCallback from '../../../hooks/useLastCallback';
@@ -25,12 +29,13 @@ import styles from './BygramProfileBannerEditor.module.scss';
 
 type StateProps = {
   currentUserId?: string;
+  currentChatId?: string;
+  currentThreadId?: ThreadId;
 };
 
 const MAX_BANNER_SIZE = 50 * 1024 * 1024;
-
-const BygramProfileBannerEditor = ({ currentUserId }: StateProps) => {
-  const { showNotification } = getActions();
+const BygramProfileBannerEditor = ({ currentUserId, currentChatId, currentThreadId }: StateProps) => {
+  const { sendMessage, showNotification } = getActions();
   const bannerKey = currentUserId ? getBygramProfileBannerKey(currentUserId) : undefined;
   const banner = useBygramCustomizationMedia(bannerKey);
   const [isGifPickerOpen, setIsGifPickerOpen] = useState(false);
@@ -46,7 +51,7 @@ const BygramProfileBannerEditor = ({ currentUserId }: StateProps) => {
     setIsSaving(true);
     try {
       await saveBygramCustomizationMedia(bannerKey, blob, source);
-      showNotification({ message: 'Баннер профиля сохранён' });
+      showNotification({ message: 'Баннер сохранён на этом устройстве' });
       return true;
     } catch {
       showNotification({ message: 'Не удалось сохранить баннер' });
@@ -88,6 +93,26 @@ const BygramProfileBannerEditor = ({ currentUserId }: StateProps) => {
     }
   });
 
+  const handleShare = useLastCallback(async () => {
+    if (!banner || !currentChatId || !currentThreadId) return;
+    setIsSaving(true);
+    try {
+      const extension = banner.isVideo ? 'mp4' : 'jpg';
+      const attachment = await buildAttachment(`bygram-banner.${extension}`, banner.blob);
+      sendMessage({
+        messageList: { chatId: currentChatId, threadId: currentThreadId, type: 'thread' },
+        text: 'Мой баннер профиля ByGram',
+        attachments: [attachment],
+        byProtoEnvelope: createByProtoProfileBannerEnvelope(Math.floor(banner.updatedAt / 1000)),
+      });
+      showNotification({ message: 'Баннер отправляется через Telegram' });
+    } catch {
+      showNotification({ message: 'Не удалось подготовить баннер к отправке' });
+    } finally {
+      setIsSaving(false);
+    }
+  });
+
   return (
     <>
       <div className={styles.root}>
@@ -111,13 +136,20 @@ const BygramProfileBannerEditor = ({ currentUserId }: StateProps) => {
           <Button size="tiny" color="translucent" onClick={() => setIsGifPickerOpen(true)} disabled={isSaving}>
             GIF из Telegram
           </Button>
+          {banner && currentChatId && (
+            <Button size="tiny" color="translucent" onClick={handleShare} disabled={isSaving}>
+              Отправить в чат
+            </Button>
+          )}
           {banner && (
             <Button size="tiny" color="danger" onClick={handleRemove} disabled={isSaving}>
               Удалить
             </Button>
           )}
         </div>
-        <p className={styles.hint}>Хранится только на этом устройстве и отображается в bygram.</p>
+        <p className={styles.hint}>
+          Хранится только на устройстве. Кнопка «Отправить в чат» синхронизирует его через Telegram.
+        </p>
       </div>
 
       <Modal
@@ -141,5 +173,12 @@ const BygramProfileBannerEditor = ({ currentUserId }: StateProps) => {
 };
 
 export default memo(withGlobal(
-  (global): Complete<StateProps> => ({ currentUserId: global.currentUserId }),
+  (global): Complete<StateProps> => {
+    const messageList = selectCurrentMessageList(global);
+    return {
+      currentUserId: global.currentUserId,
+      currentChatId: messageList?.chatId,
+      currentThreadId: messageList?.threadId,
+    };
+  },
 )(BygramProfileBannerEditor));

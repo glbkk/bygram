@@ -215,6 +215,7 @@ const SymbolMenu: FC<OwnProps & StateProps> = ({
             idPrefix={idPrefix}
             loadAndPlay={isOpen && (isActive || isFrom)}
             chatId={chatId}
+            forceAvailable
             isTranslucent={!isMobile && isBackgroundTranslucent}
             onCustomEmojiSelect={handleCustomEmojiSelect}
           />

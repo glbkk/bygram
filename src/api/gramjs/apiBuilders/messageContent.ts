@@ -39,6 +39,7 @@ import type { UniversalMessage } from './messages';
 import { addTimestampEntities } from '../../../util/dates/timestamp';
 import { buildCollectionByKey, pick } from '../../../util/iteratees';
 import { toJSNumber } from '../../../util/numbers';
+import { parseByProtoMessage } from '../../../byproto/parser';
 import {
   addMediaToLocalDb, addStoryToLocalDb, addWebPageMediaToLocalDb, type MediaRepairContext,
 } from '../helpers/localDb';
@@ -128,9 +129,13 @@ export function buildMessageTextContent(
   message: string,
   entities?: GramJs.TypeMessageEntity[],
 ): ApiFormattedText {
+  const visibleText = parseByProtoMessage(message).text;
+  const visibleEntities = entities?.map(buildApiMessageEntity).filter((entity) => (
+    entity.offset >= 0 && entity.offset + entity.length <= visibleText.length
+  ));
   return {
-    text: message,
-    ...(entities && { entities: entities.map(buildApiMessageEntity) }),
+    text: visibleText,
+    ...(visibleEntities?.length && { entities: visibleEntities }),
   };
 }
 

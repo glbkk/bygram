@@ -20,6 +20,7 @@ import {
   getBygramSettings,
   markArchivedMessagesDeleted,
 } from '../../../util/bygramArchive';
+import { bindPremiumOverlayToMessage } from '../../../util/bygramPremium';
 import { recordBygramStreakMessage } from '../../../util/bygramStreak';
 import { isUserId } from '../../../util/entities/ids';
 import { getCurrentTabId } from '../../../util/establishMultitabRole';
@@ -272,6 +273,7 @@ addActionHandler('apiUpdate', (global, actions, update): ActionReturnType => {
       } : message;
 
       void archiveNewMessage(nextMessage);
+      bindPremiumOverlayToMessage(chatId, nextMessage);
       if (isUserId(chatId) && global.currentUserId) {
         const peerUser = selectUser(global, chatId);
         if (!peerUser || !isUserBot(peerUser)) {
@@ -753,6 +755,7 @@ addActionHandler('apiUpdate', (global, actions, update): ActionReturnType => {
       };
 
       const newMessage = selectChatMessage(global, chatId, message.id)!;
+      bindPremiumOverlayToMessage(chatId, newMessage, localId);
       if (isUserId(chatId) && global.currentUserId) {
         const peerUser = selectUser(global, chatId);
         if (!peerUser || !isUserBot(peerUser)) {

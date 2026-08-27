@@ -2,6 +2,7 @@ import { memo, useEffect, useState } from '../../../lib/teact/teact';
 import { withGlobal } from '../../../global';
 
 import type { ApiSticker } from '../../../api/types';
+import type { BygramMessageBubbleStyle } from '../../../util/bygramArchive';
 
 import {
   BYGRAM_GIFT_BUBBLE_THEMES,
@@ -14,6 +15,8 @@ import CustomEmoji from '../../common/CustomEmoji';
 
 type OwnProps = {
   isVisible: boolean;
+  presetId?: BygramMessageBubbleStyle;
+  customEmojiId?: string;
 };
 
 type StateProps = {
@@ -22,14 +25,17 @@ type StateProps = {
 
 const DECORATION_SIZE = 46;
 
-function BygramBubbleDecoration({ isVisible, telegramGifts }: OwnProps & StateProps) {
+function BygramBubbleDecoration({
+  isVisible, presetId, customEmojiId, telegramGifts,
+}: OwnProps & StateProps) {
   const [settings, setSettings] = useState(getBygramSettings);
 
   useEffect(() => subscribeBygramSettings(setSettings), []);
 
-  if (!isVisible || settings.messageBubbleStyle === 'default') return undefined;
+  const selectedStyle = presetId || settings.messageBubbleStyle;
+  if (!isVisible || selectedStyle === 'default') return undefined;
 
-  const giftTheme = BYGRAM_GIFT_BUBBLE_THEMES[settings.messageBubbleStyle];
+  const giftTheme = BYGRAM_GIFT_BUBBLE_THEMES[selectedStyle];
   const shouldPlay = settings.isMessageBubbleGiftAnimated;
   const telegramGiftSticker = giftTheme?.telegramTitle && telegramGifts?.find(({ title }) => (
     title?.localeCompare(giftTheme.telegramTitle!, undefined, { sensitivity: 'base' }) === 0
@@ -71,13 +77,14 @@ function BygramBubbleDecoration({ isVisible, telegramGifts }: OwnProps & StatePr
     );
   }
 
-  if (settings.messageBubbleStyle !== 'custom') return undefined;
+  if (selectedStyle !== 'custom') return undefined;
 
-  if (settings.messageBubbleCustomEmojiId) {
+  const selectedCustomEmojiId = presetId ? customEmojiId : settings.messageBubbleCustomEmojiId;
+  if (selectedCustomEmojiId) {
     return (
       <div className="bygram-bubble-decoration" aria-hidden>
         <CustomEmoji
-          documentId={settings.messageBubbleCustomEmojiId}
+          documentId={selectedCustomEmojiId}
           size={DECORATION_SIZE}
           isBig
           noPlay={!shouldPlay}
@@ -88,7 +95,7 @@ function BygramBubbleDecoration({ isVisible, telegramGifts }: OwnProps & StatePr
     );
   }
 
-  if (settings.messageBubbleSticker) {
+  if (!presetId && settings.messageBubbleSticker) {
     return (
       <div className="bygram-bubble-decoration" aria-hidden>
         <CustomEmoji
@@ -103,7 +110,7 @@ function BygramBubbleDecoration({ isVisible, telegramGifts }: OwnProps & StatePr
     );
   }
 
-  if (!settings.messageBubbleStickerImage) return undefined;
+  if (presetId || !settings.messageBubbleStickerImage) return undefined;
 
   return (
     <div className="bygram-bubble-decoration" aria-hidden>

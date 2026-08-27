@@ -56,6 +56,7 @@ import { omitUndefined } from '../../../util/iteratees';
 import { toJSNumber } from '../../../util/numbers';
 import { getServerTime } from '../../../util/serverTime';
 import { interpolateArray } from '../../../util/waveform';
+import { parseByProtoMessage } from '../../../byproto/parser';
 import {
   buildApiCurrencyAmount,
 } from '../apiBuilders/payments';
@@ -256,7 +257,7 @@ export function buildApiMessageWithChatId(
 
   const restrictionReasons = buildApiRestrictionReasons(mtpMessage.restrictionReason);
 
-  return {
+  const apiMessage: ApiMessage = {
     id: mtpMessage.id,
     chatId,
     isOutgoing,
@@ -308,6 +309,18 @@ export function buildApiMessageWithChatId(
     fromRank: mtpMessage.fromRank,
     guestChatViaId: mtpMessage.guestchatViaFrom && getApiChatIdFromMtpPeer(mtpMessage.guestchatViaFrom),
   };
+
+  if (!forwardInfo && 'message' in mtpMessage && mtpMessage.message) {
+    const envelope = parseByProtoMessage(mtpMessage.message).envelope;
+    const senderId = fromId || (isOutgoing ? currentUserId : chatId);
+    if (envelope && senderId) {
+      void import('../../../byproto/runtime').then(({ ingestByProtoEnvelope }) => {
+        ingestByProtoEnvelope(apiMessage, senderId, envelope);
+      });
+    }
+  }
+
+  return apiMessage;
 }
 
 export function buildMessageDraft(draft: GramJs.TypeDraftMessage): ApiDraft | undefined {

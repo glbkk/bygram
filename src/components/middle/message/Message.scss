@@ -215,6 +215,8 @@
     --color-voice-transcribe: var(--color-voice-transcribe-button-own);
     --thumbs-background: var(--color-background-own);
 
+    flex-direction: row-reverse;
+
     .bygram-custom-message-bubble & {
       --background-color: var(--bygram-own-bubble-tail);
       --color-text: var(--bygram-own-bubble-text);
@@ -223,7 +225,13 @@
       --accent-color: var(--bygram-own-bubble-text);
     }
 
-    flex-direction: row-reverse;
+    &.bygram-peer-message-bubble {
+      --background-color: var(--bygram-peer-bubble-tail);
+      --color-text: var(--bygram-peer-bubble-text);
+      --color-links: var(--bygram-peer-bubble-text);
+      --secondary-color: color-mix(in srgb, var(--bygram-peer-bubble-text) 76%, transparent);
+      --accent-color: var(--bygram-peer-bubble-text);
+    }
 
     .theme-dark & {
       --color-reaction: rgb(255, 255, 255, 0.1);

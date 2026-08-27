@@ -46,6 +46,7 @@ import type {
   MediaContent,
   StarGiftAttributeIdModel,
 } from '../api/types';
+import type { ValidByProtoEnvelope } from '../byproto/types';
 import type { DC_IDS } from '../config';
 import type { SearchResultKey } from '../util/keys/searchResultKey';
 import type { IconName } from './icons';
@@ -292,6 +293,7 @@ export enum SettingsScreens {
   DoNotTranslate,
   FoldersShare,
   Passkeys,
+  Orb,
 }
 
 export type StickerSetOrReactionsSetOrRecent = Pick<ApiStickerSet, (
@@ -301,6 +303,7 @@ export type StickerSetOrReactionsSetOrRecent = Pick<ApiStickerSet, (
 
 export enum LeftColumnContent {
   ChatList,
+  Music,
   GlobalSearch,
   Settings,
   Contacts,
@@ -802,7 +805,10 @@ export type SendMessageParams = {
   attachments?: ApiAttachment[];
   lastMessageId?: number;
   text?: string;
+  networkText?: string;
+  byProtoEnvelope?: ValidByProtoEnvelope;
   entities?: ApiMessageEntity[];
+  networkEntities?: ApiMessageEntity[];
   richMessage?: ApiInputRichMessage;
   replyInfo?: ApiInputReplyInfo;
   suggestedPostInfo?: ApiInputSuggestedPostInfo;

@@ -486,6 +486,11 @@
     background: var(--bygram-own-bubble-background);
   }
 
+  .Message.bygram-peer-message-bubble &.has-solid-background,
+  .Message.bygram-peer-message-bubble &.has-background {
+    background: var(--bygram-peer-bubble-background);
+  }
+
   .bygram-gift-message-bubble .Message.own &.has-solid-background,
   .bygram-gift-message-bubble .Message.own &.has-background {
     padding-inline-end: 2.25rem;
@@ -496,12 +501,14 @@
     --custom-emoji-border-radius: 0.625rem;
 
     pointer-events: none;
+
     position: absolute;
     z-index: 2;
     top: -0.625rem;
     right: -0.4375rem;
 
     overflow: hidden;
+
     width: 2.875rem;
     height: 2.875rem;
     border-radius: 0.625rem;
@@ -554,6 +561,10 @@
 
       .bygram-custom-message-bubble .Message.own & {
         fill: var(--bygram-own-bubble-tail);
+      }
+
+      .Message.bygram-peer-message-bubble & {
+        fill: var(--bygram-peer-bubble-tail);
       }
     }
 

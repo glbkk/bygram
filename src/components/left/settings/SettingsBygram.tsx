@@ -226,6 +226,26 @@ function SettingsBygram({ isActive, onReset }: OwnProps) {
         />
       </Island>
 
+      <IslandTitle>Связь ByGram</IslandTitle>
+      <Island>
+        <Checkbox
+          label="ByProto"
+          subLabel="Передавать оформление и ByGram emoji внутри обычных сообщений Telegram"
+          checked={settings.isByProtoEnabled}
+          onCheck={(value) => handleSettingChange('isByProtoEnabled', value)}
+        />
+        <Checkbox
+          label="Принимать оформление"
+          subLabel="Автоматически сохранять пузыри и баннеры пользователей ByGram"
+          checked={settings.isByProtoAutoAcceptProfiles}
+          disabled={!settings.isByProtoEnabled}
+          onCheck={(value) => handleSettingChange('isByProtoAutoAcceptProfiles', value)}
+        />
+      </Island>
+      <IslandDescription>
+        Данные передаются напрямую через Telegram и хранятся только на этом устройстве.
+      </IslandDescription>
+
       <IslandTitle>Самолётик</IslandTitle>
       <Island>
         <Checkbox
@@ -405,6 +425,7 @@ function SettingsBygram({ isActive, onReset }: OwnProps) {
                       idPrefix="bygram-bubble-emoji"
                       loadAndPlay
                       noAddButton
+                      forceAvailable
                       onCustomEmojiSelect={handleCustomEmojiSelect}
                     />
                   )}

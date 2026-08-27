@@ -44,6 +44,7 @@ import {
 import { ensureProtocol, isMixedScriptUrl } from '../../../util/browser/url';
 import { IS_IOS } from '../../../util/browser/windowEnvironment';
 import { getArchivedRetainedMessages, getBygramSettings } from '../../../util/bygramArchive';
+import { applyBygramPremiumSend } from '../../../util/bygramPremium';
 import { recordBygramStreakMessage } from '../../../util/bygramStreak';
 import { copyTextToClipboardFromPromise } from '../../../util/clipboard';
 import { isDeepLink } from '../../../util/deepLinkParser';
@@ -66,6 +67,7 @@ import { oldTranslate } from '../../../util/oldLangProvider';
 import { debounce, onTickEnd, rafPromise } from '../../../util/schedulers';
 import { getServerTime } from '../../../util/serverTime';
 import { callApi, cancelApiProgress } from '../../../api/gramjs';
+import { prepareByProtoOutgoingText } from '../../../byproto/outgoing';
 import {
   getIsSavedDialog,
   getUserFullName,
@@ -140,6 +142,7 @@ import {
   selectFocusedMessageId,
   selectForwardsCanBeSentToChat,
   selectForwardsContainVoiceMessages,
+  selectHasTelegramPremium,
   selectIsChatBotNotStarted,
   selectIsChatRestricted,
   selectIsChatWithSelf,
@@ -554,7 +557,7 @@ addActionHandler('sendMessage', async (global, actions, payload): Promise<void> 
     dice = payload.text;
   }
 
-  const params: SendMessageParams = {
+  let params: SendMessageParams = {
     ...payload,
     chat,
     replyInfo,
@@ -571,6 +574,24 @@ addActionHandler('sendMessage', async (global, actions, payload): Promise<void> 
     richMessage: payload.richMessage,
     isPending: messagePriceInStars ? true : undefined,
     ...suggestedMessage && { isInvertedMedia: suggestedMessage?.isInvertedMedia },
+  };
+
+  const premiumSend = applyBygramPremiumSend({
+    chatId: chatId!,
+    text: params.text,
+    entities: params.entities,
+    hasTelegramPremium: selectHasTelegramPremium(global) || chatId === global.currentUserId,
+  });
+  params = {
+    ...params,
+    entities: premiumSend.entities,
+    networkEntities: premiumSend.networkEntities,
+    networkText: prepareByProtoOutgoingText({
+      peerKey: chatId!,
+      visibleText: params.text,
+      emojiRanges: premiumSend.byProtoEmojiRanges,
+      explicitEnvelope: params.byProtoEnvelope,
+    }),
   };
 
   if (!isStoryReply) {
@@ -616,7 +637,7 @@ addActionHandler('sendMessage', async (global, actions, payload): Promise<void> 
     await sendMessageOrReduceLocal(global, sendParams, localMessages);
   } else if (isGrouped) {
     const {
-      text, entities, attachments, ...commonParams
+      text, networkText, entities, networkEntities, attachments, ...commonParams
     } = params;
     const byType = splitAttachmentsByType(attachments!);
 
@@ -636,7 +657,9 @@ addActionHandler('sendMessage', async (global, actions, payload): Promise<void> 
           let sendParams: SendMessageParams = {
             ...commonParams,
             text: isFirst && !hasSentCaption ? text : undefined,
+            networkText: isFirst && !hasSentCaption ? networkText : undefined,
             entities: isFirst && !hasSentCaption ? entities : undefined,
+            networkEntities: isFirst && !hasSentCaption ? networkEntities : undefined,
             attachment: firstAttachment,
             groupedId: restAttachments.length > 0 ? groupedId : undefined,
             wasDrafted: Boolean(draft),
@@ -668,7 +691,9 @@ addActionHandler('sendMessage', async (global, actions, payload): Promise<void> 
           const sendParams = {
             ...commonParams,
             text: isLast && !hasSentCaption ? text : undefined,
+            networkText: isLast && !hasSentCaption ? networkText : undefined,
             entities: isLast && !hasSentCaption ? entities : undefined,
+            networkEntities: isLast && !hasSentCaption ? networkEntities : undefined,
             attachment: lastAttachment,
             groupedId: firstAttachments.length > 0 ? groupedId : undefined,
             wasDrafted: Boolean(draft),
@@ -681,14 +706,17 @@ addActionHandler('sendMessage', async (global, actions, payload): Promise<void> 
     }
   } else {
     const {
-      text, entities, richMessage, attachments, replyInfo: replyToForFirstMessage, ...commonParams
+      text, networkText, entities, networkEntities, richMessage, attachments,
+      replyInfo: replyToForFirstMessage, ...commonParams
     } = params;
 
     if (text || richMessage) {
       const sendParams = {
         ...commonParams,
         text,
+        networkText,
         entities,
+        networkEntities,
         richMessage,
         replyInfo: replyToForFirstMessage,
         wasDrafted: Boolean(draft),
@@ -787,12 +815,25 @@ addActionHandler('editMessage', (global, actions, payload): ActionReturnType => 
   actions.setEditingId({ messageId: undefined, tabId });
 
   (async () => {
+    const premiumSend = applyBygramPremiumSend({
+      chatId,
+      text,
+      entities: richMessage ? undefined : entities,
+      hasTelegramPremium: selectHasTelegramPremium(global) || chatId === global.currentUserId,
+    });
+    const networkText = prepareByProtoOutgoingText({
+      peerKey: chatId,
+      visibleText: text,
+      emojiRanges: premiumSend.byProtoEmojiRanges,
+    });
     await callApi('editMessage', {
       chat,
       message,
       attachment: attachments ? attachments[0] : undefined,
       text,
       entities: richMessage ? undefined : entities,
+      networkText,
+      networkEntities: premiumSend.networkEntities,
       richMessage,
       noWebPage: selectNoWebPage(global, chatId, threadId),
     }, progressCallback);

@@ -33,6 +33,8 @@ export type BygramSettings = {
   isMediaArchiveEnabled: boolean;
   isGhostModeEnabled: boolean;
   isChatStreakEnabled: boolean;
+  isByProtoEnabled: boolean;
+  isByProtoAutoAcceptProfiles: boolean;
   mediaArchiveLimitMb: number;
   messageBubbleStyle: BygramMessageBubbleStyle;
   messageBubbleColor: string;
@@ -166,6 +168,21 @@ export const BYGRAM_GIFT_BUBBLE_THEMES: Partial<Record<BygramMessageBubbleStyle,
   },
 };
 
+const BYGRAM_BASIC_BUBBLE_THEMES: Partial<Record<BygramMessageBubbleStyle, {
+  background: string;
+  tail: string;
+  text: string;
+}>> = {
+  ocean: { background: 'linear-gradient(145deg, #1687FF 0%, #0066E6 100%)', tail: '#0066E6', text: '#FFFFFF' },
+  violet: { background: 'linear-gradient(145deg, #9B6DFF 0%, #6C45E8 100%)', tail: '#6C45E8', text: '#FFFFFF' },
+  sunset: { background: 'linear-gradient(145deg, #FF7A59 0%, #E94373 100%)', tail: '#E94373', text: '#FFFFFF' },
+  mint: { background: 'linear-gradient(145deg, #20BFA9 0%, #078B83 100%)', tail: '#078B83', text: '#FFFFFF' },
+};
+
+export function getBygramBubbleVisualStyle(presetId: BygramMessageBubbleStyle) {
+  return BYGRAM_GIFT_BUBBLE_THEMES[presetId] || BYGRAM_BASIC_BUBBLE_THEMES[presetId];
+}
+
 export type BygramMessageVersion = {
   savedAt: number;
   message: ApiMessage;
@@ -210,6 +227,8 @@ const DEFAULT_SETTINGS: BygramSettings = {
   isMediaArchiveEnabled: false,
   isGhostModeEnabled: false,
   isChatStreakEnabled: true,
+  isByProtoEnabled: true,
+  isByProtoAutoAcceptProfiles: true,
   mediaArchiveLimitMb: 256,
   messageBubbleStyle: 'default',
   messageBubbleColor: '#7C5CFC',
@@ -248,16 +267,6 @@ function applyMessageBubbleStyle(nextSettings: BygramSettings) {
   const root = document.documentElement;
   const isCustom = nextSettings.messageBubbleStyle !== 'default';
   root.classList.toggle('bygram-ghost-mode', nextSettings.isGhostModeEnabled);
-  const styles: Record<'ocean' | 'violet' | 'sunset' | 'mint', {
-    background: string;
-    tail: string;
-  }> = {
-    ocean: { background: 'linear-gradient(145deg, #1687FF 0%, #0066E6 100%)', tail: '#0066E6' },
-    violet: { background: 'linear-gradient(145deg, #9B6DFF 0%, #6C45E8 100%)', tail: '#6C45E8' },
-    sunset: { background: 'linear-gradient(145deg, #FF7A59 0%, #E94373 100%)', tail: '#E94373' },
-    mint: { background: 'linear-gradient(145deg, #20BFA9 0%, #078B83 100%)', tail: '#078B83' },
-  };
-
   const giftTheme = BYGRAM_GIFT_BUBBLE_THEMES[nextSettings.messageBubbleStyle];
   const customStickerImage = nextSettings.messageBubbleStyle === 'custom'
     ? nextSettings.messageBubbleStickerImage
@@ -287,7 +296,8 @@ function applyMessageBubbleStyle(nextSettings: BygramSettings) {
     : customColor;
   const selectedStyle = nextSettings.messageBubbleStyle === 'custom'
     ? { background: customBackground, tail: nextSettings.isMessageBubbleGradientEnabled ? customColorEnd : customColor }
-    : giftTheme || styles[nextSettings.messageBubbleStyle as keyof typeof styles];
+    : giftTheme || BYGRAM_BASIC_BUBBLE_THEMES[nextSettings.messageBubbleStyle];
+  if (!selectedStyle) return;
   const textColor = giftTheme?.text || (nextSettings.messageBubbleStyle === 'custom'
     ? getContrastTextColor(customColor)
     : '#FFFFFF');

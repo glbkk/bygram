@@ -47,6 +47,7 @@ import { getBygramProfileBannerKey } from '../../../util/bygramCustomization';
 import { captureEvents, SwipeDirection } from '../../../util/captureEvents';
 import { MEMO_EMPTY_ARRAY } from '../../../util/memo';
 import { resolveTransitionName } from '../../../util/resolveTransitionName';
+import { resetByProtoPeerBanner } from '../../../byproto/runtime';
 import { REM } from '../helpers/mediaDimensions.ts';
 import renderText from '../helpers/renderText.tsx';
 
@@ -154,6 +155,7 @@ const ProfileInfo = ({
     openUniqueGiftBySlug,
     openProfileRatingModal,
     loadPeerSavedGifts,
+    showNotification,
   } = getActions();
 
   const oldLang = useOldLang();
@@ -167,11 +169,9 @@ const ProfileInfo = ({
   const prevMediaIndex = usePreviousDeprecated(mediaIndex);
   const prevAvatarOwnerId = usePreviousDeprecated(avatarOwnerId);
   const [hasSlideAnimation, setHasSlideAnimation] = useState(true);
-  const localBanner = useBygramCustomizationMedia(
-    currentUserId === peerId ? getBygramProfileBannerKey(currentUserId) : undefined,
-  );
-  const hasLocalBanner = Boolean(localBanner);
-  const usesCompactProfileLayout = !isExpanded || hasLocalBanner;
+  const banner = useBygramCustomizationMedia(getBygramProfileBannerKey(peerId));
+  const hasBanner = Boolean(banner);
+  const usesCompactProfileLayout = !isExpanded || hasBanner;
 
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const isFirst = photos.length <= 1 || currentPhotoIndex === 0;
@@ -272,6 +272,12 @@ const ProfileInfo = ({
     }
 
     openPremiumModal({ fromUserId: peerId });
+  });
+
+  const handleResetBygramBanner = useLastCallback(() => {
+    void resetByProtoPeerBanner(peerId).then(() => {
+      showNotification({ message: 'Баннер пользователя сброшен на этом устройстве' });
+    });
   });
 
   const selectPreviousMedia = useLastCallback(() => {
@@ -501,7 +507,7 @@ const ProfileInfo = ({
         styles.root,
         usesCompactProfileLayout && styles.minimized,
         isPlain && styles.plain,
-        hasLocalBanner && styles.withLocalBanner,
+        hasBanner && styles.withLocalBanner,
       )}
       style={buildStyle(
         profileColorSet
@@ -511,11 +517,11 @@ const ProfileInfo = ({
       )}
       dir={lang.isRtl ? 'rtl' : undefined}
     >
-      {localBanner && (
+      {banner && (
         <div className={styles.localBanner}>
-          {localBanner.isVideo ? (
+          {banner.isVideo ? (
             <video
-              src={localBanner.url}
+              src={banner.url}
               autoPlay={canPlayVideo}
               loop
               muted
@@ -523,12 +529,22 @@ const ProfileInfo = ({
               disablePictureInPicture
             />
           ) : (
-            <img src={localBanner.url} alt="" draggable={false} />
+            <img src={banner.url} alt="" draggable={false} />
           )}
           <div className={styles.localBannerShade} />
         </div>
       )}
-      {hasPatternBackground && !hasLocalBanner && (
+      {banner && currentUserId !== peerId && (
+        <button
+          type="button"
+          className={styles.resetBanner}
+          aria-label="Сбросить баннер ByGram"
+          onClick={handleResetBygramBanner}
+        >
+          <Icon name="close" />
+        </button>
+      )}
+      {hasPatternBackground && !hasBanner && (
         <RadialPatternBackground
           backgroundColors={profileColorSet?.bgColors}
           patternIcon={backgroundEmoji}
@@ -538,7 +554,7 @@ const ProfileInfo = ({
           yPosition={isPlain ? PATTERN_PLAIN_Y_SHIFT : PATTERN_Y_SHIFT}
         />
       )}
-      {Boolean(pinnedGifts?.length) && !hasLocalBanner && (
+      {Boolean(pinnedGifts?.length) && !hasBanner && (
         <ProfilePinnedGifts
           peerId={peerId}
           gifts={pinnedGifts}
@@ -547,7 +563,7 @@ const ProfileInfo = ({
           withGlow={!isPlain}
         />
       )}
-      {isExpanded && !hasLocalBanner && (
+      {isExpanded && !hasBanner && (
         <div className={styles.photoWrapper} style={createVtnStyle('photoWrapper', true)}>
           {renderPhotoTabs()}
           {!isForSettings && profilePhotos?.personalPhoto && (

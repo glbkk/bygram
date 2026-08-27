@@ -28,6 +28,14 @@ let voiceQueue: TrackId[] = [];
 let musicQueue: TrackId[] = [];
 
 let currentTrackId: TrackId | undefined;
+let externalAudioPauseHandler: NoneToVoidFunction | undefined;
+
+export function registerExternalAudioPauseHandler(handler: NoneToVoidFunction) {
+  externalAudioPauseHandler = handler;
+  return () => {
+    if (externalAudioPauseHandler === handler) externalAudioPauseHandler = undefined;
+  };
+}
 
 function createAudio(
   trackId: TrackId,
@@ -144,6 +152,7 @@ export function register(
   return {
     play(src: string) {
       if (!audio.paused) return;
+      externalAudioPauseHandler?.();
       const currentTrack = currentTrackId && tracks.get(currentTrackId);
       if (currentTrack && currentTrackId !== trackId) {
         currentTrack.audio.pause();

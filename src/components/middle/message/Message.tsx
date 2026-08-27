@@ -29,6 +29,7 @@ import type {
   ApiUser,
   ApiWebPage,
 } from '../../../api/types';
+import type { ByProtoBubbleParams } from '../../../byproto/types';
 import type { ObserveFn } from '../../../hooks/useIntersectionObserver';
 import type {
   ActiveEmojiInteraction,
@@ -132,6 +133,8 @@ import { IS_TAURI } from '../../../util/browser/globalEnvironment';
 import { IS_ANDROID, IS_TRANSLATION_SUPPORTED } from '../../../util/browser/windowEnvironment';
 import buildClassName from '../../../util/buildClassName';
 import buildStyle from '../../../util/buildStyle';
+import { getBygramBubbleVisualStyle } from '../../../util/bygramArchive';
+import { withPremiumEmojiOverlay } from '../../../util/bygramPremium';
 import { isUserId } from '../../../util/entities/ids';
 import { getMessageKey } from '../../../util/keys/messageKey';
 import { parseTranslationCacheKey } from '../../../util/keys/translationKey';
@@ -147,6 +150,7 @@ import getSingularPaidMedia from './helpers/getSingularPaidMedia';
 import { calculateMediaDimensions, getMinMediaWidth, getMinMediaWidthWithText } from './helpers/mediaDimensions';
 
 import useAppLayout from '../../../hooks/useAppLayout';
+import useByProtoPeer from '../../../hooks/useByProtoPeer';
 import useContextMenuHandlers from '../../../hooks/useContextMenuHandlers';
 import useEffectWithPrevDeps from '../../../hooks/useEffectWithPrevDeps';
 import useEnsureMessage from '../../../hooks/useEnsureMessage';
@@ -369,8 +373,22 @@ const QUICK_REACTION_SIZE = 1.75 * REM;
 const EXTRA_SPACE_FOR_REACTIONS = 2.25 * REM;
 const MAX_REASON_LENGTH = 200;
 
+function buildByProtoCustomBubbleVisual(params: ByProtoBubbleParams) {
+  const background = params.gradient
+    ? `linear-gradient(145deg, ${params.colorStart} 0%, ${params.colorEnd} 100%)`
+    : params.colorStart;
+  const channels = params.colorStart.slice(1).match(/.{2}/g)
+    ?.map((channel) => Number.parseInt(channel, 16)) || [0, 0, 0];
+  const luminance = (channels[0] * 299 + channels[1] * 587 + channels[2] * 114) / 1000;
+  return {
+    background,
+    tail: params.gradient ? params.colorEnd : params.colorStart,
+    text: luminance > 150 ? '#17212B' : '#FFFFFF',
+  };
+}
+
 const Message = ({
-  message,
+  message: rawMessage,
   album,
   noAvatars,
   withAvatar,
@@ -507,6 +525,7 @@ const Message = ({
     summarizeMessage,
   } = getActions();
 
+  const message = withPremiumEmojiOverlay(rawMessage);
   const ref = useRef<HTMLDivElement>();
   const bottomMarkerRef = useRef<HTMLDivElement>();
   const quickReactionRef = useRef<HTMLDivElement>();
@@ -578,6 +597,12 @@ const Message = ({
 
   const isLocal = isMessageLocal(message);
   const isOwn = isOwnMessage(message);
+  const byProtoPeerId = !isOwn ? (message.senderId || sender?.id) : undefined;
+  const byProtoPeer = useByProtoPeer(byProtoPeerId);
+  const byProtoBubblePreset = byProtoPeer?.bubble?.presetId;
+  const byProtoBubbleVisual = byProtoBubblePreset === 'custom' && byProtoPeer?.bubble?.params
+    ? buildByProtoCustomBubbleVisual(byProtoPeer.bubble.params)
+    : byProtoBubblePreset && getBygramBubbleVisualStyle(byProtoBubblePreset);
   const isScheduled = messageListType === 'scheduled' || message.isScheduled;
   const readMetricsMessage = album?.mainMessage || message;
   const canReportReadMetrics = messageListType === 'thread'
@@ -818,6 +843,7 @@ const Message = ({
     isLastInDocumentGroup && 'last-in-document-group',
     isLastInList && 'last-in-list',
     isOwn && 'own',
+    byProtoBubbleVisual && 'bygram-peer-message-bubble',
     Boolean(message.viewsCount) && 'has-views',
     message.isEdited && 'was-edited',
     hasMessageReply && 'has-reply',
@@ -1136,7 +1162,12 @@ const Message = ({
     contentWidth, style: sizeStyles, reactionsMaxWidth,
   } = sizeCalculations;
 
-  const contentStyle = buildStyle(peerColorStyle, sizeStyles);
+  const byProtoBubbleStyle = byProtoBubbleVisual
+    ? `--bygram-peer-bubble-background: ${byProtoBubbleVisual.background};`
+    + `--bygram-peer-bubble-tail: ${byProtoBubbleVisual.tail};`
+    + `--bygram-peer-bubble-text: ${byProtoBubbleVisual.text}`
+    : undefined;
+  const contentStyle = buildStyle(peerColorStyle, sizeStyles, byProtoBubbleStyle);
 
   const handleTypingAnimationEnd = useLastCallback(() => {
     if (!isTypingDraft || !previousLocalId) {
@@ -1181,6 +1212,7 @@ const Message = ({
         observeIntersectionForPlaying={observeIntersectionForPlaying}
         withTranslucentThumbs={isCustomShape}
         isInSelectMode={isInSelectMode}
+        forcePlayback
         canBeEmpty={hasFactCheck || isTypingDraft}
         maxTimestamp={maxTimestamp}
         threadId={threadId}
@@ -2013,6 +2045,15 @@ const Message = ({
           {isOwn && (
             contentClassName.includes('has-solid-background') || contentClassName.includes('has-background')
           ) && <BygramBubbleDecoration isVisible />}
+          {!isOwn && byProtoBubblePreset && (
+            contentClassName.includes('has-solid-background') || contentClassName.includes('has-background')
+          ) && (
+            <BygramBubbleDecoration
+              isVisible
+              presetId={byProtoBubblePreset}
+              customEmojiId={byProtoPeer?.bubble?.params?.decorationEmojiId}
+            />
+          )}
           {asForwarded && !isInDocumentGroupNotFirst && (
             <>
               {shouldRenderSenderName() && renderSenderName()}
@@ -2155,9 +2196,10 @@ export default memo(withGlobal<OwnProps>(
       loadingThread,
     } = selectTabState(global);
     const {
-      message, album, documentGroup, withSenderName, withAvatar, threadId, messageListType,
+      message: rawMessage, album, documentGroup, withSenderName, withAvatar, threadId, messageListType,
       isLastInDocumentGroup, isFirstInGroup, shouldIgnoreSendFocus,
     } = ownProps;
+    const message = withPremiumEmojiOverlay(rawMessage);
     const {
       id, chatId, viaBotId, guestChatViaId, isOutgoing, forwardInfo, transcriptionId, isPinned,
       viaBusinessBotId, effectId, paidMessageStars,

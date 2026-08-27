@@ -70,6 +70,7 @@ type OwnProps = {
   isReactionPicker?: boolean;
   isTranslucent?: boolean;
   noAddButton?: boolean;
+  forceAvailable?: boolean;
   onCustomEmojiSelect: (sticker: ApiSticker) => void;
   onReactionSelect?: (reaction: ApiReactionWithPaid) => void;
   onReactionContext?: (reaction: ApiReactionWithPaid) => void;
@@ -481,7 +482,7 @@ const CustomEmojiPicker: FC<OwnProps & StateProps> = ({
 };
 
 export default memo(withGlobal<OwnProps>(
-  (global, { chatId, isStatusPicker, isReactionPicker }): Complete<StateProps> => {
+  (global, { chatId, isStatusPicker, isReactionPicker, forceAvailable }): Complete<StateProps> => {
     const {
       stickers: {
         setsById: stickerSetsById,
@@ -515,7 +516,7 @@ export default memo(withGlobal<OwnProps>(
       addedCustomEmojiIds: global.customEmojis.added.setIds,
       canAnimate: selectCanPlayAnimatedEmojis(global),
       isSavedMessages,
-      isCurrentUserPremium: selectIsCurrentUserPremium(global),
+      isCurrentUserPremium: forceAvailable || selectIsCurrentUserPremium(global),
       customEmojiFeaturedIds,
       defaultTopicIconsId: global.defaultTopicIconsId,
       defaultStatusIconsId: global.defaultStatusIconsId,
