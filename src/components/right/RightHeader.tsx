@@ -9,7 +9,7 @@ import type { GiftProfileFilterOptions, ThreadId } from '../../types';
 import { MAIN_THREAD_ID } from '../../api/types';
 import { ManagementScreens, ProfileState, SettingsScreens } from '../../types';
 
-import { ANIMATION_END_DELAY, SAVED_FOLDER_ID } from '../../config';
+import { ANIMATION_END_DELAY, LAYER_TRANSITION_DURATION, SAVED_FOLDER_ID } from '../../config';
 import {
   getCanAddContact, getCanManageTopic, isChatChannel, isUserBot,
 } from '../../global/helpers';
@@ -96,7 +96,7 @@ type StateProps = {
   isOwnProfile?: boolean;
 };
 
-const COLUMN_ANIMATION_DURATION = 450 + ANIMATION_END_DELAY;
+const COLUMN_ANIMATION_DURATION = LAYER_TRANSITION_DURATION + ANIMATION_END_DELAY;
 
 enum HeaderContent {
   Profile,

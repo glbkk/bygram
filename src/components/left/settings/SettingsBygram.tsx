@@ -226,11 +226,11 @@ function SettingsBygram({ isActive, onReset }: OwnProps) {
         />
       </Island>
 
-      <IslandTitle>Связь ByGram</IslandTitle>
+      <IslandTitle>Связь bygram</IslandTitle>
       <Island>
         <Checkbox
           label="ByProto"
-          subLabel="Передавать оформление и ByGram emoji внутри обычных сообщений Telegram"
+          subLabel="Передавать оформление и bygram emoji внутри обычных сообщений Telegram"
           checked={settings.isByProtoEnabled}
           onCheck={(value) => handleSettingChange('isByProtoEnabled', value)}
         />

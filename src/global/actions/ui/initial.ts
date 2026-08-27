@@ -4,6 +4,7 @@ import type { ApiNotification } from '../../../api/types';
 import type { LangCode } from '../../../types';
 import type { ActionReturnType, GlobalState } from '../../types';
 
+import { LAYER_TRANSITION_DURATION } from '../../../config';
 import { requestMutation } from '../../../lib/fasterdom/fasterdom';
 import { IS_ELECTRON, IS_MULTIACCOUNT_SUPPORTED, IS_TAURI } from '../../../util/browser/globalEnvironment';
 import {
@@ -37,7 +38,7 @@ import {
 import { selectSharedSettings } from '../../selectors/sharedState';
 import { destroySharedStatePort, initSharedState } from '../../shared/sharedStateConnector';
 
-const HISTORY_ANIMATION_DURATION = 450;
+const HISTORY_ANIMATION_DURATION = LAYER_TRANSITION_DURATION;
 
 setSystemThemeChangeCallback((theme) => {
   let global = getGlobal();

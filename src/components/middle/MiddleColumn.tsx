@@ -13,6 +13,7 @@ import {
   EDITABLE_INPUT_CSS_SELECTOR,
   EDITABLE_INPUT_ID,
   GENERAL_TOPIC_ID,
+  LAYER_TRANSITION_DURATION,
   SUPPORTED_PHOTO_CONTENT_TYPES,
   SUPPORTED_VIDEO_CONTENT_TYPES,
   TMP_CHAT_ID,
@@ -182,8 +183,7 @@ function isVideo(item: DataTransferItem) {
   return item.kind === 'file' && item.type && SUPPORTED_VIDEO_CONTENT_TYPES.has(item.type);
 }
 
-// Must track `--layer-transition` so the chat layer is released as soon as it visually settles
-const LAYER_ANIMATION_DURATION_MS = 240 + ANIMATION_END_DELAY;
+const LAYER_ANIMATION_DURATION_MS = LAYER_TRANSITION_DURATION + ANIMATION_END_DELAY;
 const KEYBOARD_SETTLE_DURATION = 400;
 
 function MiddleColumn({

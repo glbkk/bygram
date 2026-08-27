@@ -538,7 +538,7 @@ const ProfileInfo = ({
         <button
           type="button"
           className={styles.resetBanner}
-          aria-label="Сбросить баннер ByGram"
+          aria-label="Сбросить баннер bygram"
           onClick={handleResetBygramBanner}
         >
           <Icon name="close" />

@@ -87,22 +87,25 @@ function disarmSendCollapseReserve(scroller: HTMLElement) {
   sendCollapseLatches.delete(scroller);
 }
 
+export function getEffectiveMessageListBottomReserve(scroller: HTMLElement) {
+  return isSendCollapsePhaseActive(scroller)
+    ? getSettledBottomReserve()
+    : getMessageListBottomReserve(scroller);
+}
+
 // Measuring the live reserve costs a `getComputedStyle` plus several `offsetHeight` reads, which is far
-// too much for the bottom-snap check that runs on every scroll event. The footer is watched by a
-// ResizeObserver that re-syncs the reserve on any size change, so readers reuse the last applied value
-// and only keep the class-based fast paths live.
-function getAppliedMessageListBottomReserve(scroller: HTMLElement) {
+// too much for the bottom-snap check that runs on every scroll event. Snapping is a cosmetic hint, so it
+// reuses the value last applied by `syncMessageListBottomReserve` — the footer is watched by a
+// ResizeObserver that re-syncs on any size change, and the keyboard handler syncs explicitly. Callers
+// that position scroll must keep using the live measurement above, where a stale value would misplace
+// the last message under the composer.
+export function getScrollSnapBottomReserve(scroller: HTMLElement) {
+  if (isSendCollapsePhaseActive(scroller)) return getSettledBottomReserve();
   if (scroller.classList.contains(SELECT_MODE_CLASS)) return getSettledBottomReserve();
   if (scroller.classList.contains(NO_FOOTER_CLASS)) return 0;
 
   const applied = appliedBottomReserves.get(scroller);
   return applied !== undefined ? applied : getMessageListBottomReserve(scroller);
-}
-
-export function getEffectiveMessageListBottomReserve(scroller: HTMLElement) {
-  return isSendCollapsePhaseActive(scroller)
-    ? getSettledBottomReserve()
-    : getAppliedMessageListBottomReserve(scroller);
 }
 
 export function buildTopStackCacheKey(chatId: string, threadId: number | string, messageListType: string) {
