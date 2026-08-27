@@ -185,6 +185,7 @@ function isVideo(item: DataTransferItem) {
 
 const LAYER_ANIMATION_DURATION_MS = LAYER_TRANSITION_DURATION + ANIMATION_END_DELAY;
 const KEYBOARD_SETTLE_DURATION = 400;
+const AT_BOTTOM_TOLERANCE_PX = 8;
 
 function MiddleColumn({
   leftColumnRef,
@@ -331,7 +332,9 @@ function MiddleColumn({
     });
 
     const scroller = footer.parentElement?.querySelector<HTMLElement>('.MessageList');
-    if (scroller) syncMessageListBottomReserve(scroller, getIsKeyboardAnimating());
+    if (scroller) {
+      syncMessageListBottomReserve(scroller, getIsKeyboardAnimating(), shouldKeepBottomAfterKeyboardRef.current);
+    }
   });
 
   const updateFooterHeight = useLastCallback(() => {
@@ -345,7 +348,10 @@ function MiddleColumn({
 
   const markViewportSettled = useDebouncedCallback(() => {
     isViewportAnimatingRef.current = false;
+    // Must run while the keep-at-bottom intent is still armed: this is the first sync after the
+    // keyboard animation that is allowed to pin the list, so it is the one that has to consume it.
     updateFooterHeight();
+    shouldKeepBottomAfterKeyboardRef.current = false;
   }, [updateFooterHeight], KEYBOARD_SETTLE_DURATION, true, false);
 
   useEffect(() => {
@@ -414,7 +420,12 @@ function MiddleColumn({
         ? scroller.scrollHeight - scroller.scrollTop - scroller.offsetHeight
         : Number.POSITIVE_INFINITY;
 
-      if (isFixNeeded && bottomDistance <= viewportShrink + 8) {
+      // Stays armed for the whole animation and is consumed once the viewport settles. The footer's
+      // safe-area padding is dropped while the keyboard is up, so the bottom inset moves mid-flight
+      // while pinning is skipped; consuming this on the first resize strands the list a safe-area
+      // above the bottom and tucks the newest message under the composer. Closing needs it too,
+      // which is why it no longer requires the keyboard to be opening.
+      if (bottomDistance <= viewportShrink + AT_BOTTOM_TOLERANCE_PX) {
         shouldKeepBottomAfterKeyboardRef.current = true;
       }
 
@@ -426,7 +437,6 @@ function MiddleColumn({
         if (scroller) {
           requestMeasure(() => {
             syncMessageListBottomReserve(scroller, false, shouldKeepBottomAfterKeyboardRef.current);
-            shouldKeepBottomAfterKeyboardRef.current = false;
           });
         }
 

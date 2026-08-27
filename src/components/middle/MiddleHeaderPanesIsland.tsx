@@ -241,12 +241,21 @@ const MiddleHeaderPanesIsland = ({
       window.clearTimeout(unhideFallbackTimerRef.current);
       unhideFallbackTimerRef.current = window.setTimeout(() => {
         if (isCanceled() || isHiddenRef.current) return;
-        if (transitionRef.current !== transition || transition.isSettled) return;
-        transition.expectedHeight = 0;
-        settleRef.current?.(true);
+        if (transitionRef.current !== transition) return;
+        if (!transition.isSettled) {
+          transition.expectedHeight = 0;
+          settleRef.current?.(true);
+        }
+        // Settling does not imply the island became visible: several paths in `settle` skip
+        // placement and leave the hidden class on. That state is `opacity: 0` *and*
+        // `pointer-events: none`, so a pane with content would render as an unclickable ghost.
         if (!container.classList.contains(styles.rootHidden)) return;
+        const stuckHeight = appliedReserveRef.current;
+        if (stuckHeight <= 0) return;
         requestMutation(() => {
           if (isCanceled()) return;
+          setExtraStyles(container, { '--island-height-transition': '0s', height: `${stuckHeight}px` });
+          setMaskHeight(middleColumn, stuckHeight);
           toggleIslandHiddenInstantly(container, styles.rootHidden, false);
         });
       }, UNHIDE_FALLBACK_MS);
