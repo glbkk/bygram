@@ -85,6 +85,7 @@ export interface LangPair {
   'BygramVideoMusicProcessing': undefined;
   'BygramVideoMusicFailed': undefined;
   'BygramVideoMusicUnsupported': undefined;
+  'BygramVideoMusicLoading': undefined;
   'Month2': undefined;
   'Month3': undefined;
   'Month4': undefined;

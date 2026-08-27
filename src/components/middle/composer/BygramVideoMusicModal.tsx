@@ -1,12 +1,11 @@
-import type { ChangeEvent } from 'react';
 import { memo, useEffect, useMemo, useRef, useState } from '../../../lib/teact/teact';
 
 import type { VideoMusicSegment } from '../../../util/videoRecording/overlayVideoMusic';
 
 import { MIN_VIDEO_MUSIC_SEGMENT_SEC } from '../../../util/videoRecording/overlayVideoMusic';
 
+import useLang from '../../../hooks/useLang';
 import useLastCallback from '../../../hooks/useLastCallback';
-import useOldLang from '../../../hooks/useOldLang';
 
 import Button from '../../ui/Button';
 import Modal from '../../ui/Modal';
@@ -23,6 +22,8 @@ export type OwnProps = {
 
 type Handle = 'start' | 'end';
 
+const DURATION_PROBE_SEC = 24 * 60 * 60;
+
 function formatTime(seconds: number) {
   const total = Math.max(0, Math.round(seconds));
   const mins = Math.floor(total / 60);
@@ -33,7 +34,7 @@ function formatTime(seconds: number) {
 const BygramVideoMusicModal = ({
   isOpen, file, videoDurationSec, onApply, onClose,
 }: OwnProps) => {
-  const lang = useOldLang();
+  const lang = useLang();
   const trackRef = useRef<HTMLDivElement>();
   const audioRef = useRef<HTMLAudioElement>();
   const draggingRef = useRef<Handle>();
@@ -55,28 +56,58 @@ const BygramVideoMusicModal = ({
     MIN_VIDEO_MUSIC_SEGMENT_SEC,
   );
 
+  // Built here rather than rendered as an element: iOS ignores `preload` for an object URL until
+  // `load()` is called, which left the range at zero with nothing reported.
   useEffect(() => {
+    if (!url) return undefined;
+
+    const audio = new Audio();
+    audio.preload = 'metadata';
+    audio.src = url;
+    audioRef.current = audio;
     setHasError(false);
     setTrackDuration(0);
-  }, [file]);
 
-  const handleLoadedMetadata = useLastCallback((e: ChangeEvent<HTMLAudioElement>) => {
-    const duration = e.currentTarget.duration;
-    // A stream the browser cannot measure gives no range to pick from, even though ffmpeg
-    // might still decode it, so it is reported rather than left as a dead dialog
-    if (!Number.isFinite(duration) || duration <= 0) {
-      setHasError(true);
-      return;
-    }
-    setHasError(false);
-    setTrackDuration(duration);
-    setStartSec(0);
-    setEndSec(Math.min(duration, Math.max(videoDurationSec, MIN_VIDEO_MUSIC_SEGMENT_SEC)));
-  });
+    const applyDuration = (duration: number) => {
+      // A stream the browser cannot measure leaves no range to pick from, even though ffmpeg
+      // might still decode it, so it is reported instead of leaving a dead dialog
+      if (!Number.isFinite(duration) || duration <= 0) {
+        setHasError(true);
+        return;
+      }
+      setTrackDuration(duration);
+      setStartSec(0);
+      setEndSec(Math.min(duration, Math.max(videoDurationSec, MIN_VIDEO_MUSIC_SEGMENT_SEC)));
+    };
 
-  const handleAudioError = useLastCallback(() => {
-    setHasError(true);
-  });
+    const handleMetadata = () => {
+      // Some containers report an unknown length until a seek past the end forces it to resolve
+      if (audio.duration === Infinity) {
+        audio.currentTime = DURATION_PROBE_SEC;
+        return;
+      }
+      applyDuration(audio.duration);
+    };
+    const handleDurationChange = () => {
+      if (audio.duration === Infinity) return;
+      applyDuration(audio.duration);
+    };
+    const handleError = () => setHasError(true);
+
+    audio.addEventListener('loadedmetadata', handleMetadata);
+    audio.addEventListener('durationchange', handleDurationChange);
+    audio.addEventListener('error', handleError);
+    audio.load();
+
+    return () => {
+      audio.removeEventListener('loadedmetadata', handleMetadata);
+      audio.removeEventListener('durationchange', handleDurationChange);
+      audio.removeEventListener('error', handleError);
+      audio.pause();
+      audio.src = '';
+      audioRef.current = undefined;
+    };
+  }, [url, videoDurationSec]);
 
   const stopPreview = useLastCallback(() => {
     const audio = audioRef.current;
@@ -165,20 +196,12 @@ const BygramVideoMusicModal = ({
       hasCloseButton
       isSlim
     >
-      {url && (
-        <audio
-          ref={audioRef}
-          src={url}
-          preload="metadata"
-          onLoadedMetadata={handleLoadedMetadata}
-          onError={handleAudioError}
-        />
-      )}
-
       <div className={styles.fileName}>{file?.name}</div>
 
       {hasError ? (
         <div className={styles.error}>{lang('BygramVideoMusicUnsupported')}</div>
+      ) : !trackDuration ? (
+        <div className={styles.hint}>{lang('BygramVideoMusicLoading')}</div>
       ) : (
         <>
           <div
