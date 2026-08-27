@@ -133,7 +133,7 @@ import { IS_TAURI } from '../../../util/browser/globalEnvironment';
 import { IS_ANDROID, IS_TRANSLATION_SUPPORTED } from '../../../util/browser/windowEnvironment';
 import buildClassName from '../../../util/buildClassName';
 import buildStyle from '../../../util/buildStyle';
-import { getBygramBubbleVisualStyle } from '../../../util/bygramArchive';
+import { getBygramBubbleVisualStyle, getBygramSettings } from '../../../util/bygramArchive';
 import { withPremiumEmojiOverlay } from '../../../util/bygramPremium';
 import { isUserId } from '../../../util/entities/ids';
 import { getMessageKey } from '../../../util/keys/messageKey';
@@ -141,6 +141,7 @@ import { parseTranslationCacheKey } from '../../../util/keys/translationKey';
 import { getServerTime } from '../../../util/serverTime';
 import stopEvent from '../../../util/stopEvent';
 import { isElementInViewport } from '../../../util/visibility/isElementInViewport';
+import { applyByProtoEnvelope } from '../../../byproto/runtime';
 import { calculateDimensionsForMessageMedia, getStickerDimensions, REM } from '../../common/helpers/mediaDimensions';
 import renderText from '../../common/helpers/renderText';
 import { getCustomEmojiSize } from '../composer/helpers/customEmoji';
@@ -523,6 +524,7 @@ const Message = ({
     markPollVotesRead,
     openThread,
     summarizeMessage,
+    showNotification,
   } = getActions();
 
   const message = withPremiumEmojiOverlay(rawMessage);
@@ -1782,6 +1784,22 @@ const Message = ({
   });
 
   const handleLocalInlineButtonClick = useLastCallback((button: ApiKeyboardButton) => {
+    if (button.type === 'byProtoProfile') {
+      if (button.action === 'preview') {
+        handleMediaClick();
+        return;
+      }
+
+      const packet = message.byProto;
+      if (!packet) return;
+      void applyByProtoEnvelope(message, packet.senderId, packet.envelope).then((isApplied) => {
+        showNotification({
+          message: isApplied ? 'Оформление пользователя применено' : 'Не удалось применить оформление',
+        });
+      });
+      return;
+    }
+
     if (button.type === 'openThread') {
       openThread({
         chatId,
@@ -1987,6 +2005,18 @@ const Message = ({
   }, [isBotForum, lang, message.inlineButtons, messageTopic, isLastInList, threadId]);
 
   const additionalInlineButtons = suggestedPostButtons || openThreadButtons;
+  const shouldOfferByProtoProfile = !getBygramSettings().isByProtoAutoAcceptProfiles;
+  const byProtoProfileButtons: ApiKeyboardButton[][] | undefined = !isOwn && message.byProto
+    && message.byProto.envelope.type === 'profile.banner'
+    ? [[
+      { type: 'byProtoProfile', text: 'Посмотреть', action: 'preview' },
+      { type: 'byProtoProfile', text: 'Применить', action: 'apply', style: { type: 'primary' } },
+    ]]
+    : shouldOfferByProtoProfile && !isOwn && message.byProto
+      && message.byProto.envelope.type === 'profile.update'
+      ? [[{ type: 'byProtoProfile', text: 'Применить оформление', action: 'apply', style: { type: 'primary' } }]]
+      : undefined;
+  const localInlineButtons = additionalInlineButtons || byProtoProfileButtons;
 
   return (
     <div
@@ -2128,9 +2158,9 @@ const Message = ({
         {message.inlineButtons && (
           <InlineButtons inlineButtons={message.inlineButtons} onClick={handleInlineButtonClick} />
         )}
-        {additionalInlineButtons && (
+        {localInlineButtons && (
           <InlineButtons
-            inlineButtons={additionalInlineButtons}
+            inlineButtons={localInlineButtons}
             onClick={handleLocalInlineButtonClick}
           />
         )}

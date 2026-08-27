@@ -6,7 +6,7 @@ import type { ThreadId } from '../../../types';
 import { ApiMediaFormat } from '../../../api/types';
 
 import { getVideoMediaHash } from '../../../global/helpers';
-import { selectCurrentMessageList } from '../../../global/selectors';
+import { selectCurrentMessageList, selectUser } from '../../../global/selectors';
 import buildClassName from '../../../util/buildClassName';
 import {
   getBygramProfileBannerKey,
@@ -29,12 +29,15 @@ import styles from './BygramProfileBannerEditor.module.scss';
 
 type StateProps = {
   currentUserId?: string;
+  currentUserName: string;
   currentChatId?: string;
   currentThreadId?: ThreadId;
 };
 
 const MAX_BANNER_SIZE = 50 * 1024 * 1024;
-const BygramProfileBannerEditor = ({ currentUserId, currentChatId, currentThreadId }: StateProps) => {
+const BygramProfileBannerEditor = ({
+  currentUserId, currentUserName, currentChatId, currentThreadId,
+}: StateProps) => {
   const { sendMessage, showNotification } = getActions();
   const bannerKey = currentUserId ? getBygramProfileBannerKey(currentUserId) : undefined;
   const banner = useBygramCustomizationMedia(bannerKey);
@@ -101,7 +104,7 @@ const BygramProfileBannerEditor = ({ currentUserId, currentChatId, currentThread
       const attachment = await buildAttachment(`bygram-banner.${extension}`, banner.blob);
       sendMessage({
         messageList: { chatId: currentChatId, threadId: currentThreadId, type: 'thread' },
-        text: 'Мой баннер профиля ByGram',
+        text: `${currentUserName} хочет показать вам свой баннер`,
         attachments: [attachment],
         byProtoEnvelope: createByProtoProfileBannerEnvelope(Math.floor(banner.updatedAt / 1000)),
       });
@@ -175,8 +178,10 @@ const BygramProfileBannerEditor = ({ currentUserId, currentChatId, currentThread
 export default memo(withGlobal(
   (global): Complete<StateProps> => {
     const messageList = selectCurrentMessageList(global);
+    const currentUser = global.currentUserId ? selectUser(global, global.currentUserId) : undefined;
     return {
       currentUserId: global.currentUserId,
+      currentUserName: currentUser?.firstName || currentUser?.lastName || 'Пользователь bygram',
       currentChatId: messageList?.chatId,
       currentThreadId: messageList?.threadId,
     };

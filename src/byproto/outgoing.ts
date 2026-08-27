@@ -4,6 +4,7 @@ import type {
   ByProtoEmojiRange,
   ByProtoEnvelope,
   ByProtoProfileBannerEnvelope,
+  ByProtoProfileUpdateEnvelope,
   ValidByProtoEnvelope,
 } from './types';
 import { BYPROTO_VERSION } from './types';
@@ -74,6 +75,16 @@ export function prepareByProtoOutgoingText(params: {
 
 export function createByProtoProfileBannerEnvelope(revision: number): ByProtoProfileBannerEnvelope {
   return createEnvelope('profile.banner', { revision, mediaMessageId: 0 }) as ByProtoProfileBannerEnvelope;
+}
+
+export function createByProtoProfileUpdateEnvelope(): ByProtoProfileUpdateEnvelope {
+  const profile = getLocalProfile();
+  return createEnvelope('profile.update', {
+    revision: profile.revision,
+    bubblePreset: profile.bubblePreset,
+    bubbleParams: profile.bubbleParams,
+    statusEmoji: profile.statusEmoji,
+  }) as ByProtoProfileUpdateEnvelope;
 }
 
 export function createByProtoEnvelope(type: string, payload: unknown): ByProtoEnvelope {

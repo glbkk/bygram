@@ -38,6 +38,13 @@ export function ingestByProtoEnvelope(message: ApiMessage, senderId: string, env
     .finally(() => processingPackets.delete(envelope.id));
 }
 
+export async function applyByProtoEnvelope(
+  message: ApiMessage, senderId: string, envelope: ValidByProtoEnvelope,
+) {
+  if (!getBygramSettings().isByProtoEnabled) return false;
+  return processEnvelope(message, senderId, envelope, true);
+}
+
 export function getByProtoPeerSnapshot(peerId: string) {
   return snapshots.get(peerId);
 }
@@ -83,8 +90,10 @@ export async function resetByProtoPeerBanner(peerId: string) {
   updateSnapshot(peerId, { banner: undefined });
 }
 
-async function processEnvelope(message: ApiMessage, senderId: string, envelope: ValidByProtoEnvelope) {
-  if (await ByProtoStore.hasProcessedPacket(envelope.id)) return;
+async function processEnvelope(
+  message: ApiMessage, senderId: string, envelope: ValidByProtoEnvelope, shouldForceAccept = false,
+) {
+  if (await ByProtoStore.hasProcessedPacket(envelope.id)) return true;
   let wasProcessed = true;
 
   switch (envelope.type) {
@@ -100,7 +109,10 @@ async function processEnvelope(message: ApiMessage, senderId: string, envelope: 
       break;
     }
     case 'profile.update': {
-      if (!getBygramSettings().isByProtoAutoAcceptProfiles) break;
+      if (!shouldForceAccept && !getBygramSettings().isByProtoAutoAcceptProfiles) {
+        wasProcessed = false;
+        break;
+      }
       const current = await ByProtoStore.getPeerProfile(senderId);
       if (current && current.revision >= envelope.payload.revision) break;
       const profile = {
@@ -152,15 +164,20 @@ async function processEnvelope(message: ApiMessage, senderId: string, envelope: 
       });
       break;
     case 'profile.banner':
-      wasProcessed = await acceptPeerBanner(message, senderId, envelope.payload.revision);
+      wasProcessed = await acceptPeerBanner(
+        message, senderId, envelope.payload.revision, shouldForceAccept,
+      );
       break;
   }
 
   if (wasProcessed) await ByProtoStore.markPacketProcessed(envelope.id);
+  return wasProcessed;
 }
 
-async function acceptPeerBanner(message: ApiMessage, senderId: string, revision: number) {
-  if (!getBygramSettings().isByProtoAutoAcceptProfiles) return true;
+async function acceptPeerBanner(
+  message: ApiMessage, senderId: string, revision: number, shouldForceAccept: boolean,
+) {
+  if (!shouldForceAccept && !getBygramSettings().isByProtoAutoAcceptProfiles) return false;
   const current = await ByProtoStore.getPeerBanner(senderId);
   if (current && current.revision >= revision) return true;
 

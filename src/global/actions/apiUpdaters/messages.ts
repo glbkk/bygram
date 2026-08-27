@@ -32,6 +32,7 @@ import { notifyAboutMessage } from '../../../util/notifications';
 import { onTickEnd } from '../../../util/schedulers';
 import { getServerTime } from '../../../util/serverTime';
 import { callApi } from '../../../api/gramjs';
+import { ingestByProtoEnvelope } from '../../../byproto/runtime';
 import {
   addPaidReaction,
   checkIfHasUnreadReactions,
@@ -125,6 +126,17 @@ import {
   selectThreadLocalStateParam,
   selectThreadReadState,
 } from '../../selectors/threads';
+
+function consumeByProtoEnvelope<T extends Partial<ApiMessage>>(message: T): T {
+  const { byProto } = message;
+
+  if (byProto && message.id !== undefined && message.chatId && message.content
+    && message.date !== undefined && message.isOutgoing !== undefined) {
+    ingestByProtoEnvelope(message as ApiMessage, byProto.senderId, byProto.envelope);
+  }
+
+  return message;
+}
 
 const ANIMATION_DELAY = 350;
 const SNAP_ANIMATION_DELAY = 1000;
@@ -239,8 +251,9 @@ addActionHandler('apiUpdate', (global, actions, update): ActionReturnType => {
   switch (update['@type']) {
     case 'newMessage': {
       const {
-        chatId, id, message, shouldForceReply, wasDrafted, poll, webPages,
+        chatId, id, message: rawMessage, shouldForceReply, wasDrafted, poll, webPages,
       } = update;
+      const message = consumeByProtoEnvelope(rawMessage);
       const chat = selectChat(global, chatId);
       const isLocal = isMessageLocal(message);
       const threadId = selectThreadIdFromMessage(global, message) || MAIN_THREAD_ID;
@@ -565,8 +578,9 @@ addActionHandler('apiUpdate', (global, actions, update): ActionReturnType => {
 
     case 'updateMessage': {
       const {
-        chatId, id, message, poll, webPages, isFromNew, isFull, shouldForceReply,
+        chatId, id, message: rawMessage, poll, webPages, isFromNew, isFull, shouldForceReply,
       } = update;
+      const message = consumeByProtoEnvelope(rawMessage);
 
       const currentMessage = selectChatMessage(global, chatId, id);
 
@@ -581,7 +595,7 @@ addActionHandler('apiUpdate', (global, actions, update): ActionReturnType => {
         } satisfies ApiMessage;
         void archiveEditedMessage(currentMessage, nextArchivedMessage);
       } else if (isFull) {
-        void archiveNewMessage(message);
+        void archiveNewMessage(message as ApiMessage);
       }
 
       if (message.reactions) {
@@ -606,7 +620,7 @@ addActionHandler('apiUpdate', (global, actions, update): ActionReturnType => {
             '@type': 'newMessage',
             id: update.id,
             chatId: update.chatId,
-            message: update.message,
+            message: message as ApiMessage,
             poll: update.poll,
             webPages: update.webPages,
             shouldForceReply,
@@ -615,7 +629,7 @@ addActionHandler('apiUpdate', (global, actions, update): ActionReturnType => {
 
         // If update contains the full message, store it
         if (update.isFull) {
-          global = addMessages(global, [update.message]);
+          global = addMessages(global, [message as ApiMessage]);
         }
         setGlobal(global);
         return;
@@ -720,8 +734,9 @@ addActionHandler('apiUpdate', (global, actions, update): ActionReturnType => {
 
     case 'updateMessageSendSucceeded': {
       const {
-        chatId, localId, message, poll, webPages,
+        chatId, localId, message: rawMessage, poll, webPages,
       } = update;
+      const message = consumeByProtoEnvelope(rawMessage);
 
       global = updateListedAndViewportIds(global, message);
 

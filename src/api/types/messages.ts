@@ -1,3 +1,4 @@
+import type { ValidByProtoEnvelope } from '../../byproto/types';
 import type { ThreadId, ThreadReadState, WebPageMediaSize } from '../../types';
 import type {
   ApiBotInlineMediaResult,
@@ -819,6 +820,10 @@ export interface ApiMessage {
 
   isTypingDraft?: boolean; // Local field
   wasTypingDraft?: boolean; // Local field
+  byProto?: { // Transient field passed from the MTProto worker to the main thread
+    envelope: ValidByProtoEnvelope;
+    senderId: string;
+  };
 }
 
 export interface ApiReactions {
@@ -1092,6 +1097,12 @@ export interface KeyboardButtonNoForwardsRequest extends ApiKeyboardButtonBase {
   buttonType: 'accept' | 'reject';
 }
 
+export interface KeyboardButtonByProtoProfile extends ApiKeyboardButtonBase {
+  type: 'byProtoProfile';
+  text: string;
+  action: 'preview' | 'apply';
+}
+
 export type ApiKeyboardButton = (
   ApiKeyboardButtonSimple
   | ApiKeyboardButtonReceipt
@@ -1108,6 +1119,7 @@ export type ApiKeyboardButton = (
   | KeyboardButtonOpenThread
   | KeyboardButtonGiftOffer
   | KeyboardButtonNoForwardsRequest
+  | KeyboardButtonByProtoProfile
 );
 
 export type ApiKeyboardButtons = ApiKeyboardButton[][];

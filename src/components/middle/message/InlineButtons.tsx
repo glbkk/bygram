@@ -53,6 +53,8 @@ const InlineButtons = ({ className, inlineButtons, onClick }: OwnProps) => {
         return <Icon className={styles.cornerIcon} name="webapp" />;
       case 'copy':
         return <Icon className={styles.cornerIcon} name="copy" />;
+      case 'byProtoProfile':
+        return <Icon className={styles.leftIcon} name={button.action === 'preview' ? 'eye' : 'check'} />;
       case 'suggestedMessage':
         if (button.buttonType === 'suggestChanges') {
           return <Icon className={styles.leftIcon} name="edit" />;

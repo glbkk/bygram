@@ -314,9 +314,7 @@ export function buildApiMessageWithChatId(
     const envelope = parseByProtoMessage(mtpMessage.message).envelope;
     const senderId = fromId || (isOutgoing ? currentUserId : chatId);
     if (envelope && senderId) {
-      void import('../../../byproto/runtime').then(({ ingestByProtoEnvelope }) => {
-        ingestByProtoEnvelope(apiMessage, senderId, envelope);
-      });
+      apiMessage.byProto = { envelope, senderId };
     }
   }
 
