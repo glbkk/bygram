@@ -2,11 +2,12 @@ import {
   memo, useEffect,
   useMemo,
 } from '../../../lib/teact/teact';
-import { getActions } from '../../../global';
+import { getActions, getGlobal } from '../../../global';
 
 import type { ApiAttachMenuPeerType, ApiFormattedText, ApiMessage } from '../../../api/types';
 import type { GlobalState } from '../../../global/types';
 import type { MessageListType, ThemeKey, ThreadId } from '../../../types';
+import { MAIN_THREAD_ID } from '../../../api/types';
 
 import {
   CONTENT_TYPES_WITH_PREVIEW, DEBUG_LOG_FILENAME, SUPPORTED_AUDIO_CONTENT_TYPES,
@@ -18,12 +19,21 @@ import {
   getMessagePhoto,
   getMessageVideo, getMessageVoice,
 } from '../../../global/helpers';
+import { selectUser } from '../../../global/selectors';
 import { IS_TOUCH_ENV } from '../../../util/browser/windowEnvironment';
 import buildClassName from '../../../util/buildClassName';
+import { getBygramSettings } from '../../../util/bygramArchive';
+import { getBygramProfileBannerKey } from '../../../util/bygramCustomization';
 import { getDebugLogs } from '../../../util/debugConsole';
 import { validateFiles } from '../../../util/files';
 import { openSystemFilesDialog } from '../../../util/systemFilesDialog';
+import {
+  createByProtoProfileBannerEnvelope,
+  createByProtoProfileUpdateEnvelope,
+} from '../../../byproto/outgoing';
+import buildAttachment from './helpers/buildAttachment';
 
+import useBygramCustomizationMedia from '../../../hooks/useBygramCustomizationMedia';
 import useFlag from '../../../hooks/useFlag';
 import useLang from '../../../hooks/useLang';
 import useLastCallback from '../../../hooks/useLastCallback';
@@ -105,11 +115,18 @@ const AttachMenu = ({
 }: OwnProps) => {
   const {
     openPollModal,
+    sendMessage,
+    showNotification,
     updateAttachmentSettings,
   } = getActions();
   const [isAttachMenuOpen, openAttachMenu, closeAttachMenu] = useFlag();
   const [handleMouseEnter, handleMouseLeave, markMouseInside] = useMouseInside(isAttachMenuOpen, closeAttachMenu);
   const [isDateModalOpen, openDateModal, closeDateModal] = useFlag();
+  const currentUserId = getGlobal().currentUserId;
+  const profileBanner = useBygramCustomizationMedia(
+    currentUserId ? getBygramProfileBannerKey(currentUserId) : undefined,
+  );
+  const isByProtoEnabled = getBygramSettings().isByProtoEnabled;
 
   const canSendVideoAndPhoto = canSendPhotos && canSendVideos;
   const canSendVideoOrPhoto = canSendPhotos || canSendVideos;
@@ -201,6 +218,44 @@ const AttachMenu = ({
   const handlePollCreate = useLastCallback(() => {
     closeAttachMenu();
     openPollModal({ chatId, threadId, messageListType });
+  });
+
+  const getCurrentUserName = () => {
+    const global = getGlobal();
+    const currentUser = global.currentUserId ? selectUser(global, global.currentUserId) : undefined;
+    return currentUser?.firstName || currentUser?.lastName || 'Пользователь bygram';
+  };
+
+  const handleShareBubble = useLastCallback(() => {
+    closeAttachMenu();
+    sendMessage({
+      messageList: { chatId, threadId: threadId || MAIN_THREAD_ID, type: messageListType },
+      text: `${getCurrentUserName()} хочет поделиться пузырьком сообщений`,
+      byProtoEnvelope: createByProtoProfileUpdateEnvelope(),
+    });
+    showNotification({ message: 'Пузырёк отправляется через Telegram' });
+  });
+
+  const handleShareBanner = useLastCallback(async () => {
+    closeAttachMenu();
+    if (!profileBanner) {
+      showNotification({ message: 'Сначала добавьте баннер в настройках профиля' });
+      return;
+    }
+
+    try {
+      const extension = profileBanner.isVideo ? 'mp4' : 'jpg';
+      const attachment = await buildAttachment(`bygram-banner.${extension}`, profileBanner.blob);
+      sendMessage({
+        messageList: { chatId, threadId: threadId || MAIN_THREAD_ID, type: messageListType },
+        text: `${getCurrentUserName()} хочет показать вам свой баннер`,
+        attachments: [attachment],
+        byProtoEnvelope: createByProtoProfileBannerEnvelope(Math.floor(profileBanner.updatedAt / 1000)),
+      });
+      showNotification({ message: 'Баннер отправляется через Telegram' });
+    } catch {
+      showNotification({ message: 'Не удалось подготовить баннер к отправке' });
+    }
   });
 
   if (!isButtonVisible && !isDateModalOpen) {
@@ -298,6 +353,14 @@ const AttachMenu = ({
             )}
             {canExpandRichInput && (
               <MenuItem icon="article" onClick={onRichInputExpand}>{lang('AttachmentMenuArticle')}</MenuItem>
+            )}
+
+            {!editingMessage && !isScheduled && isByProtoEnabled && (
+              <>
+                <MenuSeparator />
+                <MenuItem icon="colorize" onClick={handleShareBubble}>Поделиться пузырьком</MenuItem>
+                <MenuItem icon="photo" onClick={handleShareBanner}>Поделиться баннером</MenuItem>
+              </>
             )}
 
             {!editingMessage && !canEditMedia && !isScheduled && Boolean(bots?.length) && (

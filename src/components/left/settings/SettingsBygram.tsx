@@ -8,7 +8,6 @@ import type {
 import { ApiMediaFormat } from '../../../api/types';
 
 import { getMediaThumbUri, getStickerMediaHash } from '../../../global/helpers';
-import { selectCurrentMessageList, selectUser } from '../../../global/selectors';
 import {
   BYGRAM_GIFT_BUBBLE_THEMES,
   clearBygramArchive,
@@ -17,7 +16,6 @@ import {
   updateBygramSettings,
 } from '../../../util/bygramArchive';
 import * as mediaLoader from '../../../util/mediaLoader';
-import { createByProtoProfileUpdateEnvelope } from '../../../byproto/outgoing';
 
 import useFlag from '../../../hooks/useFlag';
 import useHistoryBack from '../../../hooks/useHistoryBack';
@@ -29,7 +27,6 @@ import CustomEmoji from '../../common/CustomEmoji';
 import CustomEmojiPicker from '../../common/CustomEmojiPicker';
 import Island, { IslandDescription, IslandTitle } from '../../gili/layout/Island';
 import StickerPicker from '../../middle/composer/StickerPicker';
-import Button from '../../ui/Button';
 import Checkbox from '../../ui/Checkbox';
 import ConfirmDialog from '../../ui/ConfirmDialog';
 import ListItem from '../../ui/ListItem';
@@ -93,7 +90,7 @@ async function loadStickerPreview(sticker: ApiSticker) {
 }
 
 function SettingsBygram({ isActive, onReset }: OwnProps) {
-  const { sendMessage, showNotification } = getActions();
+  const { showNotification } = getActions();
   const [settings, setSettings] = useState<BygramSettings>(() => getBygramSettings());
   const [stats, setStats] = useState<BygramArchiveStats>(EMPTY_STATS);
   const [isStickerLoading, setIsStickerLoading] = useState(false);
@@ -123,24 +120,6 @@ function SettingsBygram({ isActive, onReset }: OwnProps) {
 
   const handleBubbleStyleChange = useLastCallback((style: BygramMessageBubbleStyle) => {
     setSettings(updateBygramSettings({ messageBubbleStyle: style }));
-  });
-
-  const handleShareBubble = useLastCallback(() => {
-    const global = getGlobal();
-    const messageList = selectCurrentMessageList(global);
-    if (!messageList) {
-      showNotification({ message: 'Сначала откройте чат, в который хотите отправить пузырёк' });
-      return;
-    }
-
-    const currentUser = global.currentUserId ? selectUser(global, global.currentUserId) : undefined;
-    const currentUserName = currentUser?.firstName || currentUser?.lastName || 'Пользователь bygram';
-    sendMessage({
-      messageList,
-      text: `${currentUserName} хочет поделиться пузырьком сообщений`,
-      byProtoEnvelope: createByProtoProfileUpdateEnvelope(),
-    });
-    showNotification({ message: 'Пузырёк отправляется через Telegram' });
   });
 
   const handleBubbleColorChange = useLastCallback((event: React.ChangeEvent<HTMLInputElement>) => {
@@ -463,11 +442,6 @@ function SettingsBygram({ isActive, onReset }: OwnProps) {
             checked={settings.isMessageBubbleGiftAnimated}
             onCheck={(value) => setSettings(updateBygramSettings({ isMessageBubbleGiftAnimated: value }))}
           />
-        )}
-        {settings.messageBubbleStyle !== 'default' && (
-          <Button color="primary" onClick={handleShareBubble} disabled={!settings.isByProtoEnabled}>
-            Поделиться пузырьком
-          </Button>
         )}
       </Island>
       <IslandDescription dir={lang.isRtl ? 'rtl' : undefined}>

@@ -2,11 +2,9 @@ import { memo, useState } from '../../../lib/teact/teact';
 import { getActions, withGlobal } from '../../../global';
 
 import type { ApiVideo } from '../../../api/types';
-import type { ThreadId } from '../../../types';
 import { ApiMediaFormat } from '../../../api/types';
 
 import { getVideoMediaHash } from '../../../global/helpers';
-import { selectCurrentMessageList, selectUser } from '../../../global/selectors';
 import buildClassName from '../../../util/buildClassName';
 import {
   getBygramProfileBannerKey,
@@ -15,8 +13,6 @@ import {
 } from '../../../util/bygramCustomization';
 import * as mediaLoader from '../../../util/mediaLoader';
 import { openSystemFilesDialog } from '../../../util/systemFilesDialog';
-import { createByProtoProfileBannerEnvelope } from '../../../byproto/outgoing';
-import buildAttachment from '../../middle/composer/helpers/buildAttachment';
 
 import useBygramCustomizationMedia from '../../../hooks/useBygramCustomizationMedia';
 import useLastCallback from '../../../hooks/useLastCallback';
@@ -29,16 +25,11 @@ import styles from './BygramProfileBannerEditor.module.scss';
 
 type StateProps = {
   currentUserId?: string;
-  currentUserName: string;
-  currentChatId?: string;
-  currentThreadId?: ThreadId;
 };
 
 const MAX_BANNER_SIZE = 50 * 1024 * 1024;
-const BygramProfileBannerEditor = ({
-  currentUserId, currentUserName, currentChatId, currentThreadId,
-}: StateProps) => {
-  const { sendMessage, showNotification } = getActions();
+const BygramProfileBannerEditor = ({ currentUserId }: StateProps) => {
+  const { showNotification } = getActions();
   const bannerKey = currentUserId ? getBygramProfileBannerKey(currentUserId) : undefined;
   const banner = useBygramCustomizationMedia(bannerKey);
   const [isGifPickerOpen, setIsGifPickerOpen] = useState(false);
@@ -96,26 +87,6 @@ const BygramProfileBannerEditor = ({
     }
   });
 
-  const handleShare = useLastCallback(async () => {
-    if (!banner || !currentChatId || !currentThreadId) return;
-    setIsSaving(true);
-    try {
-      const extension = banner.isVideo ? 'mp4' : 'jpg';
-      const attachment = await buildAttachment(`bygram-banner.${extension}`, banner.blob);
-      sendMessage({
-        messageList: { chatId: currentChatId, threadId: currentThreadId, type: 'thread' },
-        text: `${currentUserName} хочет показать вам свой баннер`,
-        attachments: [attachment],
-        byProtoEnvelope: createByProtoProfileBannerEnvelope(Math.floor(banner.updatedAt / 1000)),
-      });
-      showNotification({ message: 'Баннер отправляется через Telegram' });
-    } catch {
-      showNotification({ message: 'Не удалось подготовить баннер к отправке' });
-    } finally {
-      setIsSaving(false);
-    }
-  });
-
   return (
     <>
       <div className={styles.root}>
@@ -139,11 +110,6 @@ const BygramProfileBannerEditor = ({
           <Button size="tiny" color="translucent" onClick={() => setIsGifPickerOpen(true)} disabled={isSaving}>
             GIF из Telegram
           </Button>
-          {banner && currentChatId && (
-            <Button size="tiny" color="translucent" onClick={handleShare} disabled={isSaving}>
-              Отправить в чат
-            </Button>
-          )}
           {banner && (
             <Button size="tiny" color="danger" onClick={handleRemove} disabled={isSaving}>
               Удалить
@@ -151,7 +117,7 @@ const BygramProfileBannerEditor = ({
           )}
         </div>
         <p className={styles.hint}>
-          Хранится только на устройстве. Кнопка «Отправить в чат» синхронизирует его через Telegram.
+          Хранится только на устройстве. Поделиться баннером можно через скрепку в чате.
         </p>
       </div>
 
@@ -176,14 +142,5 @@ const BygramProfileBannerEditor = ({
 };
 
 export default memo(withGlobal(
-  (global): Complete<StateProps> => {
-    const messageList = selectCurrentMessageList(global);
-    const currentUser = global.currentUserId ? selectUser(global, global.currentUserId) : undefined;
-    return {
-      currentUserId: global.currentUserId,
-      currentUserName: currentUser?.firstName || currentUser?.lastName || 'Пользователь bygram',
-      currentChatId: messageList?.chatId,
-      currentThreadId: messageList?.threadId,
-    };
-  },
+  (global): Complete<StateProps> => ({ currentUserId: global.currentUserId }),
 )(BygramProfileBannerEditor));

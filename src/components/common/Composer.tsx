@@ -125,6 +125,7 @@ import {
   IS_IOS, IS_VIDEO_RECORDING_SUPPORTED, IS_VOICE_RECORDING_SUPPORTED,
 } from '../../util/browser/windowEnvironment';
 import buildClassName from '../../util/buildClassName';
+import { getBygramSettings } from '../../util/bygramArchive';
 import captureEscKeyListener from '../../util/captureEscKeyListener';
 import { formatMediaDuration } from '../../util/dates/oldDateFormat';
 import { processDeepLink } from '../../util/deeplink';
@@ -631,7 +632,7 @@ const Composer = ({
   });
 
   const updateRichMessage = useLastCallback((value?: ApiInputRichMessage) => {
-    if (value && !isCurrentUserPremium && !isChatWithSelf) {
+    if (value && !isCurrentUserPremium && !isChatWithSelf && !getBygramSettings().isByProtoEnabled) {
       const formattedValue = getRichInputAsFormatted(value);
       if (formattedValue && containsCustomEmoji(formattedValue)) {
         showCustomEmojiPremiumNotification();
@@ -1725,7 +1726,8 @@ const Composer = ({
 
   const handleCustomEmojiSelect = useLastCallback((emoji: ApiSticker) => {
     const emojiSetId = 'id' in emoji.stickerSetInfo && emoji.stickerSetInfo.id;
-    if (!emoji.isFree && !isCurrentUserPremium && !isChatWithSelf && emojiSetId !== chatEmojiSetId) {
+    if (!emoji.isFree && !isCurrentUserPremium && !isChatWithSelf && emojiSetId !== chatEmojiSetId
+      && !getBygramSettings().isByProtoEnabled) {
       showCustomEmojiPremiumNotification();
       return;
     }
