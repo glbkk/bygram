@@ -176,6 +176,9 @@ export const VIDEO_RECORDING_MIME_TYPE = 'video/mp4;codecs=avc1.42E01E,mp4a.40.2
 export const ROUND_VIDEO_BITRATE = 1_200_000; // bps
 export const ROUND_AUDIO_BITRATE = 64_000; // bps
 
+// Music laid over an outgoing video, stereo unlike round video's mono voice track
+export const VIDEO_MUSIC_AUDIO_BITRATE = 128_000; // bps
+
 export const EDITABLE_INPUT_ID = 'editable-message-text';
 export const EDITABLE_INPUT_MODAL_ID = 'editable-message-text-modal';
 export const EDITABLE_STORY_INPUT_ID = 'editable-story-input-text';

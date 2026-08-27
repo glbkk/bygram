@@ -3289,3 +3289,13 @@
 "RichEditorEquationPrompt" = "Введите формулу";
 "RichEditorEquationToBlock" = "Сделать блочной формулой";
 "RichEditorEquationToInline" = "Сделать строчной формулой";
+"BygramVideoMusicAdd" = "Наложить музыку";
+"BygramVideoMusicTitle" = "Музыка для видео";
+"BygramVideoMusicHint" = "Звук видео будет заменён выбранным отрывком. Отрывок длиннее видео обрежется.";
+"BygramVideoMusicFrom" = "Начало отрывка";
+"BygramVideoMusicTo" = "Конец отрывка";
+"BygramVideoMusicPreview" = "Прослушать";
+"BygramVideoMusicStop" = "Остановить";
+"BygramVideoMusicApply" = "Наложить";
+"BygramVideoMusicProcessing" = "Наложение музыки…";
+"BygramVideoMusicFailed" = "Не удалось наложить музыку";

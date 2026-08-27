@@ -1,0 +1,104 @@
+.fileName {
+  overflow: hidden;
+
+  margin-bottom: 1.25rem;
+
+  font-weight: var(--font-weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.track {
+  touch-action: none;
+  position: relative;
+  height: 2.75rem;
+  margin: 0 0.75rem 0.5rem;
+
+  &::before {
+    content: "";
+
+    position: absolute;
+    top: 50%;
+    right: 0;
+    left: 0;
+    transform: translateY(-50%);
+
+    height: 0.25rem;
+    border-radius: 0.125rem;
+
+    background-color: var(--color-borders);
+  }
+}
+
+.selection {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+
+  height: 0.25rem;
+  border-radius: 0.125rem;
+
+  background-color: var(--color-primary);
+}
+
+.handle {
+  touch-action: none;
+  cursor: grab;
+
+  position: absolute;
+  top: 50%;
+
+  /* The visual dot is small, but the touch target stays a full finger wide */
+  width: 2.75rem;
+  height: 2.75rem;
+  margin-top: -1.375rem;
+  margin-left: -1.375rem;
+
+  &::after {
+    content: "";
+
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+
+    width: 1.125rem;
+    height: 1.125rem;
+    border-radius: 50%;
+
+    background-color: var(--color-primary);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  }
+
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+.readout {
+  display: flex;
+  align-items: baseline;
+  margin: 0 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.duration {
+  margin-left: auto;
+  color: var(--color-text-secondary);
+}
+
+.hint {
+  margin: 0.75rem 0.75rem 0;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  margin-top: 1rem;
+}
+
+.spacer {
+  flex: 1;
+}

@@ -6,6 +6,7 @@ import type {
 } from '../../../api/types';
 import type { GlobalState, TabState } from '../../../global/types';
 import type { MessageListType, ThreadId } from '../../../types';
+import type { VideoMusicSegment } from '../../../util/videoRecording/overlayVideoMusic';
 import type { RichEditorTooltipsConfig } from '../../common/tooltips/types';
 import type { RichEditor } from './richEditorTypes';
 
@@ -33,6 +34,7 @@ import { validateFiles } from '../../../util/files';
 import { formatStarsAsIcon } from '../../../util/localization/format';
 import { removeAllSelections } from '../../../util/selection';
 import { openSystemFilesDialog } from '../../../util/systemFilesDialog';
+import { overlayVideoMusic } from '../../../util/videoRecording/overlayVideoMusic';
 import { prepareRoundVideo } from '../../../util/videoRecording/prepareRoundVideo';
 import { buildRichMessageFromFormatted, getRichInputAsFormatted } from '../../ui/textInput/richText';
 import buildAttachment from './helpers/buildAttachment';
@@ -55,6 +57,7 @@ import MediaEditor from '../../ui/mediaEditor/MediaEditor';
 import MenuItem from '../../ui/MenuItem';
 import Modal from '../../ui/Modal';
 import AttachmentModalItem from './AttachmentModalItem';
+import BygramVideoMusicModal from './BygramVideoMusicModal.async';
 import CustomSendMenu from './CustomSendMenu.async';
 import MessageInput from './MessageInput.async';
 import SymbolMenuButton from './SymbolMenuButton';
@@ -206,6 +209,8 @@ const AttachmentModal = ({
   );
   const [renderingShouldSendInHighQuality, setRenderingShouldSendInHighQuality] = useState(shouldSendInHighQuality);
   const [isConvertingRoundVideo, setIsConvertingRoundVideo] = useState(false);
+  const [musicFile, setMusicFile] = useState<File>();
+  const [isApplyingMusic, setIsApplyingMusic] = useState(false);
 
   const isOpen = Boolean(attachments.length);
   const renderingIsOpen = Boolean(renderingAttachments?.length);
@@ -352,7 +357,7 @@ const AttachmentModal = ({
   const sendAttachments = useLastCallback((
     isSilent?: boolean, scheduledAt?: number | true, scheduleRepeatPeriod?: number,
   ) => {
-    if (!isOpen || isConvertingRoundVideo) return;
+    if (!isOpen || isConvertingRoundVideo || isApplyingMusic) return;
 
     const shouldSendScheduled = (shouldSchedule || scheduledAt) && isForMessage && !editingMessage;
     if (shouldSendScheduled) {
@@ -428,6 +433,48 @@ const AttachmentModal = ({
       console.error(err);
     } finally {
       setIsConvertingRoundVideo(false);
+    }
+  });
+
+  const singleVideoAttachment = renderingAttachments?.length === 1
+    && SUPPORTED_VIDEO_CONTENT_TYPES.has(renderingAttachments[0].mimeType)
+    ? renderingAttachments[0] : undefined;
+  const canAddMusic = Boolean(
+    singleVideoAttachment?.blob && singleVideoAttachment.quick?.duration && !singleVideoAttachment.isRoundVideo,
+  );
+
+  const handleAddMusicClick = useLastCallback(() => {
+    openSystemFilesDialog('audio/*', (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) setMusicFile(file);
+    });
+  });
+
+  const handleMusicModalClose = useLastCallback(() => {
+    setMusicFile(undefined);
+  });
+
+  const handleMusicApply = useLastCallback(async (segment: VideoMusicSegment) => {
+    const attachment = singleVideoAttachment;
+    const duration = attachment?.quick?.duration;
+    const file = musicFile;
+    setMusicFile(undefined);
+    if (!attachment?.blob || duration === undefined || !file) return;
+
+    setIsApplyingMusic(true);
+    showNotification({ message: { key: 'BygramVideoMusicProcessing' } });
+    try {
+      const blob = await overlayVideoMusic(attachment.blob, file, segment, duration);
+      const withMusic = await buildAttachment(attachment.filename, blob, {
+        quick: attachment.quick,
+      });
+      onAttachmentsUpdate([withMusic]);
+    } catch (err) {
+      showNotification({ message: { key: 'BygramVideoMusicFailed' } });
+      // eslint-disable-next-line no-console
+      console.error(err);
+    } finally {
+      setIsApplyingMusic(false);
     }
   });
 
@@ -723,6 +770,11 @@ const AttachmentModal = ({
                       {lang('BygramSendAsRoundVideo')}
                     </MenuItem>
                   )}
+                  {canAddMusic && (
+                    <MenuItem icon="note" onClick={handleAddMusicClick}>
+                      {lang('BygramVideoMusicAdd')}
+                    </MenuItem>
+                  )}
                   {
                     canInvertMedia && (!isInvertedMedia ? (
 
@@ -828,12 +880,19 @@ const AttachmentModal = ({
         data-attach-description={lang('AttachmentDragAddItems')}
         data-dropzone
       >
-        {isConvertingRoundVideo && (
+        {(isConvertingRoundVideo || isApplyingMusic) && (
           <div className={styles.roundVideoProcessing}>
             <Loading />
-            <span>{lang('BygramRoundVideoProcessing')}</span>
+            <span>{lang(isApplyingMusic ? 'BygramVideoMusicProcessing' : 'BygramRoundVideoProcessing')}</span>
           </div>
         )}
+        <BygramVideoMusicModal
+          isOpen={Boolean(musicFile)}
+          file={musicFile}
+          videoDurationSec={singleVideoAttachment?.quick?.duration ?? 0}
+          onApply={handleMusicApply}
+          onClose={handleMusicModalClose}
+        />
         <svg className={styles.dropOutlineContainer}>
           <rect className={styles.dropOutline} x="0" y="0" width="100%" height="100%" rx="8" />
         </svg>
@@ -915,7 +974,7 @@ const AttachmentModal = ({
                 className={styles.send}
                 size="smaller"
                 inline
-                disabled={isConvertingRoundVideo}
+                disabled={isConvertingRoundVideo || isApplyingMusic}
                 onClick={handleSendClick}
                 onContextMenu={canShowCustomSendMenu ? handleContextMenu : undefined}
                 iconName={!editingMessage && !shouldSchedule && !paidMessagesStars ? 'new-send' : undefined}

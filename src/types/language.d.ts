@@ -74,6 +74,16 @@ export interface LangPair {
   'BygramBubbleCustomColor': undefined;
   'BygramChatWallpaper': undefined;
   'BygramChatWallpaperRemove': undefined;
+  'BygramVideoMusicAdd': undefined;
+  'BygramVideoMusicTitle': undefined;
+  'BygramVideoMusicHint': undefined;
+  'BygramVideoMusicFrom': undefined;
+  'BygramVideoMusicTo': undefined;
+  'BygramVideoMusicPreview': undefined;
+  'BygramVideoMusicStop': undefined;
+  'BygramVideoMusicApply': undefined;
+  'BygramVideoMusicProcessing': undefined;
+  'BygramVideoMusicFailed': undefined;
   'Month2': undefined;
   'Month3': undefined;
   'Month4': undefined;
