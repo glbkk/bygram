@@ -2,7 +2,7 @@ import { memo, useEffect, useLayoutEffect, useMemo, useRef } from '@teact';
 import { getActions, withGlobal } from '../../global';
 
 import type { ApiChatFolder, ApiChatlistExportedInvite } from '../../api/types';
-import { GlobalSearchContent, LeftColumnContent, SettingsScreens } from '../../types';
+import { LeftColumnContent, SettingsScreens } from '../../types';
 
 import { requestMeasure, requestMutation } from '../../lib/fasterdom/fasterdom';
 import { selectTabState } from '../../global/selectors';
@@ -54,7 +54,6 @@ const FoldersSidebar = ({
     setActiveChatFolder,
     openLeftColumnContent,
     openSettingsScreen,
-    setGlobalSearchContent,
   } = getActions();
 
   const tabsRef = useRef<HTMLDivElement>();
@@ -131,12 +130,6 @@ const FoldersSidebar = ({
     openSettingsScreen({ screen: SettingsScreens.Folders });
   });
 
-  const handleMusicClick = useLastCallback(() => {
-    setGlobalSearchContent({ content: GlobalSearchContent.Music });
-    openLeftColumnContent({ contentKey: LeftColumnContent.GlobalSearch });
-    openSettingsScreen({ screen: undefined });
-  });
-
   // Prevent `activeTab` pointing at non-existing folder after update
   useEffect(() => {
     if (!folderTabs?.length) {
@@ -199,14 +192,6 @@ const FoldersSidebar = ({
         <div ref={pillRef} className={styles.pill} />
       </div>
       {!isAtEnd && <div className={styles.divider} />}
-      <Button
-        color="translucent"
-        className={styles.menuButton}
-        onClick={handleMusicClick}
-        iconName="record-play"
-        iconClassName={styles.icon}
-        ariaLabel="Музыка"
-      />
       <Button
         color="translucent"
         className={buildClassName(styles.menuButton, styles.settingsButton)}

@@ -2,7 +2,7 @@ import { type FC, memo } from '@teact';
 import { APP_REVISION } from 'virtual:git-info';
 import { getActions } from '../../global';
 
-import { GlobalSearchContent, LeftColumnContent, SettingsScreens } from '../../types';
+import { LeftColumnContent, SettingsScreens } from '../../types';
 
 import {
   APP_NAME,
@@ -30,9 +30,7 @@ const LeftSideMenuDropdown = ({
   shouldHideSearch,
   className,
 }: OwnProps) => {
-  const {
-    openLeftColumnContent, closeForumPanel, openSettingsScreen, setGlobalSearchContent,
-  } = getActions();
+  const { openLeftColumnContent, closeForumPanel, openSettingsScreen } = getActions();
   const [isBotMenuOpen, markBotMenuOpen, unmarkBotMenuOpen] = useFlag();
   const lang = useLang();
 
@@ -50,11 +48,6 @@ const LeftSideMenuDropdown = ({
 
   const handleSelectContacts = useLastCallback(() => {
     openLeftColumnContent({ contentKey: LeftColumnContent.Contacts });
-  });
-
-  const handleSelectMusic = useLastCallback(() => {
-    setGlobalSearchContent({ content: GlobalSearchContent.Music });
-    openLeftColumnContent({ contentKey: LeftColumnContent.GlobalSearch });
   });
 
   const handleSelectArchived = useLastCallback(() => {
@@ -82,7 +75,6 @@ const LeftSideMenuDropdown = ({
       <LeftSideMenuItems
         onSelectArchived={handleSelectArchived}
         onSelectContacts={handleSelectContacts}
-        onSelectMusic={handleSelectMusic}
         onSelectSettings={handleSelectSettings}
         onBotMenuOpened={markBotMenuOpen}
         onBotMenuClosed={unmarkBotMenuOpen}
