@@ -64,6 +64,14 @@ import SymbolMenuButton from './SymbolMenuButton';
 
 import styles from './AttachmentModal.module.scss';
 
+// iOS reads a bare `audio/*` as "pick from the media library", where tracks cannot be exported,
+// which leaves ordinary files such as .mp3 in Files unselectable. Spelling the extensions out
+// keeps the document picker available alongside it.
+const MUSIC_FILE_ACCEPT = [
+  'audio/*',
+  '.mp3', '.m4a', '.aac', '.wav', '.flac', '.ogg', '.oga', '.opus', '.aiff', '.aif', '.caf', '.wma',
+].join(',');
+
 export type OwnProps = {
   chatId: string;
   threadId: ThreadId;
@@ -444,10 +452,10 @@ const AttachmentModal = ({
   );
 
   const handleAddMusicClick = useLastCallback(() => {
-    openSystemFilesDialog('audio/*', (e) => {
+    openSystemFilesDialog(MUSIC_FILE_ACCEPT, (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) setMusicFile(file);
-    });
+    }, true);
   });
 
   const handleMusicModalClose = useLastCallback(() => {

@@ -42,6 +42,7 @@ const BygramVideoMusicModal = ({
   const [startSec, setStartSec] = useState(0);
   const [endSec, setEndSec] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [hasError, setHasError] = useState(false);
 
   const url = useMemo(() => (file ? URL.createObjectURL(file) : undefined), [file]);
   useEffect(() => () => {
@@ -54,12 +55,27 @@ const BygramVideoMusicModal = ({
     MIN_VIDEO_MUSIC_SEGMENT_SEC,
   );
 
+  useEffect(() => {
+    setHasError(false);
+    setTrackDuration(0);
+  }, [file]);
+
   const handleLoadedMetadata = useLastCallback((e: ChangeEvent<HTMLAudioElement>) => {
     const duration = e.currentTarget.duration;
-    if (!Number.isFinite(duration) || duration <= 0) return;
+    // A stream the browser cannot measure gives no range to pick from, even though ffmpeg
+    // might still decode it, so it is reported rather than left as a dead dialog
+    if (!Number.isFinite(duration) || duration <= 0) {
+      setHasError(true);
+      return;
+    }
+    setHasError(false);
     setTrackDuration(duration);
     setStartSec(0);
     setEndSec(Math.min(duration, Math.max(videoDurationSec, MIN_VIDEO_MUSIC_SEGMENT_SEC)));
+  });
+
+  const handleAudioError = useLastCallback(() => {
+    setHasError(true);
   });
 
   const stopPreview = useLastCallback(() => {
@@ -155,50 +171,57 @@ const BygramVideoMusicModal = ({
           src={url}
           preload="metadata"
           onLoadedMetadata={handleLoadedMetadata}
+          onError={handleAudioError}
         />
       )}
 
       <div className={styles.fileName}>{file?.name}</div>
 
-      <div
-        ref={trackRef}
-        className={styles.track}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
-      >
-        <div
-          className={styles.selection}
-          style={`left: ${startFraction * 100}%; right: ${(1 - endFraction) * 100}%`}
-        />
-        <div
-          className={styles.handle}
-          style={`left: ${startFraction * 100}%`}
-          role="slider"
-          tabIndex={0}
-          aria-label={lang('BygramVideoMusicFrom')}
-          aria-valuenow={Math.round(startSec)}
-          onPointerDown={handlePointerDown('start')}
-        />
-        <div
-          className={styles.handle}
-          style={`left: ${endFraction * 100}%`}
-          role="slider"
-          tabIndex={0}
-          aria-label={lang('BygramVideoMusicTo')}
-          aria-valuenow={Math.round(endSec)}
-          onPointerDown={handlePointerDown('end')}
-        />
-      </div>
+      {hasError ? (
+        <div className={styles.error}>{lang('BygramVideoMusicUnsupported')}</div>
+      ) : (
+        <>
+          <div
+            ref={trackRef}
+            className={styles.track}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
+          >
+            <div
+              className={styles.selection}
+              style={`left: ${startFraction * 100}%; right: ${(1 - endFraction) * 100}%`}
+            />
+            <div
+              className={styles.handle}
+              style={`left: ${startFraction * 100}%`}
+              role="slider"
+              tabIndex={0}
+              aria-label={lang('BygramVideoMusicFrom')}
+              aria-valuenow={Math.round(startSec)}
+              onPointerDown={handlePointerDown('start')}
+            />
+            <div
+              className={styles.handle}
+              style={`left: ${endFraction * 100}%`}
+              role="slider"
+              tabIndex={0}
+              aria-label={lang('BygramVideoMusicTo')}
+              aria-valuenow={Math.round(endSec)}
+              onPointerDown={handlePointerDown('end')}
+            />
+          </div>
 
-      <div className={styles.readout}>
-        <span>{`${formatTime(startSec)} – ${formatTime(endSec)}`}</span>
-        <span className={styles.duration}>{formatTime(endSec - startSec)}</span>
-      </div>
+          <div className={styles.readout}>
+            <span>{`${formatTime(startSec)} – ${formatTime(endSec)}`}</span>
+            <span className={styles.duration}>{formatTime(endSec - startSec)}</span>
+          </div>
 
-      <div className={styles.hint}>
-        {lang('BygramVideoMusicHint')}
-      </div>
+          <div className={styles.hint}>
+            {lang('BygramVideoMusicHint')}
+          </div>
+        </>
+      )}
 
       <div className={styles.actions}>
         <Button isText onClick={handleTogglePreview} disabled={!trackDuration}>

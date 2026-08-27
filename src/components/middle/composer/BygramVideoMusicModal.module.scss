@@ -8,6 +8,11 @@
   white-space: nowrap;
 }
 
+.error {
+  margin: 0 0.75rem;
+  color: var(--color-error);
+}
+
 .track {
   touch-action: none;
   position: relative;
