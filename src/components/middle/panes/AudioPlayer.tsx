@@ -1,5 +1,7 @@
 import type { FC } from '../../../lib/teact/teact';
-import { useEffect, useMemo, useRef } from '../../../lib/teact/teact';
+import {
+  useEffect, useMemo, useRef, useState,
+} from '../../../lib/teact/teact';
 import { getActions, withGlobal } from '../../../global';
 
 import type {
@@ -21,6 +23,11 @@ import { selectMessageMediaDuration } from '../../../global/selectors/media';
 import { makeTrackId } from '../../../util/audioPlayer';
 import { IS_IOS, IS_TOUCH_ENV } from '../../../util/browser/windowEnvironment';
 import buildClassName from '../../../util/buildClassName';
+import {
+  isBygramAudioFavorite,
+  subscribeBygramAudioFavorites,
+  toggleBygramAudioFavorite,
+} from '../../../util/bygramAudioFavorites';
 import { clearMediaSession } from '../../../util/mediaSession';
 import renderText from '../../common/helpers/renderText';
 
@@ -62,6 +69,7 @@ type StateProps = {
   isPlaybackRateActive?: boolean;
   isMuted: boolean;
   timestamp?: number;
+  currentUserId?: string;
 };
 
 const PLAYBACK_RATES: Record<number, number> = {
@@ -89,6 +97,7 @@ const AudioPlayer: FC<OwnProps & StateProps> = ({
   isPlaybackRateActive,
   isMuted,
   timestamp,
+  currentUserId,
   onPaneStateChange,
 }) => {
   const {
@@ -112,6 +121,8 @@ const AudioPlayer: FC<OwnProps & StateProps> = ({
 
   const { audio, voice, video } = renderingMessage ? getMessageContent(renderingMessage) : {} satisfies MediaContent;
   const isVoice = Boolean(voice || video);
+  const canLike = Boolean(audio && renderingMessage && currentUserId);
+  const [isLiked, setIsLiked] = useState(false);
   const shouldRenderPlaybackButton = isVoice || (audio?.duration || 0) > PLAYBACK_RATE_FOR_AUDIO_MIN_DURATION;
   const senderName = renderingSender ? getPeerTitle(lang, renderingSender) : undefined;
 
@@ -177,6 +188,15 @@ const AudioPlayer: FC<OwnProps & StateProps> = ({
     }
   }, [isPlaying, message?.isDeleting, playPause]);
 
+  useEffect(() => {
+    const update = () => setIsLiked(Boolean(
+      renderingMessage && currentUserId
+      && isBygramAudioFavorite(currentUserId, renderingMessage.chatId, renderingMessage.id),
+    ));
+    update();
+    return subscribeBygramAudioFavorites(update);
+  }, [currentUserId, renderingMessage]);
+
   const handleClick = useLastCallback(() => {
     const { chatId, id } = renderingMessage!;
     focusMessage({ chatId, messageId: id });
@@ -192,6 +212,11 @@ const AudioPlayer: FC<OwnProps & StateProps> = ({
     closeAudioPlayer();
     clearMediaSession();
     stop();
+  });
+
+  const handleLike = useLastCallback(() => {
+    if (!renderingMessage || !currentUserId) return;
+    setIsLiked(toggleBygramAudioFavorite(currentUserId, renderingMessage));
   });
 
   const handleVolumeChange = useLastCallback((value: number) => {
@@ -304,6 +329,17 @@ const AudioPlayer: FC<OwnProps & StateProps> = ({
           {audio ? renderAudio(audio) : renderVoice(lang('AttachAudio'), senderName)}
           <RippleEffect />
         </div>
+        {canLike && (
+          <Button
+            round
+            className={buildClassName('player-like', isLiked && 'applied')}
+            color="translucent"
+            size="smaller"
+            onClick={handleLike}
+            ariaLabel={isLiked ? 'Убрать из понравившихся' : 'Добавить в понравившиеся'}
+            iconName={isLiked ? 'heart' : 'heart-outline'}
+          />
+        )}
         <Button
           round
           className="player-close"
@@ -402,6 +438,18 @@ const AudioPlayer: FC<OwnProps & StateProps> = ({
         </DropdownMenu>
       )}
 
+      {canLike && (
+        <Button
+          round
+          className={buildClassName('player-like', isLiked && 'applied')}
+          color="translucent"
+          size="smaller"
+          onClick={handleLike}
+          ariaLabel={isLiked ? 'Убрать из понравившихся' : 'Добавить в понравившиеся'}
+          iconName={isLiked ? 'heart' : 'heart-outline'}
+        />
+      )}
+
       <Button
         round
         className="player-close"
@@ -482,6 +530,7 @@ export default withGlobal<OwnProps>(
       isMuted,
       timestamp,
       mediaDuration,
+      currentUserId: global.currentUserId,
     };
   },
 )(AudioPlayer);

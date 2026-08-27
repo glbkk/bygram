@@ -43,6 +43,7 @@ import AccountMenuItems from './AccountMenuItems';
 type OwnProps = {
   onSelectSettings: NoneToVoidFunction;
   onSelectContacts: NoneToVoidFunction;
+  onSelectMusic: NoneToVoidFunction;
   onSelectArchived: NoneToVoidFunction;
   onBotMenuOpened: NoneToVoidFunction;
   onBotMenuClosed: NoneToVoidFunction;
@@ -67,6 +68,7 @@ const LeftSideMenuItems = ({
   currentUser,
   onSelectArchived,
   onSelectContacts,
+  onSelectMusic,
   onSelectSettings,
   onBotMenuOpened,
   onBotMenuClosed,
@@ -178,6 +180,12 @@ const LeftSideMenuItems = ({
         onClick={onSelectContacts}
       >
         {lang('MenuContacts')}
+      </MenuItem>
+      <MenuItem
+        icon="record-play"
+        onClick={onSelectMusic}
+      >
+        Музыка
       </MenuItem>
       {bots.map((bot) => (
         <AttachBotItem

@@ -53,6 +53,16 @@
     }
   }
 
+  .player-like {
+    flex-shrink: 0;
+    margin: 0.125rem;
+
+    &.applied {
+      --color-text-secondary: #e85d75;
+      color: #e85d75;
+    }
+  }
+
   .volume-button-wrapper {
     position: relative;
     display: flex;
