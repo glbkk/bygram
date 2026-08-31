@@ -42,6 +42,14 @@ export interface LangPair {
   'BygramPrivacyTitle': undefined;
   'BygramGhostMode': undefined;
   'BygramGhostModeDesc': undefined;
+  'BygramGhostModeOn': undefined;
+  'BygramGhostModeOff': undefined;
+  'BygramGhostStoryAsk': undefined;
+  'BygramGhostStoryAskDesc': undefined;
+  'BygramGhostStoryTitle': undefined;
+  'BygramGhostStoryDesc': undefined;
+  'BygramGhostStoryHidden': undefined;
+  'BygramGhostStoryNormal': undefined;
   'BygramArchivedGiftTab': undefined;
   'BygramArchivedGiftDesc': undefined;
   'BygramLegacyGiftTree': undefined;

@@ -75,6 +75,7 @@ import MessageListHistoryHandler from '../middle/MessageListHistoryHandler';
 import MiddleColumn from '../middle/MiddleColumn';
 import AudioPlayer from '../middle/panes/AudioPlayer';
 import BygramChatPasswordModal from '../modals/BygramChatPasswordModal';
+import BygramGhostStoryModal from '../modals/BygramGhostStoryModal';
 import ModalContainer from '../modals/ModalContainer';
 import PaymentModal from '../payment/PaymentModal.async';
 import ReceiptModal from '../payment/ReceiptModal.async';
@@ -637,6 +638,7 @@ const Main = ({
       <AudioPlayer noUi />
       <ModalContainer />
       <BygramChatPasswordModal />
+      <BygramGhostStoryModal />
       <HistoryCalendar isOpen={isHistoryCalendarOpen} />
       <StickerSetModal
         isOpen={Boolean(openedStickerSetShortName)}

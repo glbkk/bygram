@@ -1,0 +1,2 @@
+import{Xc as e,vf as t}from"./cacheApi-DuCCf1yz.js";var n={root:`_40aWbFdG`,thin:`_1yj96yuC`,thick:`_5EdrUuc8`},r=({className:r,size:i=`thin`})=>t(`div`,{className:e(n.root,n[i],r)});export{r as t};
+//# sourceMappingURL=MenuSeparator-P7thWp1i.js.map

@@ -1,6 +1,8 @@
 import type { ActionReturnType } from '../../types';
 
 import { canOpenStoryAfterActivation } from '../../../util/appActivationGuard';
+import { getBygramSettings, setBygramGhostMode } from '../../../util/bygramArchive';
+import { requestBygramGhostStoryChoice } from '../../../util/bygramGhostStoryDialog';
 import { copyTextToClipboard } from '../../../util/clipboard';
 import { getCurrentTabId } from '../../../util/establishMultitabRole';
 import { omit } from '../../../util/iteratees';
@@ -31,9 +33,31 @@ addActionHandler('openStoryViewer', async (global, actions, payload): Promise<vo
     return;
   }
 
-  const peer = selectPeer(global, peerId);
+  let peer = selectPeer(global, peerId);
   if (!peer) {
     return;
+  }
+
+  // Asking after the viewer is open would be too late, since the view is reported as soon as the story
+  // is on screen. Own and archived stories report nothing, so they open straight away.
+  const isOwnStories = peerId === global.currentUserId || isArchive;
+  const shouldAskGhostMode = getBygramSettings().isGhostStoryPromptEnabled
+    && !isOwnStories
+    && !selectTabState(global, tabId).storyViewer.peerId;
+
+  if (shouldAskGhostMode) {
+    const choice = await requestBygramGhostStoryChoice();
+    if (!choice) {
+      return;
+    }
+
+    setBygramGhostMode(choice === 'ghost');
+
+    global = getGlobal();
+    peer = selectPeer(global, peerId);
+    if (!peer) {
+      return;
+    }
   }
 
   const tabState = selectTabState(global, tabId);

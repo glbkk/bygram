@@ -20,10 +20,12 @@ import { selectSharedSettings } from '../../../global/selectors/sharedState';
 import { IS_TAURI } from '../../../util/browser/globalEnvironment';
 import { IS_APP, IS_MAC_OS } from '../../../util/browser/windowEnvironment';
 import buildClassName from '../../../util/buildClassName';
+import { toggleBygramGhostMode } from '../../../util/bygramArchive';
 import captureEscKeyListener from '../../../util/captureEscKeyListener';
 import { formatDateToString } from '../../../util/dates/oldDateFormat';
 
 import useAppLayout from '../../../hooks/useAppLayout';
+import useBygramGhostMode from '../../../hooks/useBygramGhostMode';
 import useConnectionStatus from '../../../hooks/useConnectionStatus';
 import { useHotkeys } from '../../../hooks/useHotkeys';
 import useLang from '../../../hooks/useLang';
@@ -106,6 +108,7 @@ const LeftMainHeader = ({
     openSettingsScreen,
     searchMessagesGlobal,
     closeForumPanel,
+    showNotification,
   } = getActions();
 
   const oldLang = useOldLang();
@@ -114,6 +117,17 @@ const LeftMainHeader = ({
 
   const areContactsVisible = content === LeftColumnContent.Contacts;
   const hasMenu = content === LeftColumnContent.ChatList;
+
+  const isGhostModeEnabled = useBygramGhostMode();
+  // The read receipt for a chat leaves half a second after it opens, so the mode has to be reachable
+  // from the chat list rather than from inside the chat, where switching it on would already be late
+  const canToggleGhostMode = hasMenu;
+
+  const handleGhostModeClick = useLastCallback(() => {
+    showNotification({
+      message: { key: toggleBygramGhostMode() ? 'BygramGhostModeOn' : 'BygramGhostModeOff' },
+    });
+  });
 
   const isSearchButton = isForumPanelOpen && isFoldersSidebarShown && !IS_WITH_WINDOW_BUTTONS;
 
@@ -288,6 +302,21 @@ const LeftMainHeader = ({
           />
         </SearchInput>
         {isCurrentUserPremium && <StatusButton />}
+        {canToggleGhostMode && (
+          <Button
+            round
+            ripple={!isMobile}
+            size="smaller"
+            color="translucent"
+            ariaLabel={lang('BygramGhostMode')}
+            onClick={handleGhostModeClick}
+            className={buildClassName(
+              !isCurrentUserPremium && 'extra-spacing',
+              isGhostModeEnabled && 'activated',
+            )}
+            iconName={isGhostModeEnabled ? 'eye-crossed-outline' : 'eye-outline'}
+          />
+        )}
         {hasPasscode && (
           <Button
             round
@@ -296,7 +325,7 @@ const LeftMainHeader = ({
             color="translucent"
             ariaLabel={`${oldLang('ShortcutsController.Others.LockByPasscode')} (Ctrl+Shift+L)`}
             onClick={handleLockScreen}
-            className={buildClassName(!isCurrentUserPremium && 'extra-spacing')}
+            className={buildClassName(!isCurrentUserPremium && !canToggleGhostMode && 'extra-spacing')}
             iconName="lock"
           />
         )}

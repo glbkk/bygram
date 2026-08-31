@@ -8,6 +8,7 @@ server/
 .env.server
 dev/createBygramLanCertificate.sh
 dev/runBygramLan.sh
+dev/generateServerlessMusicCatalog.mjs
 _legacy-server-variant/
 
 src/lib/gramjs/build/

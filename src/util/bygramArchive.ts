@@ -32,6 +32,7 @@ export type BygramSettings = {
   isEditHistoryEnabled: boolean;
   isMediaArchiveEnabled: boolean;
   isGhostModeEnabled: boolean;
+  isGhostStoryPromptEnabled: boolean;
   isChatStreakEnabled: boolean;
   isByProtoEnabled: boolean;
   isByProtoAutoAcceptProfiles: boolean;
@@ -226,6 +227,7 @@ const DEFAULT_SETTINGS: BygramSettings = {
   isEditHistoryEnabled: true,
   isMediaArchiveEnabled: false,
   isGhostModeEnabled: false,
+  isGhostStoryPromptEnabled: true,
   isChatStreakEnabled: true,
   isByProtoEnabled: true,
   isByProtoAutoAcceptProfiles: true,
@@ -252,6 +254,15 @@ export function getBygramSettings() {
 // them from, which is why the same setting decides where paid emoji may be offered.
 export function canUseBygramPremiumEmoji() {
   return settings.isByProtoEnabled;
+}
+
+export function toggleBygramGhostMode() {
+  return updateBygramSettings({ isGhostModeEnabled: !settings.isGhostModeEnabled }).isGhostModeEnabled;
+}
+
+export function setBygramGhostMode(isEnabled: boolean) {
+  if (settings.isGhostModeEnabled === isEnabled) return;
+  updateBygramSettings({ isGhostModeEnabled: isEnabled });
 }
 
 export function updateBygramSettings(patch: Partial<BygramSettings>) {

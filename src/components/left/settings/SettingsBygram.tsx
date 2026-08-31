@@ -13,6 +13,7 @@ import {
   clearBygramArchive,
   getBygramArchiveStats,
   getBygramSettings,
+  subscribeBygramSettings,
   updateBygramSettings,
 } from '../../../util/bygramArchive';
 import * as mediaLoader from '../../../util/mediaLoader';
@@ -105,6 +106,9 @@ function SettingsBygram({ isActive, onReset }: OwnProps) {
   useEffect(() => {
     void refreshStats();
   }, []);
+
+  // Ghost mode also has a button above the chat list, so this screen cannot own the value alone
+  useEffect(() => subscribeBygramSettings(setSettings), []);
 
   const refreshStats = useLastCallback(async () => {
     setStats(await getBygramArchiveStats());
@@ -223,6 +227,12 @@ function SettingsBygram({ isActive, onReset }: OwnProps) {
           subLabel={lang('BygramGhostModeDesc')}
           checked={settings.isGhostModeEnabled}
           onCheck={(value) => handleSettingChange('isGhostModeEnabled', value)}
+        />
+        <Checkbox
+          label={lang('BygramGhostStoryAsk')}
+          subLabel={lang('BygramGhostStoryAskDesc')}
+          checked={settings.isGhostStoryPromptEnabled}
+          onCheck={(value) => handleSettingChange('isGhostStoryPromptEnabled', value)}
         />
       </Island>
 
