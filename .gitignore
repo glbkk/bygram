@@ -11,6 +11,11 @@ dev/runBygramLan.sh
 dev/generateServerlessMusicCatalog.mjs
 _legacy-server-variant/
 
+# The music library ships as the committed build output in dist/bygram-music, so the source
+# copy stays out of the repo. A build without it deletes that output, so restore
+# public/bygram-music from dist before rebuilding.
+public/bygram-music/
+
 src/lib/gramjs/build/
 build-contest/
 tests/
