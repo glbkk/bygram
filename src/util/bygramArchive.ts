@@ -247,6 +247,13 @@ export function getBygramSettings() {
   return settings;
 }
 
+// Telegram refuses paid emoji from accounts without Premium, so bygram keeps them locally and ships
+// them to the other side inside a ByProto packet. Without that carrier there is nothing to restore
+// them from, which is why the same setting decides where paid emoji may be offered.
+export function canUseBygramPremiumEmoji() {
+  return settings.isByProtoEnabled;
+}
+
 export function updateBygramSettings(patch: Partial<BygramSettings>) {
   settings = { ...settings, ...patch };
   applyMessageBubbleStyle(settings);

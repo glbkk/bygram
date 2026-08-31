@@ -14,6 +14,7 @@ import { selectIsContextMenuTranslucent, selectTabState } from '../../../global/
 import { selectSharedSettings } from '../../../global/selectors/sharedState';
 import { IS_TOUCH_ENV } from '../../../util/browser/windowEnvironment';
 import buildClassName from '../../../util/buildClassName';
+import { canUseBygramPremiumEmoji } from '../../../util/bygramArchive';
 import { resolveTransitionName } from '../../../util/resolveTransitionName';
 
 import useAppLayout from '../../../hooks/useAppLayout';
@@ -215,7 +216,7 @@ const SymbolMenu: FC<OwnProps & StateProps> = ({
             idPrefix={idPrefix}
             loadAndPlay={isOpen && (isActive || isFrom)}
             chatId={chatId}
-            forceAvailable
+            forceAvailable={canUseBygramPremiumEmoji()}
             isTranslucent={!isMobile && isBackgroundTranslucent}
             onCustomEmojiSelect={handleCustomEmojiSelect}
           />

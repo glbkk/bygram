@@ -1,11 +1,12 @@
-import { getGlobal } from '../global';
+import { getGlobal, setGlobal } from '../global';
 
 import type { ApiMessage, ApiMessageEntity, ApiMessageEntityCustomEmoji } from '../api/types';
 import type { ByProtoEmojiRange } from '../byproto/types';
 import { ApiMessageEntityTypes } from '../api/types';
 
 import { getEmojiOnlyCountForMessage } from '../global/helpers/getEmojiOnlyCountForMessage';
-import { selectCustomEmoji } from '../global/selectors';
+import { updateChatMessage } from '../global/reducers';
+import { selectChatMessage, selectCustomEmoji } from '../global/selectors';
 import { isUserId } from './entities/ids';
 import { isLocalMessageId } from './keys/messageKey';
 import { unique } from './iteratees';
@@ -156,6 +157,22 @@ export function registerByProtoPremiumOverlay(params: {
   }].slice(-OVERLAY_LIMIT));
   persistOverlays();
   notifyOverlays(params.chatId);
+  commitPremiumOverlayToMessage(params.chatId, params.messageId);
+}
+
+// The packet carrying the paid emoji is decoded only after the message has been stored and rendered,
+// so the restored entities are written back into it. Leaving them in the overlay alone would keep
+// the message untouched in the global state, and nothing would ask it to render again.
+function commitPremiumOverlayToMessage(chatId: string, messageId: number) {
+  let global = getGlobal();
+  const message = selectChatMessage(global, chatId, messageId);
+  if (!message) return;
+
+  const restored = withPremiumEmojiOverlay(message);
+  if (restored === message) return;
+
+  global = updateChatMessage(global, chatId, messageId, { content: restored.content });
+  setGlobal(global);
 }
 
 function rememberConversation(pairId: string, messages: BygramPremiumEmojiMessage[]) {

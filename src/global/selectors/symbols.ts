@@ -2,6 +2,7 @@ import type { ApiSticker, ApiStickerSet, ApiStickerSetInfo } from '../../api/typ
 import type { GlobalState, TabArgs } from '../types';
 
 import { RESTRICTED_EMOJI_SET_ID, TON_CURRENCY_CODE } from '../../config';
+import { canUseBygramPremiumEmoji } from '../../util/bygramArchive';
 import { hasMixedEmojiSkinTones, removeEmojiSkinTone } from '../../util/emoji/skinTone';
 import { getCurrentTabId } from '../../util/establishMultitabRole';
 import { convertCurrencyFromBaseUnit } from '../../util/formatCurrency';
@@ -94,7 +95,7 @@ export function selectStickersForEmoji<T extends GlobalState>(global: T, emoji: 
 }
 
 export function selectCustomEmojiForEmoji<T extends GlobalState>(global: T, emoji: string) {
-  const isCurrentUserPremium = selectIsCurrentUserPremium(global);
+  const isCurrentUserPremium = selectIsCurrentUserPremium(global) || canUseBygramPremiumEmoji();
   const addedCustomSets = global.customEmojis.added.setIds;
   let customEmojiForEmoji: ApiSticker[] = [];
 
@@ -112,7 +113,7 @@ export function selectCustomEmojiForEmoji<T extends GlobalState>(global: T, emoj
 
 // Slow, not to be used in `withGlobal`
 export function selectCustomEmojiForEmojis<T extends GlobalState>(global: T, emojis: string[]) {
-  const isCurrentUserPremium = selectIsCurrentUserPremium(global);
+  const isCurrentUserPremium = selectIsCurrentUserPremium(global) || canUseBygramPremiumEmoji();
   const addedCustomSets = global.customEmojis.added.setIds;
   let customEmojiForEmoji: ApiSticker[] = [];
 

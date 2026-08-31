@@ -50,7 +50,9 @@ export function buildStickerFromDocument(document: GramJs.TypeDocument,
   const stickerOrEmojiAttribute = (stickerAttribute || customEmojiAttribute)!;
   const stickerSetInfo = buildApiStickerSetInfo(stickerOrEmojiAttribute?.stickerset);
   const emoji = stickerOrEmojiAttribute?.alt;
-  const isFree = Boolean(customEmojiAttribute?.free ?? true) && !isPremium;
+  // `free` is a flag-only field, so it reads back as `undefined` for paid emoji rather than `false`.
+  // Defaulting it to `true` would mark every premium emoji as free and disable the bygram fallback.
+  const isFree = (customEmojiAttribute ? Boolean(customEmojiAttribute.free) : true) && !isPremium;
 
   const cachedThumb = document.thumbs && document.thumbs.find(
     (s): s is GramJs.PhotoCachedSize => s instanceof GramJs.PhotoCachedSize,
