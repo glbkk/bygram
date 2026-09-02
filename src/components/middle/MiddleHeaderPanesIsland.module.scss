@@ -2,6 +2,8 @@
   --panes-top-base: calc(var(--middle-header-height) + var(--middle-panel-inline-padding) + var(--middle-header-gap));
   --island-transform-transition: transform var(--layer-transition);
 
+  pointer-events: auto;
+
   position: absolute;
   z-index: var(--z-middle-header);
   top: calc(var(--middle-header-player-height, 0px) + var(--panes-top-base));

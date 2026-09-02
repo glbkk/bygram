@@ -336,17 +336,10 @@ function BygramMusic() {
     const { track, playlist, attachments } = pendingShare;
 
     if (attachments?.length) {
-      const caption = track
-        ? [
-          `🎵 ${track.artist} — ${track.title}`,
-          'Отправлено с помощью bygram',
-          'https://glbkk.github.io/bygram',
-        ].join('\n')
-        : [
-          `🎵 Плейлист «${playlist?.name || 'bygramMusic'}» · ${attachments.length} треков`,
-          'Отправлено с помощью bygram',
-          'https://glbkk.github.io/bygram',
-        ].join('\n');
+      const caption = [
+        '🎵 Отправлено с помощью bygram',
+        '⬇️ https://glbkk.github.io/bygram',
+      ].join('\n');
       sendMessage({
         messageList: { chatId, threadId, type: 'thread' },
         text: caption,

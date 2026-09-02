@@ -229,6 +229,7 @@
   &.full-width-player {
     @include mixins.middle-header-pane-island;
 
+    pointer-events: auto;
     height: 3rem;
 
     .AudioPlayer-content {

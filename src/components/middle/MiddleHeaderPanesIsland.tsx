@@ -403,6 +403,7 @@ const MiddleHeaderPanesIsland = ({
       }
     >
       <BygramAudioPlayer
+        isCompact
         isHidden={isHidden}
         onPaneStateChange={setBygramPlayerState}
       />
