@@ -3,7 +3,6 @@ import type { FC } from '../../../lib/teact/teact';
 import {
   memo, useEffect, useRef, useState,
 } from '../../../lib/teact/teact';
-import { getActions } from '../../../global';
 
 import type { FolderEditDispatch } from '../../../hooks/reducers/useFoldersReducer';
 import { LeftColumnContent } from '../../../types';
@@ -19,6 +18,7 @@ import useLastCallback from '../../../hooks/useLastCallback';
 import useOldLang from '../../../hooks/useOldLang';
 import useShowTransitionDeprecated from '../../../hooks/useShowTransitionDeprecated';
 
+import BygramMusic from '../../music/BygramMusic';
 import Button from '../../ui/Button';
 import Transition from '../../ui/Transition';
 import NewChatButton from '../NewChatButton';
@@ -69,7 +69,6 @@ const LeftMain: FC<OwnProps> = ({
   isAccountFrozen,
   isFoldersSidebarShown,
 }) => {
-  const { openLeftColumnContent } = getActions();
   const [isNewChatButtonShown, setIsNewChatButtonShown] = useState(IS_TOUCH_ENV);
   const [tauriUpdate, setTauriUpdate] = useState<Update>();
   const [isTauriUpdateDownloading, setIsTauriUpdateDownloading] = useState(false);
@@ -111,10 +110,6 @@ const LeftMain: FC<OwnProps> = ({
     }, BUTTON_CLOSE_DELAY_MS);
   });
 
-  const handleSelectContacts = useLastCallback(() => {
-    openLeftColumnContent({ contentKey: LeftColumnContent.Contacts });
-  });
-
   const handleUpdateClick = useLastCallback(async () => {
     if (tauriUpdate) {
       try {
@@ -132,14 +127,6 @@ const LeftMain: FC<OwnProps> = ({
     } else {
       window.location.reload();
     }
-  });
-
-  const handleSelectNewChannel = useLastCallback(() => {
-    openLeftColumnContent({ contentKey: LeftColumnContent.NewChannelStep1 });
-  });
-
-  const handleSelectNewGroup = useLastCallback(() => {
-    openLeftColumnContent({ contentKey: LeftColumnContent.NewGroupStep1 });
   });
 
   useEffect(() => {
@@ -179,6 +166,7 @@ const LeftMain: FC<OwnProps> = ({
   );
 
   const lang = useOldLang();
+  const isMusicOpen = content === LeftColumnContent.Music;
 
   return (
     <div
@@ -186,16 +174,18 @@ const LeftMain: FC<OwnProps> = ({
       onMouseEnter={!IS_TOUCH_ENV ? handleMouseEnter : undefined}
       onMouseLeave={!IS_TOUCH_ENV ? handleMouseLeave : undefined}
     >
-      <LeftMainHeader
-        shouldHideSearch={isForumPanelVisible}
-        content={content}
-        contactsFilter={contactsFilter}
-        onSearchQuery={onSearchQuery}
-        onReset={onReset}
-        shouldSkipTransition={shouldSkipTransition}
-        isClosingSearch={isClosingSearch}
-        isFoldersSidebarShown={isFoldersSidebarShown}
-      />
+      {!isMusicOpen && (
+        <LeftMainHeader
+          shouldHideSearch={isForumPanelVisible}
+          content={content}
+          contactsFilter={contactsFilter}
+          onSearchQuery={onSearchQuery}
+          onReset={onReset}
+          shouldSkipTransition={shouldSkipTransition}
+          isClosingSearch={isClosingSearch}
+          isFoldersSidebarShown={isFoldersSidebarShown}
+        />
+      )}
       <Transition
         name={shouldSkipTransition ? 'none' : 'zoomFade'}
         renderCount={TRANSITION_RENDER_COUNT}
@@ -215,6 +205,8 @@ const LeftMain: FC<OwnProps> = ({
                   isFoldersSidebarShown={isFoldersSidebarShown}
                 />
               );
+            case LeftColumnContent.Music:
+              return <BygramMusic />;
             case LeftColumnContent.GlobalSearch:
               return (
                 <LeftSearch
@@ -252,10 +244,7 @@ const LeftMain: FC<OwnProps> = ({
         />
       )}
       <NewChatButton
-        isShown={isNewChatButtonShown}
-        onNewPrivateChat={handleSelectContacts}
-        onNewChannel={handleSelectNewChannel}
-        onNewGroup={handleSelectNewGroup}
+        isShown={isNewChatButtonShown && !isMusicOpen}
         isAccountFrozen={isAccountFrozen}
       />
     </div>

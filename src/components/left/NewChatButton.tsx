@@ -1,96 +1,52 @@
 import type { FC } from '../../lib/teact/teact';
-import {
-  useCallback, useEffect, useMemo, useState,
-} from '../../lib/teact/teact';
 import { getActions } from '../../global';
+
+import { LeftColumnContent } from '../../types';
 
 import buildClassName from '../../util/buildClassName';
 
+import useLastCallback from '../../hooks/useLastCallback';
 import useOldLang from '../../hooks/useOldLang';
 
 import Icon from '../common/icons/Icon';
 import Button from '../ui/Button';
-import Menu from '../ui/Menu';
-import MenuItem from '../ui/MenuItem';
 
 import './NewChatButton.scss';
 
 type OwnProps = {
   isShown: boolean;
-  onNewPrivateChat: () => void;
-  onNewChannel: () => void;
-  onNewGroup: () => void;
   isAccountFrozen?: boolean;
 };
 
 const NewChatButton: FC<OwnProps> = ({
   isShown,
-  onNewPrivateChat,
-  onNewChannel,
-  onNewGroup,
   isAccountFrozen,
 }) => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { openFrozenAccountModal } = getActions();
-
-  const shouldRender = isShown || isMenuOpen;
-
-  useEffect(() => {
-    if (!shouldRender) {
-      setIsMenuOpen(false);
-    }
-  }, [shouldRender]);
-
+  const { openFrozenAccountModal, openLeftColumnContent } = getActions();
   const lang = useOldLang();
 
-  const fabClassName = buildClassName(
-    'NewChatButton',
-    shouldRender && 'revealed',
-    isMenuOpen && 'menu-is-open',
-  );
-
-  const toggleIsMenuOpen = useCallback(() => {
+  const handleClick = useLastCallback(() => {
     if (isAccountFrozen) {
       openFrozenAccountModal();
       return;
     }
-    setIsMenuOpen(!isMenuOpen);
-  }, [isMenuOpen, isAccountFrozen]);
-
-  const handleClose = useCallback(() => {
-    setIsMenuOpen(false);
-  }, []);
-
-  const menuItems = useMemo(() => (
-    <>
-      <MenuItem icon="channel" onClick={onNewChannel}>{lang('NewChannel')}</MenuItem>
-      <MenuItem icon="group" onClick={onNewGroup}>{lang('NewGroup')}</MenuItem>
-      <MenuItem icon="user" onClick={onNewPrivateChat}>{lang('NewMessageTitle')}</MenuItem>
-    </>
-  ), [lang, onNewChannel, onNewGroup, onNewPrivateChat]);
+    openLeftColumnContent({ contentKey: LeftColumnContent.Music });
+  });
 
   return (
-    <div className={fabClassName} dir={lang.isRtl ? 'rtl' : undefined}>
+    <div
+      className={buildClassName('NewChatButton', 'music-fab', isShown && 'revealed')}
+      dir={lang.isRtl ? 'rtl' : undefined}
+    >
       <Button
         round
         color="primary"
-        className={isMenuOpen ? 'active' : ''}
-        onClick={toggleIsMenuOpen}
-        ariaLabel={lang(isMenuOpen ? 'Close' : 'NewMessageTitle')}
+        onClick={handleClick}
+        ariaLabel="Музыка"
         tabIndex={-1}
       >
-        <Icon name="new-chat-filled" />
-        <Icon name="close" />
+        <Icon name="note" />
       </Button>
-      <Menu
-        isOpen={isMenuOpen}
-        positionX={lang.isRtl ? 'left' : 'right'}
-        positionY="bottom"
-        autoClose
-        onClose={handleClose}
-      >
-        {menuItems}
-      </Menu>
     </div>
   );
 };

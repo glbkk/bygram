@@ -140,10 +140,12 @@
     "emoji-data-ios": "git+https://github.com/korenskoy/emoji-data-ios#30529a2",
     "fflate": "^0.8.3",
     "idb-keyval": "^6.2.5",
+    "jsqr": "^1.4.0",
     "lovely-chart": "^2.0.2",
     "lowlight": "^3.3.0",
     "music-metadata": "^11.13.0",
     "opus-recorder": "github:Ajaxy/opus-recorder#116830a",
+    "pngjs": "^7.0.0",
     "qr-code-styling": "^1.9.2",
     "temml": "^0.13.3"
   },

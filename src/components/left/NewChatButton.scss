@@ -27,29 +27,9 @@
   }
 
   > .Button {
-    .icon-new-chat-filled,
-    .icon-close {
+    .icon-note {
       position: absolute;
-    }
-
-    &:not(.active) {
-      .icon-new-chat-filled {
-        animation: grow-icon 0.4s ease-out;
-      }
-
-      .icon-close {
-        animation: hide-icon 0.4s forwards ease-out;
-      }
-    }
-
-    &.active {
-      .icon-close {
-        animation: grow-icon 0.4s ease-out;
-      }
-
-      .icon-new-chat-filled {
-        animation: hide-icon 0.4s forwards ease-out;
-      }
+      animation: grow-icon 0.4s ease-out;
     }
   }
 }

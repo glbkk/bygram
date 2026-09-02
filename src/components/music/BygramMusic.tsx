@@ -64,7 +64,7 @@ function BygramMusic() {
         : current);
       setError(undefined);
     } catch {
-      setError('Не удалось открыть локальный музыкальный каталог');
+      setError('Не удалось открыть музыку. Проверьте сеть и попробуйте снова');
     }
   });
 
@@ -92,7 +92,7 @@ function BygramMusic() {
       setSelectedAlbum(undefined);
       setSearchResults(await bygramMusicApi.searchMusic(query.trim()));
     } catch {
-      setError('Не удалось выполнить поиск по локальному каталогу');
+      setError('Не удалось найти треки в SoundCloud');
     } finally {
       setIsSearching(false);
     }
@@ -431,7 +431,7 @@ function BygramMusic() {
               )
             ))}
             {home?.librarySize === 0 && (
-              <EmptyState title="Найдите первую песню" text="Поиск работает через SoundCloud и YouTube." />
+              <EmptyState title="Найдите первую песню" text="Поиск и стрим идут через SoundCloud, без регистрации." />
             )}
           </>
         )}

@@ -303,8 +303,8 @@ function buildCsp(appEnv: string) {
   worker-src 'self'${appEnv === 'development' ? ' blob:' : ''};
   style-src 'self' 'unsafe-inline';
   font-src 'self' data:;
-  img-src 'self' data: blob: https://ss3.4sqi.net/img/categories_v2/ https://cdn.changes.tg/;
-  media-src 'self' blob: data:;
+  img-src 'self' data: blob: https: http:;
+  media-src 'self' blob: data: https: http:;
   object-src 'none';
   frame-src http: https:
     bitkeep: bnc: bybitapp: echooo: imtokenv2: mytonwallet-tc:
