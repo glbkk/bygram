@@ -8,7 +8,6 @@ import buildClassName from '../../util/buildClassName';
 import useLastCallback from '../../hooks/useLastCallback';
 import useOldLang from '../../hooks/useOldLang';
 
-import Icon from '../common/icons/Icon';
 import Button from '../ui/Button';
 
 import './NewChatButton.scss';
@@ -44,9 +43,8 @@ const NewChatButton: FC<OwnProps> = ({
         onClick={handleClick}
         ariaLabel="Музыка"
         tabIndex={-1}
-      >
-        <Icon name="note" />
-      </Button>
+        iconName="note"
+      />
     </div>
   );
 };

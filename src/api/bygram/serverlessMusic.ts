@@ -118,12 +118,36 @@ class BygramServerlessMusic {
       const recent = await resolveTracks(state.recentIds);
       cacheTracks([...favorites, ...recent]);
 
-      const wave = remote?.wave?.length
+      let wave = remote?.wave?.length
         ? remote.wave
         : (cached?.wave.length
           ? cached.wave
           : buildWave(catalog.length ? catalog : daily, favorites, recent, state.playCounts).slice(0, 40));
+
+      // Personalize wave with related tracks when the user already has listening history.
+      const waveSeed = favorites[0] || recent[0];
+      if (waveSeed && isSoundCloudId(waveSeed.id)) {
+        const related = await Promise.race([
+          scRelatedTracks(waveSeed.id, 40).catch(() => undefined),
+          new Promise<undefined>((resolve) => {
+            window.setTimeout(() => resolve(undefined), 1800);
+          }),
+        ]);
+        if (related?.length) {
+          wave = buildWave(
+            related,
+            favorites,
+            recent,
+            state.playCounts,
+            daily.map((track) => track.id),
+          ).slice(0, 40);
+        }
+      }
+
       cacheTracks(wave);
+      if (remote?.daily?.length || wave.length) {
+        writeHomeCache({ daily, wave });
+      }
 
       return {
         daily,
@@ -554,15 +578,44 @@ function groupAlbums(tracks: BygramMusicTrack[]) {
 }
 
 function buildWave(
-  tracks: BygramMusicTrack[], favorites: BygramMusicTrack[], recent: BygramMusicTrack[], counts: Record<string, number>,
+  tracks: BygramMusicTrack[],
+  favorites: BygramMusicTrack[],
+  recent: BygramMusicTrack[],
+  counts: Record<string, number>,
+  excludedIds: string[] = [],
 ) {
+  const excluded = new Set(excludedIds);
   const seeds = [...favorites, ...recent].slice(0, 12);
-  if (!seeds.length) return deterministicOrder(tracks, getDateSeed() + 17);
-  return [...tracks].sort((first, second) => {
-    const firstScore = seeds.reduce((score, seed) => score + similarity(first, seed), 0) + (counts[first.id] || 0);
-    const secondScore = seeds.reduce((score, seed) => score + similarity(second, seed), 0) + (counts[second.id] || 0);
-    return secondScore - firstScore;
+  const pool = tracks.filter((track) => !excluded.has(track.id));
+  const ordered = !seeds.length
+    ? deterministicOrder(pool, getDateSeed() + 17)
+    : [...pool].sort((first, second) => {
+      const firstScore = seeds.reduce((score, seed) => score + similarity(first, seed), 0)
+        + (counts[first.id] || 0) * 5;
+      const secondScore = seeds.reduce((score, seed) => score + similarity(second, seed), 0)
+        + (counts[second.id] || 0) * 5;
+      return secondScore - firstScore;
+    });
+
+  const selected: BygramMusicTrack[] = [];
+  const artistCounts = new Map<string, number>();
+  let lastArtist = '';
+  ordered.forEach((track) => {
+    if (selected.length >= 40) return;
+    const artistKey = normalize(track.artist) || track.id;
+    if (artistKey === lastArtist) return;
+    if ((artistCounts.get(artistKey) || 0) >= 2) return;
+    selected.push(track);
+    artistCounts.set(artistKey, (artistCounts.get(artistKey) || 0) + 1);
+    lastArtist = artistKey;
   });
+  if (selected.length < 12) {
+    ordered.forEach((track) => {
+      if (selected.length >= 40 || selected.some((item) => item.id === track.id)) return;
+      selected.push(track);
+    });
+  }
+  return selected;
 }
 
 function similarity(first: BygramMusicTrack, second: BygramMusicTrack) {
@@ -609,15 +662,34 @@ function isSoundCloudId(id: string) {
 }
 
 function encodeShareCode(playlist: BygramMusicPlaylist) {
-  const payload = JSON.stringify({ name: playlist.name, trackIds: playlist.trackIds });
+  const payload = JSON.stringify({
+    name: playlist.name,
+    trackIds: playlist.trackIds,
+    tracks: playlist.tracks.map((track) => ({
+      id: track.id,
+      title: track.title,
+      artist: track.artist,
+      album: track.album,
+      genre: track.genre,
+      durationSeconds: track.durationSeconds,
+      artworkUrl: track.artworkUrl,
+      audioUrl: track.audioUrl,
+      mimeType: track.mimeType,
+    })),
+  });
   return btoa(unescape(encodeURIComponent(payload))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 function decodeShareCode(code: string) {
   const normalized = code.replace(/-/g, '+').replace(/_/g, '/');
   const payload = decodeURIComponent(escape(atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '='))));
-  const parsed = JSON.parse(payload) as { name: string; trackIds: string[] };
+  const parsed = JSON.parse(payload) as {
+    name: string;
+    trackIds: string[];
+    tracks?: BygramMusicTrack[];
+  };
   if (!parsed.name || !Array.isArray(parsed.trackIds)) throw new Error('INVALID_PLAYLIST');
+  if (parsed.tracks?.length) cacheTracks(parsed.tracks);
   const now = new Date().toISOString();
   return {
     id: `shared-${hash(payload)}`,

@@ -101,6 +101,7 @@ import MessageSelectToolbar from './MessageSelectToolbar';
 import MiddleHeader from './MiddleHeader';
 import MiddleHeaderPanesIsland from './MiddleHeaderPanesIsland';
 import AudioPlayer from './panes/AudioPlayer';
+import BygramAudioPlayer from './panes/BygramAudioPlayer';
 import PremiumRequiredPlaceholder from './PremiumRequiredPlaceholder';
 import ReactorListModal from './ReactorListModal.async';
 import MiddleSearch from './search/MiddleSearch.async';
@@ -321,6 +322,25 @@ function MiddleColumn({
   const isViewportAnimatingRef = useRef(false);
   const previousViewportHeightRef = useRef<number>();
   const shouldKeepBottomAfterKeyboardRef = useRef(false);
+  const telegramPlayerHeightRef = useRef(0);
+  const bygramPlayerHeightRef = useRef(0);
+
+  const publishPlayerPaneHeight = useLastCallback(() => {
+    onPlayerPaneStateChange({
+      height: Math.max(telegramPlayerHeightRef.current, bygramPlayerHeightRef.current),
+    });
+  });
+
+  const handleTelegramPlayerPaneStateChange = useLastCallback((state: PaneState) => {
+    telegramPlayerHeightRef.current = state.height || 0;
+    publishPlayerPaneHeight();
+  });
+
+  const handleBygramPlayerPaneStateChange = useLastCallback((state: PaneState) => {
+    bygramPlayerHeightRef.current = state.height || 0;
+    publishPlayerPaneHeight();
+  });
+
   const getIsKeyboardAnimating = useLastCallback(() => isViewportAnimatingRef.current);
 
   const syncFooterSlide = useLastCallback((footer: HTMLElement) => {
@@ -617,7 +637,12 @@ function MiddleColumn({
       <AudioPlayer
         className="island-player"
         isHidden={hasActiveMiddleSearch || isRichInputExpanded || (isTablet && isLeftColumnShown)}
-        onPaneStateChange={onPlayerPaneStateChange}
+        onPaneStateChange={handleTelegramPlayerPaneStateChange}
+      />
+      <BygramAudioPlayer
+        className="island-player"
+        isHidden={hasActiveMiddleSearch || isRichInputExpanded || (isTablet && isLeftColumnShown)}
+        onPaneStateChange={handleBygramPlayerPaneStateChange}
       />
       {Boolean(renderingChatId && renderingThreadId) && (
         <>

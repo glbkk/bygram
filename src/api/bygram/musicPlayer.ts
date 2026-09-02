@@ -303,7 +303,7 @@ class BygramMusicPlayer {
     navigator.mediaSession.metadata = new MediaMetadata({
       title: track.title,
       artist: track.artist,
-      album: track.album || 'ByGram Music',
+      album: track.album || 'bygram',
       artwork: track.artworkUrl ? [{ src: new URL(track.artworkUrl, window.location.origin).toString() }] : undefined,
     });
   }

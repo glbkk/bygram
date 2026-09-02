@@ -20,6 +20,7 @@ import {
 } from '../../../middle/hooks/useHeaderPane';
 
 import AudioPlayer from '../../../middle/panes/AudioPlayer';
+import BygramAudioPlayer from '../../../middle/panes/BygramAudioPlayer';
 import FrozenAccountPane from './FrozenAccountPane';
 import GiftAuctionPane from './GiftAuctionPane';
 import SuggestionPane from './SuggestionPane';
@@ -53,6 +54,7 @@ const ChatListPanes = ({
   onHeightChange,
 }: OwnProps & StateProps) => {
   const [getPlayerState, setPlayerState] = useSignal<PaneState>(FALLBACK_PANE_STATE);
+  const [getBygramPlayerState, setBygramPlayerState] = useSignal<PaneState>(FALLBACK_PANE_STATE);
   const [getFrozenAccountState, setFrozenAccountState] = useSignal<PaneState>(FALLBACK_PANE_STATE);
   const [getUnconfirmedSessionState, setUnconfirmedSessionState] = useSignal<PaneState>(FALLBACK_PANE_STATE);
   const [getGiftAuctionState, setGiftAuctionState] = useSignal<PaneState>(FALLBACK_PANE_STATE);
@@ -87,6 +89,7 @@ const ChatListPanes = ({
     // Keep in sync with the order of the panes in the DOM
     const stateArray = [
       getPlayerState(),
+      getBygramPlayerState(),
       getFrozenAccountState(),
       getUnconfirmedSessionState(),
       getGiftAuctionState(),
@@ -118,7 +121,8 @@ const ChatListPanes = ({
       }
     });
   }, [
-    getPlayerState, getFrozenAccountState, getUnconfirmedSessionState, getGiftAuctionState, getSuggestionState,
+    getPlayerState, getBygramPlayerState, getFrozenAccountState, getUnconfirmedSessionState,
+    getGiftAuctionState, getSuggestionState,
   ]);
 
   return (
@@ -133,10 +137,16 @@ const ChatListPanes = ({
       }
     >
       {(isMobile || isTablet) && (
-        <AudioPlayer
-          isCompact
-          onPaneStateChange={setPlayerState}
-        />
+        <>
+          <AudioPlayer
+            isCompact
+            onPaneStateChange={setPlayerState}
+          />
+          <BygramAudioPlayer
+            isCompact
+            onPaneStateChange={setBygramPlayerState}
+          />
+        </>
       )}
       {!noBanners && (
         <>

@@ -78,20 +78,30 @@ export async function scSearch(query: string, limit = 40): Promise<{
 }
 
 export async function scHomeTracks(limit = 20): Promise<{ daily: BygramMusicTrack[]; wave: BygramMusicTrack[] }> {
-  // One charts request only — related/wave used to double the relay latency on first paint.
   const charts = await scApiGet('/charts', {
     kind: 'trending',
     genre: 'soundcloud:genres:all-music',
-    limit: String(limit),
+    limit: String(Math.max(limit * 2, 40)),
     linked_partitioning: '1',
   });
-  const daily = rankTracks(
+  const ranked = diversifyArtists(rankTracks(
     (charts.collection || [])
       .map((entry: { track?: unknown }) => mapTrack(entry.track || entry))
       .filter(Boolean) as MappedTrack[],
-  ).slice(0, 20);
+  ), Math.max(limit * 2, 40));
 
-  return { daily, wave: daily };
+  const daily = ranked.slice(0, limit);
+  const dailyIds = new Set(daily.map((track) => track.id));
+  // Shifted/reversed pool so "Моя волна" is not a clone of "Плейлист дня".
+  const wave = diversifyArtists(
+    [...ranked.slice(Math.floor(limit / 2)), ...ranked].filter((track) => !dailyIds.has(track.id)),
+    40,
+  );
+
+  return {
+    daily,
+    wave: wave.length >= 8 ? wave : diversifyArtists([...ranked].reverse(), 40),
+  };
 }
 
 export async function scRelatedTracks(trackId: string, limit = 40): Promise<BygramMusicTrack[]> {
@@ -502,6 +512,33 @@ function tokenizeQuery(value: string) {
 
 function dedupeTracks(tracks: BygramMusicTrack[]) {
   return tracks.filter((track, index, list) => list.findIndex((item) => item.id === track.id) === index);
+}
+
+function diversifyArtists(tracks: BygramMusicTrack[], limit: number) {
+  const selected: BygramMusicTrack[] = [];
+  const artistCounts = new Map<string, number>();
+  let lastArtist = '';
+
+  const tryPush = (track: BygramMusicTrack, enforceSpacing: boolean, artistLimit: number) => {
+    const artistKey = normalize(track.artist) || track.id;
+    if (selected.some((item) => item.id === track.id)) return false;
+    if (enforceSpacing && artistKey === lastArtist) return false;
+    if ((artistCounts.get(artistKey) || 0) >= artistLimit) return false;
+    selected.push(track);
+    artistCounts.set(artistKey, (artistCounts.get(artistKey) || 0) + 1);
+    lastArtist = artistKey;
+    return true;
+  };
+
+  tracks.forEach((track) => {
+    if (selected.length >= limit) return;
+    tryPush(track, true, 2);
+  });
+  tracks.forEach((track) => {
+    if (selected.length >= limit) return;
+    tryPush(track, false, 3);
+  });
+  return selected.slice(0, limit);
 }
 
 function dedupeAlbums(albums: BygramMusicAlbum[]) {

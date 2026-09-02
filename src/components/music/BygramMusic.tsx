@@ -56,6 +56,7 @@ function BygramMusic() {
   const [notice, setNotice] = useState<string>();
   const [error, setError] = useState<string>();
   const [pendingShare, setPendingShare] = useState<{ track: BygramMusicTrack; attachment: ApiAttachment }>();
+  const [pendingPlaylistShareUrl, setPendingPlaylistShareUrl] = useState<string>();
   const searchRequestIdRef = useRef(0);
 
   const applyHome = useLastCallback((nextHome: BygramMusicHome) => {
@@ -238,18 +239,38 @@ function BygramMusic() {
       const shared = await bygramMusicApi.shareMusicPlaylist(playlist.id);
       const url = new URL(window.location.href);
       url.searchParams.set('bygramPlaylist', shared.shareCode);
-      const shareData = { title: shared.name, text: `Плейлист «${shared.name}» в ByGram`, url: url.toString() };
+      const shareUrl = url.toString();
+      const shareData = {
+        title: shared.name,
+        text: `Плейлист «${shared.name}» в bygram`,
+        url: shareUrl,
+      };
       if (navigator.share) {
-        await navigator.share(shareData);
-      } else {
-        copyTextToClipboard(url.toString());
-        setNotice('Ссылка на плейлист скопирована');
+        try {
+          await navigator.share(shareData);
+          setSelectedPlaylist(shared);
+          await loadHome();
+          return;
+        } catch (shareError) {
+          if ((shareError as Error).name === 'AbortError') return;
+        }
       }
+      setPendingPlaylistShareUrl(shareUrl);
       setSelectedPlaylist(shared);
       await loadHome();
-    } catch (shareError) {
-      if ((shareError as Error).name !== 'AbortError') setError('Не удалось поделиться плейлистом');
+    } catch {
+      setError('Не удалось поделиться плейлистом');
     }
+  });
+
+  const sendSharedPlaylistLink = useLastCallback((chatId: string, threadId = MAIN_THREAD_ID) => {
+    if (!pendingPlaylistShareUrl) return;
+    sendMessage({
+      messageList: { chatId, threadId, type: 'thread' },
+      text: `🎵 Плейлист в bygram\n${pendingPlaylistShareUrl}`,
+    });
+    setNotice('Ссылка на плейлист отправляется');
+    setPendingPlaylistShareUrl(undefined);
   });
 
   const saveSharedPlaylist = useLastCallback(async (playlist: BygramMusicPlaylist) => {
@@ -438,6 +459,7 @@ function BygramMusic() {
               playlists={home?.playlists || []}
               onCreate={() => setIsCreatePlaylistOpen(true)}
               onOpen={setSelectedPlaylist}
+              onShare={sharePlaylist}
             />
           )
         ) : isHomeLoading && !home ? (
@@ -554,6 +576,19 @@ function BygramMusic() {
         onSelectRecipient={sendSharedTrack}
         onClose={() => setPendingShare(undefined)}
       />
+      <RecipientPicker
+        isOpen={Boolean(pendingPlaylistShareUrl)}
+        title="Отправить плейлист"
+        searchPlaceholder="Поиск чатов"
+        onSelectRecipient={sendSharedPlaylistLink}
+        onClose={() => {
+          if (pendingPlaylistShareUrl) {
+            copyTextToClipboard(pendingPlaylistShareUrl);
+            setNotice('Ссылка на плейлист скопирована');
+          }
+          setPendingPlaylistShareUrl(undefined);
+        }}
+      />
     </main>
   );
 }
@@ -571,62 +606,70 @@ function MiniPlayer({
   const track = player.track!;
   return (
     <section className={styles.miniPlayer}>
-      <button type="button" className={styles.miniMain} onClick={() => bygramMusicPlayer.toggle()}>
-        <TrackArtwork track={track} />
-        <span className={styles.meta}>
-          <strong>{track.title}</strong>
-          <span>{track.artist}</span>
-        </span>
-      </button>
-      <div className={styles.miniControls}>
-        <Button
-          round
-          color="translucent"
-          size="smaller"
-          iconName={isLiked ? 'heart' : 'heart-outline'}
-          ariaLabel="Избранное"
-          onClick={() => onToggleLike(track)}
-        />
-        <Button
-          round
-          color="translucent"
-          size="smaller"
-          iconName="add"
-          ariaLabel="В плейлист"
-          onClick={() => onAddToPlaylist(track)}
-        />
-        <Button
-          round
-          color="translucent"
-          size="smaller"
-          iconName="diamond"
-          ariaLabel="Волна"
-          isLoading={isWaveLoading}
-          onClick={() => onStartWave(track)}
-        />
-        <Button
-          round
-          color="translucent"
-          size="smaller"
-          iconName="skip-previous"
-          ariaLabel="Назад"
-          onClick={() => void bygramMusicPlayer.previous()}
-        />
-        <Button
-          round
-          ariaLabel={player.isPlaying ? 'Пауза' : 'Играть'}
-          onClick={() => bygramMusicPlayer.toggle()}
-        >
-          {player.isLoading ? <Spinner /> : <Icon name={player.isPlaying ? 'pause' : 'play'} />}
-        </Button>
-        <Button
-          round
-          color="translucent"
-          size="smaller"
-          iconName="skip-next"
-          ariaLabel="Далее"
-          onClick={() => void bygramMusicPlayer.next()}
-        />
+      <div className={styles.miniRow}>
+        <button type="button" className={styles.miniMain} onClick={() => bygramMusicPlayer.toggle()}>
+          <TrackArtwork track={track} />
+          <span className={styles.meta}>
+            <strong>{track.title}</strong>
+            <span>{track.artist}</span>
+          </span>
+        </button>
+        <div className={styles.miniControls}>
+          <Button
+            className={styles.miniBtn}
+            round
+            color="translucent"
+            size="smaller"
+            iconName={isLiked ? 'heart' : 'heart-outline'}
+            ariaLabel="Избранное"
+            onClick={() => onToggleLike(track)}
+          />
+          <Button
+            className={styles.miniBtn}
+            round
+            color="translucent"
+            size="smaller"
+            iconName="add"
+            ariaLabel="В плейлист"
+            onClick={() => onAddToPlaylist(track)}
+          />
+          <Button
+            className={styles.miniBtn}
+            round
+            color="translucent"
+            size="smaller"
+            iconName="diamond"
+            ariaLabel="Волна"
+            isLoading={isWaveLoading}
+            onClick={() => onStartWave(track)}
+          />
+          <Button
+            className={styles.miniBtn}
+            round
+            color="translucent"
+            size="smaller"
+            iconName="skip-previous"
+            ariaLabel="Назад"
+            onClick={() => void bygramMusicPlayer.previous()}
+          />
+          <Button
+            className={`${styles.miniBtn} ${styles.miniPlay}`}
+            round
+            ariaLabel={player.isPlaying ? 'Пауза' : 'Играть'}
+            onClick={() => bygramMusicPlayer.toggle()}
+          >
+            {player.isLoading ? <Spinner /> : <Icon name={player.isPlaying ? 'pause' : 'play'} />}
+          </Button>
+          <Button
+            className={styles.miniBtn}
+            round
+            color="translucent"
+            size="smaller"
+            iconName="skip-next"
+            ariaLabel="Далее"
+            onClick={() => void bygramMusicPlayer.next()}
+          />
+        </div>
       </div>
       <input
         className={styles.miniProgress}
@@ -642,10 +685,11 @@ function MiniPlayer({
   );
 }
 
-function PlaylistLibrary({ playlists, onCreate, onOpen }: {
+function PlaylistLibrary({ playlists, onCreate, onOpen, onShare }: {
   playlists: BygramMusicPlaylist[];
   onCreate: NoneToVoidFunction;
   onOpen: (playlist: BygramMusicPlaylist) => void;
+  onShare: (playlist: BygramMusicPlaylist) => void;
 }) {
   return (
     <section className={styles.library}>
@@ -656,11 +700,24 @@ function PlaylistLibrary({ playlists, onCreate, onOpen }: {
       {playlists.length ? (
         <div className={styles.playlistGrid}>
           {playlists.map((playlist) => (
-            <button key={playlist.id} type="button" className={styles.playlistCard} onClick={() => onOpen(playlist)}>
-              <PlaylistCover playlist={playlist} />
-              <strong>{playlist.name}</strong>
-              <span>{`${playlist.tracks.length} треков`}</span>
-            </button>
+            <div key={playlist.id} className={styles.playlistCard}>
+              <button type="button" className={styles.playlistCardMain} onClick={() => onOpen(playlist)}>
+                <PlaylistCover playlist={playlist} />
+                <strong>{playlist.name}</strong>
+                <span>{`${playlist.tracks.length} треков`}</span>
+              </button>
+              {playlist.isOwn && (
+                <Button
+                  className={styles.playlistShare}
+                  round
+                  color="translucent"
+                  size="tiny"
+                  iconName="share-filled"
+                  ariaLabel="Поделиться плейлистом"
+                  onClick={() => onShare(playlist)}
+                />
+              )}
+            </div>
           ))}
         </div>
       ) : <EmptyState title="Пока пусто" text="Создайте плейлист или добавьте трек из поиска" />}
