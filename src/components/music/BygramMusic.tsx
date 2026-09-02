@@ -271,12 +271,12 @@ function BygramMusic() {
   }, [home]);
 
   return (
-    <main id="MiddleColumn" className={`${styles.root} ui-ready`}>
+    <main id="BygramMusic" className={styles.root}>
       <header className={styles.header}>
         <Button round color="translucent" iconName="arrow-left" ariaLabel="Назад к чатам" onClick={close} />
         <div className={styles.heading}>
           <strong className={styles.headingTitle}>Музыка</strong>
-          <span className={styles.headingSubtitle}>ByGram Music</span>
+          <span className={styles.headingSubtitle}>bygram</span>
         </div>
         <div className={styles.search}>
           <SearchInput

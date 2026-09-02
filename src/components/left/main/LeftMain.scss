@@ -12,6 +12,13 @@
   > .Transition {
     overflow: hidden;
     flex: 1;
+    min-height: 0;
+
+    > .Transition_slide {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
   }
 
   .ChatFolders {
