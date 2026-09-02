@@ -28,20 +28,34 @@ let clientIdRefreshInflight: Promise<void> | undefined;
  * Metadata goes through public CORS relays raced in parallel; audio plays directly from sndcdn.
  */
 export async function scSearchTracks(query: string, limit = 40): Promise<BygramMusicTrack[]> {
-  const payload = await scApiGet('/search/tracks', {
-    q: query,
-    limit: String(Math.min(Math.max(limit, 24), 50)),
-    linked_partitioning: '1',
-  });
-  return rankTracks(
-    (payload.collection || []).map(mapTrack).filter(Boolean) as MappedTrack[],
-    query,
-  ).slice(0, limit);
+  const variants = searchQueryVariants(query);
+  let lastError: Error | undefined;
+
+  for (const variant of variants) {
+    try {
+      const payload = await scApiGet('/search/tracks', {
+        q: variant,
+        limit: String(Math.min(Math.max(limit, 24), 50)),
+        linked_partitioning: '1',
+      });
+      const mapped = rankTracks(
+        (payload.collection || []).map(mapTrack).filter(Boolean) as MappedTrack[],
+        query,
+      );
+      if (mapped.length) return mapped.slice(0, limit);
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+    }
+  }
+
+  if (lastError) throw lastError;
+  return [];
 }
 
 export async function scSearchAlbums(query: string, limit = 12): Promise<BygramMusicAlbum[]> {
+  const variant = searchQueryVariants(query)[0] || query;
   const payload = await scApiGet('/search/playlists', {
-    q: query,
+    q: variant,
     limit: String(Math.min(limit, 16)),
     linked_partitioning: '1',
   });
@@ -55,10 +69,9 @@ export async function scSearch(query: string, limit = 40): Promise<{
   tracks: BygramMusicTrack[];
   albums: BygramMusicAlbum[];
 }> {
-  const [tracks, albums] = await Promise.all([
-    scSearchTracks(query, limit),
-    scSearchAlbums(query, 12).catch(() => [] as BygramMusicAlbum[]),
-  ]);
+  // Tracks first — album/playlist search used to compete for the same flaky relays.
+  const tracks = await scSearchTracks(query, limit);
+  const albums = await scSearchAlbums(query, 12).catch(() => [] as BygramMusicAlbum[]);
   const derived = groupScAlbums(tracks).filter((album) => album.trackCount >= 2).slice(0, 8);
   const mergedAlbums = dedupeAlbums([...albums, ...derived]).slice(0, 16);
   return { tracks, albums: mergedAlbums };
@@ -235,7 +248,7 @@ function invalidateClientId() {
 }
 
 async function scrapeClientId() {
-  const html = await fetchTextViaRelay(`${SC_ORIGIN}/`);
+  const html = await fetchTextViaRelay(`${SC_ORIGIN}/`, 'text');
   const scriptUrls = [...html.matchAll(/<script[^>]+src=["']([^"']+)["']/g)]
     .map((match) => absolutize(match[1]))
     .filter((url) => url.includes('sndcdn.com') && /\.js(\?|$)/.test(url)
@@ -257,22 +270,28 @@ async function scrapeClientId() {
 }
 
 async function fetchJsonViaRelay(url: string) {
-  const text = await fetchTextViaRelay(url);
-  try {
-    return JSON.parse(text);
-  } catch {
-    throw new Error('RELAY_BAD_JSON');
+  // Relays frequently return HTML error pages with HTTP 200. Require real JSON and retry.
+  let lastError: Error | undefined;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const text = await fetchTextViaRelay(url, 'json');
+      return parseRelayJson(text);
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      // Brief pause before retry — allorigins often recovers after a burst of HTML pages.
+      await new Promise((resolve) => {
+        window.setTimeout(resolve, 250 * (attempt + 1));
+      });
+    }
   }
+  throw lastError || new Error('RELAY_BAD_JSON');
 }
 
-async function fetchTextViaRelay(url: string) {
-  // Race public relays; first valid JSON/body wins.
-  // allorigins /raw is the reliable path (~6–12s). /get is kept as a parallel sibling.
-  const attempts = [
-    fetchAllOriginsRaw(url),
-    fetchAllOriginsGet(url),
-    fetchCodetabs(url),
-  ];
+async function fetchTextViaRelay(url: string, mode: 'json' | 'text' = 'text') {
+  // Race public relays; first valid body wins. Jina is preferred for JSON (fast + stable for RU tracks).
+  const attempts = mode === 'json'
+    ? [fetchJina(url), fetchAllOriginsRaw(url), fetchAllOriginsGet(url), fetchCodetabs(url)]
+    : [fetchAllOriginsRaw(url), fetchAllOriginsGet(url), fetchJina(url), fetchCodetabs(url)];
 
   const errors: string[] = [];
   return new Promise<string>((resolve, reject) => {
@@ -282,8 +301,8 @@ async function fetchTextViaRelay(url: string) {
     attempts.forEach((attempt) => {
       void attempt.then((text) => {
         if (settled) return;
-        if (!looksLikeUsefulBody(text)) {
-          throw new Error('relay_useless_body');
+        if (!looksLikeUsefulBody(text, mode)) {
+          throw new Error(mode === 'json' ? 'relay_not_json' : 'relay_useless_body');
         }
         settled = true;
         resolve(text);
@@ -296,6 +315,24 @@ async function fetchTextViaRelay(url: string) {
       });
     });
   });
+}
+
+async function fetchJina(url: string) {
+  const response = await fetch(`https://r.jina.ai/${url}`, {
+    headers: {
+      Accept: 'application/json',
+      'X-Return-Format': 'json',
+    },
+    signal: AbortSignal.timeout(RELAY_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new Error(`jina_http_${response.status}`);
+  const wrap = await response.json() as {
+    code?: number;
+    data?: { text?: string; content?: string };
+  };
+  const payload = wrap.data?.content || wrap.data?.text;
+  if (typeof payload !== 'string' || !payload.trim()) throw new Error('jina_empty');
+  return payload;
 }
 
 async function fetchAllOriginsRaw(url: string) {
@@ -333,11 +370,28 @@ async function fetchCodetabs(url: string) {
   return text;
 }
 
-function looksLikeUsefulBody(text: string) {
+function parseRelayJson(text: string) {
+  const trimmed = text.trim();
+  if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) {
+    throw new Error('RELAY_BAD_JSON');
+  }
+  const parsed = JSON.parse(trimmed);
+  // Jina wraps upstream JSON as a string in data.text / data.content.
+  if (parsed?.data && (typeof parsed.data.content === 'string' || typeof parsed.data.text === 'string')) {
+    const inner = parsed.data.content || parsed.data.text;
+    return JSON.parse(inner);
+  }
+  return parsed;
+}
+
+function looksLikeUsefulBody(text: string, mode: 'json' | 'text') {
   const trimmed = text.trim();
   if (!trimmed || trimmed.startsWith('Oops...')) return false;
+  if (mode === 'json') {
+    // Never accept HTML/error pages for API payloads — that was dropping RU search hits.
+    return trimmed.startsWith('{') || trimmed.startsWith('[');
+  }
   if (trimmed.startsWith('{') || trimmed.startsWith('[')) return true;
-  // HTML pages from SoundCloud homepage scrape still count.
   if (trimmed.includes('<script') || trimmed.includes('client_id')) return true;
   return trimmed.length > 40;
 }
@@ -345,7 +399,11 @@ function looksLikeUsefulBody(text: string) {
 function mapTrack(raw: any): MappedTrack | undefined {
   if (!raw || (raw.kind && raw.kind !== 'track') || !raw.id || !raw.title) return undefined;
   if (raw.policy === 'BLOCK') return undefined;
-  if (!raw.streamable && raw.policy !== 'ALLOW' && raw.policy !== 'SNIP') return undefined;
+  // MONETIZE is the common policy for popular RU uploads; still streamable via progressive media.
+  const policy = String(raw.policy || '');
+  if (!raw.streamable && policy !== 'ALLOW' && policy !== 'SNIP' && policy !== 'MONETIZE') {
+    return undefined;
+  }
 
   const artist = raw.user?.username || raw.user?.full_name || 'SoundCloud';
   const artwork = pickArtwork(raw.artwork_url) || pickArtwork(raw.user?.avatar_url);
@@ -363,7 +421,7 @@ function mapTrack(raw: any): MappedTrack | undefined {
     ...(artwork ? { artworkUrl: artwork } : {}),
     audioUrl: `sc://${raw.id}`,
     mimeType: 'audio/mpeg',
-    isPreview: raw.policy === 'SNIP',
+    isPreview: policy === 'SNIP',
     playbackCount: Number(raw.playback_count) || 0,
     likesCount: Number(raw.likes_count || raw.favoritings_count) || 0,
   };
@@ -389,21 +447,24 @@ function mapPlaylistAlbum(raw: any): BygramMusicAlbum | undefined {
 
 function rankTracks(tracks: MappedTrack[], query = ''): BygramMusicTrack[] {
   const normalizedQuery = normalize(query);
+  const queryTokens = tokenizeQuery(normalizedQuery);
   const wantsRemix = /\b(remix|mix|cover|nightcore|slowed|sped)\b/i.test(query);
   const scored = tracks.map((track) => {
     const title = normalize(track.title);
     const artist = normalize(track.artist);
-    const haystack = `${title} ${artist}`;
+    const haystack = `${title} ${artist}`.replace(/[-_/|]+/g, ' ');
+    const compactHaystack = haystack.replace(/\s+/g, '');
     let score = (track.likesCount || 0) * 3 + (track.playbackCount || 0);
     if (track.isPreview) score -= 1_000_000;
     if (!wantsRemix && /\b(remix|nightcore|slowed|sped up|8d audio|cover)\b/i.test(track.title)) {
       score -= 500_000;
     }
     if (normalizedQuery) {
+      const compactQuery = normalizedQuery.replace(/[^a-z0-9а-яё]+/gi, '');
       if (title === normalizedQuery || artist === normalizedQuery) score += 2_000_000;
-      if (haystack.includes(normalizedQuery)) score += 800_000;
-      normalizedQuery.split(/\s+/).filter(Boolean).forEach((token) => {
-        if (haystack.includes(token)) score += 50_000;
+      if (haystack.includes(normalizedQuery) || compactHaystack.includes(compactQuery)) score += 800_000;
+      queryTokens.forEach((token) => {
+        if (haystack.includes(token) || compactHaystack.includes(token)) score += 50_000;
       });
     }
     return { track, score };
@@ -418,6 +479,25 @@ function rankTracks(tracks: MappedTrack[], query = ''): BygramMusicTrack[] {
       return clean;
     })
     .filter((track, index, list) => list.findIndex((item) => item.id === track.id) === index);
+}
+
+function searchQueryVariants(query: string) {
+  const raw = String(query || '').trim();
+  const cleaned = raw
+    .replace(/[–—−]/g, ' ')
+    .replace(/[-_/|,]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const noPunctuation = cleaned.replace(/[^\p{L}\p{N}\s]+/gu, ' ').replace(/\s+/g, ' ').trim();
+  return Array.from(new Set([raw, cleaned, noPunctuation].filter(Boolean)));
+}
+
+function tokenizeQuery(value: string) {
+  return value
+    .replace(/[–—−_-]+/g, ' ')
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter((token) => token.length > 1);
 }
 
 function dedupeTracks(tracks: BygramMusicTrack[]) {

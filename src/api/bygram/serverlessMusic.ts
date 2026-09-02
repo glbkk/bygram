@@ -145,19 +145,26 @@ class BygramServerlessMusic {
   }
 
   async searchMusic(query: string): Promise<BygramMusicSearch> {
-    const normalized = normalize(query);
+    const trimmed = query.trim();
+    const normalized = normalize(trimmed);
     if (!normalized) return { tracks: [], albums: [] };
 
     const cached = readSearchCache(normalized);
     if (cached?.tracks.length) {
-      // Refresh in background so repeated searches stay fresh without blocking.
       if (!isSearchCacheFresh(normalized)) {
-        void refreshSearchCache(query.trim(), normalized);
+        void refreshSearchCache(trimmed, normalized);
       }
       return cached;
     }
 
-    const remote = await scSearch(query.trim(), 40).catch(() => undefined);
+    let remote: BygramMusicSearch | undefined;
+    let remoteFailed = false;
+    try {
+      remote = await scSearch(trimmed, 40);
+    } catch {
+      remoteFailed = true;
+    }
+
     if (remote?.tracks.length) {
       cacheTracks(remote.tracks);
       remote.albums.forEach((album) => cacheTracks(album.tracks));
@@ -169,7 +176,13 @@ class BygramServerlessMusic {
     const found = tracks.filter((track) => normalize(
       `${track.title} ${track.artist} ${track.album || ''} ${track.genre || ''}`,
     ).includes(normalized));
-    return { tracks: found.slice(0, 40), albums: groupAlbums(found).slice(0, 20) };
+    if (found.length) {
+      return { tracks: found.slice(0, 40), albums: groupAlbums(found).slice(0, 20) };
+    }
+
+    // Don't pretend "nothing found" when SoundCloud relays failed — UI should retry.
+    if (remoteFailed) throw new Error('SEARCH_UNAVAILABLE');
+    return { tracks: [], albums: [] };
   }
 
   async getMusicAlbum(albumId: string) {
@@ -576,7 +589,14 @@ function hash(value: string) {
 }
 
 function normalize(value: string) {
-  return value.toLocaleLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').trim();
+  return value
+    .toLocaleLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[–—−]/g, ' ')
+    .replace(/[-_/|,]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function resolveAssetUrl(path: string) {
