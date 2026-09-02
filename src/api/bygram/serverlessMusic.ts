@@ -12,9 +12,10 @@ import type {
 import {
   groupScAlbums,
   scHomeTracks,
+  scPlaylistTracks,
   scRelatedTracks,
   scResolveStream,
-  scSearchTracks,
+  scSearch,
   scTracksByIds,
 } from './soundcloudBrowser';
 
@@ -28,53 +29,140 @@ type MusicState = {
 
 const STATE_KEY = 'bygram-serverless-music-v1';
 const TRACK_CACHE_KEY = 'bygram-sc-track-cache-v1';
+const HOME_CACHE_KEY = 'bygram-sc-home-cache-v1';
+const SEARCH_CACHE_KEY = 'bygram-sc-search-cache-v1';
+const SEARCH_CACHE_TTL_MS = 20 * 60 * 1000;
 const CATALOG_PATH = 'bygram-music/catalog.json';
 const MAX_RECENT = 40;
 const MAX_TRACK_CACHE = 500;
+const MAX_SEARCH_CACHE = 40;
 let catalogPromise: Promise<BygramMusicTrack[]> | undefined;
+let homeInflight: Promise<BygramMusicHome> | undefined;
+
+type HomeCache = {
+  fetchedAt: number;
+  daily: BygramMusicTrack[];
+  wave: BygramMusicTrack[];
+};
 
 class BygramServerlessMusic {
   ensureSession() {
     return Promise.resolve(undefined);
   }
 
-  async getMusicHome(): Promise<BygramMusicHome> {
+  /** Instant paint from local cache — never waits on SoundCloud relays. */
+  getCachedMusicHome(): BygramMusicHome | undefined {
     const state = loadState();
-    const remote = await scHomeTracks().catch(() => undefined);
-    const catalog = remote ? [] : await loadCatalog().catch(() => [] as BygramMusicTrack[]);
-    const daily = remote?.daily?.length ? remote.daily : deterministicOrder(catalog, getDateSeed()).slice(0, 20);
-    cacheTracks(daily);
+    const cached = readHomeCache();
+    const favorites = resolveTracksSync(state.likedIds);
+    const recent = resolveTracksSync(state.recentIds);
+    const playlists = state.playlists.map((playlist) => hydratePlaylistSync(playlist));
 
-    const favorites = await resolveTracks(state.likedIds);
-    const recent = await resolveTracks(state.recentIds);
-    cacheTracks([...favorites, ...recent]);
-
-    const wave = remote?.wave?.length
-      ? remote.wave
-      : buildWave(catalog.length ? catalog : daily, favorites, recent, state.playCounts).slice(0, 40);
-    cacheTracks(wave);
+    if (!cached?.daily.length && !favorites.length && !recent.length && !playlists.length) {
+      return undefined;
+    }
 
     return {
-      daily,
-      wave,
+      daily: cached?.daily || [],
+      wave: cached?.wave.length ? cached.wave : (cached?.daily || []),
       recent,
       favorites,
-      playlists: await Promise.all(state.playlists.map((playlist) => hydratePlaylist(playlist))),
-      librarySize: remote?.daily.length || catalog.length || daily.length,
+      playlists,
+      librarySize: cached?.daily.length || favorites.length || recent.length,
     };
+  }
+
+  async getMusicHome(): Promise<BygramMusicHome> {
+    if (homeInflight) return homeInflight;
+
+    homeInflight = (async () => {
+      const state = loadState();
+      const cached = readHomeCache();
+      const catalogPromiseLocal = loadCatalog().catch(() => [] as BygramMusicTrack[]);
+
+      // Soft deadline: keep showing cache/catalog instead of blocking on slow relays.
+      const remote = await Promise.race([
+        scHomeTracks().catch(() => undefined),
+        new Promise<undefined>((resolve) => {
+          window.setTimeout(() => resolve(undefined), cached?.daily.length ? 900 : 2500);
+        }),
+      ]);
+
+      // If Soft deadline missed, still let charts finish in the background for next open.
+      if (!remote?.daily?.length) {
+        void scHomeTracks()
+          .then((fresh) => {
+            if (fresh?.daily?.length) {
+              writeHomeCache({ daily: fresh.daily, wave: fresh.wave || fresh.daily });
+              cacheTracks([...fresh.daily, ...(fresh.wave || [])]);
+            }
+          })
+          .catch(() => undefined);
+      }
+
+      const catalog = remote?.daily?.length
+        ? []
+        : (cached?.daily.length ? [] : await catalogPromiseLocal);
+
+      const daily = remote?.daily?.length
+        ? remote.daily
+        : (cached?.daily.length
+          ? cached.daily
+          : deterministicOrder(catalog, getDateSeed()).slice(0, 20));
+      cacheTracks(daily);
+      if (remote?.daily?.length) {
+        writeHomeCache({ daily: remote.daily, wave: remote.wave || remote.daily });
+      }
+
+      const favorites = await resolveTracks(state.likedIds);
+      const recent = await resolveTracks(state.recentIds);
+      cacheTracks([...favorites, ...recent]);
+
+      const wave = remote?.wave?.length
+        ? remote.wave
+        : (cached?.wave.length
+          ? cached.wave
+          : buildWave(catalog.length ? catalog : daily, favorites, recent, state.playCounts).slice(0, 40));
+      cacheTracks(wave);
+
+      return {
+        daily,
+        wave,
+        recent,
+        favorites,
+        playlists: await Promise.all(state.playlists.map((playlist) => hydratePlaylist(playlist))),
+        librarySize: daily.length || catalog.length,
+      };
+    })().finally(() => {
+      homeInflight = undefined;
+    });
+
+    return homeInflight;
+  }
+
+  getCachedMusicSearch(query: string): BygramMusicSearch | undefined {
+    return readSearchCache(normalize(query));
   }
 
   async searchMusic(query: string): Promise<BygramMusicSearch> {
     const normalized = normalize(query);
     if (!normalized) return { tracks: [], albums: [] };
 
-    const remoteTracks = await scSearchTracks(query.trim(), 40).catch(() => undefined);
-    if (remoteTracks?.length) {
-      cacheTracks(remoteTracks);
-      return {
-        tracks: remoteTracks.slice(0, 40),
-        albums: groupScAlbums(remoteTracks).slice(0, 20),
-      };
+    const cached = readSearchCache(normalized);
+    if (cached?.tracks.length) {
+      // Refresh in background so repeated searches stay fresh without blocking.
+      if (!isSearchCacheFresh(normalized)) {
+        void refreshSearchCache(query.trim(), normalized);
+      }
+      return cached;
+    }
+
+    const remote = await scSearch(query.trim(), 40).catch(() => undefined);
+    if (remote?.tracks.length) {
+      cacheTracks(remote.tracks);
+      remote.albums.forEach((album) => cacheTracks(album.tracks));
+      writeSearchCache(normalized, remote);
+      return remote;
     }
 
     const tracks = await loadCatalog().catch(() => [] as BygramMusicTrack[]);
@@ -85,6 +173,13 @@ class BygramServerlessMusic {
   }
 
   async getMusicAlbum(albumId: string) {
+    if (albumId.startsWith('sc-playlist:')) {
+      const remote = await scPlaylistTracks(albumId).catch(() => undefined);
+      if (remote) {
+        cacheTracks(remote.tracks);
+        return remote;
+      }
+    }
     if (albumId.startsWith('sc-album:')) {
       return groupScAlbums(Object.values(loadTrackCache())).find(({ id }) => id === albumId);
     }
@@ -328,6 +423,97 @@ function cacheTracks(tracks: BygramMusicTrack[]) {
     });
   }
   localStorage.setItem(TRACK_CACHE_KEY, JSON.stringify(cache));
+}
+
+function resolveTracksSync(ids: string[]) {
+  const cache = loadTrackCache();
+  return ids.map((id) => cache[id]).filter(Boolean);
+}
+
+function hydratePlaylistSync(playlist: StoredPlaylist): BygramMusicPlaylist {
+  const tracks = resolveTracksSync(playlist.trackIds);
+  return {
+    ...playlist,
+    type: 'custom',
+    ownerTelegramUserId: getGlobal().currentUserId || '',
+    trackIds: [...playlist.trackIds],
+    tracks,
+    isOwn: true,
+  };
+}
+
+function readHomeCache(): HomeCache | undefined {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(HOME_CACHE_KEY) || '') as HomeCache;
+    if (!parsed?.daily?.length) return undefined;
+    return parsed; // stale-while-revalidate: always paint, refresh in background
+  } catch {
+    return undefined;
+  }
+}
+
+function writeHomeCache(value: Omit<HomeCache, 'fetchedAt'>) {
+  try {
+    localStorage.setItem(HOME_CACHE_KEY, JSON.stringify({
+      fetchedAt: Date.now(),
+      daily: value.daily,
+      wave: value.wave,
+    } satisfies HomeCache));
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
+type SearchCacheStore = Record<string, { fetchedAt: number; result: BygramMusicSearch }>;
+
+function readSearchCache(normalizedQuery: string): BygramMusicSearch | undefined {
+  if (!normalizedQuery) return undefined;
+  try {
+    const store = JSON.parse(localStorage.getItem(SEARCH_CACHE_KEY) || '{}') as SearchCacheStore;
+    const entry = store[normalizedQuery];
+    if (!entry?.result?.tracks?.length) return undefined;
+    return entry.result;
+  } catch {
+    return undefined;
+  }
+}
+
+function isSearchCacheFresh(normalizedQuery: string) {
+  try {
+    const store = JSON.parse(localStorage.getItem(SEARCH_CACHE_KEY) || '{}') as SearchCacheStore;
+    const entry = store[normalizedQuery];
+    return Boolean(entry && Date.now() - entry.fetchedAt < SEARCH_CACHE_TTL_MS);
+  } catch {
+    return false;
+  }
+}
+
+function writeSearchCache(normalizedQuery: string, result: BygramMusicSearch) {
+  if (!normalizedQuery || !result.tracks.length) return;
+  try {
+    const store = JSON.parse(localStorage.getItem(SEARCH_CACHE_KEY) || '{}') as SearchCacheStore;
+    store[normalizedQuery] = { fetchedAt: Date.now(), result };
+    const keys = Object.keys(store);
+    if (keys.length > MAX_SEARCH_CACHE) {
+      keys
+        .sort((first, second) => (store[first].fetchedAt || 0) - (store[second].fetchedAt || 0))
+        .slice(0, keys.length - MAX_SEARCH_CACHE)
+        .forEach((key) => {
+          delete store[key];
+        });
+    }
+    localStorage.setItem(SEARCH_CACHE_KEY, JSON.stringify(store));
+  } catch {
+    // ignore
+  }
+}
+
+async function refreshSearchCache(query: string, normalizedQuery: string) {
+  const remote = await scSearch(query, 40).catch(() => undefined);
+  if (!remote?.tracks.length) return;
+  cacheTracks(remote.tracks);
+  remote.albums.forEach((album) => cacheTracks(album.tracks));
+  writeSearchCache(normalizedQuery, remote);
 }
 
 function rememberPlayed(trackId: string) {

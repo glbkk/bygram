@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useState } from '@teact';
+import { memo, useEffect, useMemo, useRef, useState } from '../../lib/teact/teact';
 import { getActions } from '../../global';
 
 import type { BygramMusicQueueSource } from '../../api/bygram/musicPlayer';
@@ -6,6 +6,7 @@ import type {
   BygramMusicAlbum, BygramMusicHome, BygramMusicPlaylist, BygramMusicSearch, BygramMusicTrack,
 } from '../../api/bygram/musicTypes';
 import type { ApiAttachment } from '../../api/types';
+import type { MenuItemContextAction } from '../ui/ListItem';
 import { MAIN_THREAD_ID } from '../../api/types';
 import { LeftColumnContent } from '../../types';
 
@@ -15,12 +16,14 @@ import { bygramMusicApi } from '../../api/bygram/serverlessMusic';
 import buildAttachment from '../middle/composer/helpers/buildAttachment';
 
 import useBygramMusicPlayer from '../../hooks/useBygramMusicPlayer';
+import useDebouncedCallback from '../../hooks/useDebouncedCallback';
 import useLastCallback from '../../hooks/useLastCallback';
 
 import Icon from '../common/icons/Icon';
 import RecipientPicker from '../common/RecipientPicker';
 import Button from '../ui/Button';
 import InputText from '../ui/InputText';
+import ListItem from '../ui/ListItem';
 import Modal from '../ui/Modal';
 import SearchInput from '../ui/SearchInput';
 import Spinner from '../ui/Spinner';
@@ -33,14 +36,17 @@ type PlayerState = ReturnType<typeof useBygramMusicPlayer>;
 function BygramMusic() {
   const { openLeftColumnContent, sendMessage } = getActions();
   const player = useBygramMusicPlayer();
-  const [home, setHome] = useState<BygramMusicHome>();
+  const [home, setHome] = useState<BygramMusicHome | undefined>(() => bygramMusicApi.getCachedMusicHome());
+  const [isHomeLoading, setIsHomeLoading] = useState(() => !bygramMusicApi.getCachedMusicHome());
   const [view, setView] = useState<MusicView>('discover');
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<BygramMusicSearch>();
   const [isSearching, setIsSearching] = useState(false);
   const [isTrackWaveLoading, setIsTrackWaveLoading] = useState(false);
   const [isAlbumLoading, setIsAlbumLoading] = useState(false);
-  const [likedIds, setLikedIds] = useState<Set<string>>(() => new Set());
+  const [likedIds, setLikedIds] = useState<Set<string>>(() => new Set(
+    bygramMusicApi.getCachedMusicHome()?.favorites.map((track) => track.id) || [],
+  ));
   const [selectedPlaylist, setSelectedPlaylist] = useState<BygramMusicPlaylist>();
   const [selectedAlbum, setSelectedAlbum] = useState<BygramMusicAlbum>();
   const [isCreatePlaylistOpen, setIsCreatePlaylistOpen] = useState(false);
@@ -50,21 +56,28 @@ function BygramMusic() {
   const [notice, setNotice] = useState<string>();
   const [error, setError] = useState<string>();
   const [pendingShare, setPendingShare] = useState<{ track: BygramMusicTrack; attachment: ApiAttachment }>();
+  const searchRequestIdRef = useRef(0);
+
+  const applyHome = useLastCallback((nextHome: BygramMusicHome) => {
+    setHome(nextHome);
+    const nextLikedIds = new Set(nextHome.favorites.map((track) => track.id));
+    setLikedIds(nextLikedIds);
+    bygramMusicPlayer.syncLikedIds(nextLikedIds);
+    setSelectedPlaylist((current) => current?.isOwn
+      ? nextHome.playlists.find((playlist) => playlist.id === current.id) || current
+      : current);
+  });
 
   const loadHome = useLastCallback(async () => {
     try {
       await bygramMusicApi.ensureSession();
       const nextHome = await bygramMusicApi.getMusicHome();
-      setHome(nextHome);
-      const nextLikedIds = new Set(nextHome.favorites.map((track) => track.id));
-      setLikedIds(nextLikedIds);
-      bygramMusicPlayer.syncLikedIds(nextLikedIds);
-      setSelectedPlaylist((current) => current?.isOwn
-        ? nextHome.playlists.find((playlist) => playlist.id === current.id) || current
-        : current);
+      applyHome(nextHome);
       setError(undefined);
     } catch {
-      setError('Не удалось открыть музыку. Проверьте сеть и попробуйте снова');
+      if (!home) setError('Не удалось открыть музыку. Проверьте сеть и попробуйте снова');
+    } finally {
+      setIsHomeLoading(false);
     }
   });
 
@@ -84,18 +97,52 @@ function BygramMusic() {
     openLeftColumnContent({ contentKey: LeftColumnContent.ChatList });
   });
 
-  const search = useLastCallback(async () => {
-    if (query.trim().length < 2) return;
-    setIsSearching(true);
+  const runSearch = useLastCallback(async (rawQuery: string) => {
+    const trimmed = rawQuery.trim();
+    if (trimmed.length < 2) {
+      setSearchResults(undefined);
+      setIsSearching(false);
+      return;
+    }
+
+    const requestId = ++searchRequestIdRef.current;
+    const cached = bygramMusicApi.getCachedMusicSearch(trimmed);
+    if (cached?.tracks.length) {
+      setSelectedAlbum(undefined);
+      setSearchResults(cached);
+      setIsSearching(false);
+    } else {
+      setIsSearching(true);
+    }
+
     setError(undefined);
     try {
+      const results = await bygramMusicApi.searchMusic(trimmed);
+      if (requestId !== searchRequestIdRef.current) return;
       setSelectedAlbum(undefined);
-      setSearchResults(await bygramMusicApi.searchMusic(query.trim()));
+      setSearchResults(results);
     } catch {
-      setError('Не удалось найти треки в SoundCloud');
+      if (requestId !== searchRequestIdRef.current) return;
+      if (!cached?.tracks.length) setError('Не удалось найти треки. Попробуйте ещё раз');
     } finally {
-      setIsSearching(false);
+      if (requestId === searchRequestIdRef.current) setIsSearching(false);
     }
+  });
+
+  const debouncedSearch = useDebouncedCallback((value: string) => {
+    void runSearch(value);
+  }, [runSearch], 350, true);
+
+  const handleQueryChange = useLastCallback((value: string) => {
+    setQuery(value);
+    if (value.trim().length < 2) {
+      searchRequestIdRef.current += 1;
+      setSearchResults(undefined);
+      setSelectedAlbum(undefined);
+      setIsSearching(false);
+      return;
+    }
+    debouncedSearch(value);
   });
 
   const playTrack = useLastCallback((
@@ -107,14 +154,18 @@ function BygramMusic() {
   });
 
   const openAlbum = useLastCallback(async (album: BygramMusicAlbum) => {
-    if (album.tracks.length) {
+    if (album.tracks.length && !album.id.startsWith('sc-playlist:')) {
       setSelectedAlbum(album);
       return;
+    }
+    if (album.tracks.length && album.id.startsWith('sc-playlist:')) {
+      setSelectedAlbum(album);
     }
     setIsAlbumLoading(true);
     setError(undefined);
     try {
-      setSelectedAlbum(await bygramMusicApi.getMusicAlbum(album.id));
+      const resolved = await bygramMusicApi.getMusicAlbum(album.id);
+      setSelectedAlbum(resolved || album);
     } catch {
       setError('Не удалось загрузить треки альбома');
     } finally {
@@ -218,7 +269,7 @@ function BygramMusic() {
 
   const shareTrack = useLastCallback(async (track: BygramMusicTrack) => {
     try {
-      setNotice('Подготавливаем трек для отправки…');
+      setNotice('Подготавливаем трек…');
       await bygramMusicApi.ensureSession();
       const file = await bygramMusicApi.downloadMusicTrack(track);
       const attachment = await buildAttachment(file.name, file);
@@ -236,9 +287,9 @@ function BygramMusic() {
       const wave = await bygramMusicApi.getMusicTrackWave(track.id);
       bygramMusicPlayer.replaceQueue('track-wave', wave);
       if (!player.isPlaying) bygramMusicPlayer.toggle();
-      setNotice(`Волна построена по треку «${track.title}»`);
+      setNotice(`Волна по «${track.title}»`);
     } catch {
-      setError('Не удалось построить волну по треку');
+      setError('Не удалось построить волну');
     } finally {
       setIsTrackWaveLoading(false);
     }
@@ -258,17 +309,14 @@ function BygramMusic() {
   const visibleSections = useMemo(() => {
     if (!home) return [];
     return [
-      { key: 'daily' as const, title: 'Плейлист дня', subtitle: 'Обновляется каждый день', tracks: home.daily },
-      {
-        key: 'wave' as const,
-        title: 'Моя волна',
-        subtitle: 'Подстраивается под ваши прослушивания',
-        tracks: home.wave,
-      },
-      { key: 'recent' as const, title: 'Недавно слушали', subtitle: '', tracks: home.recent },
-      { key: 'favorites' as const, title: 'Избранное', subtitle: '', tracks: home.favorites },
+      { key: 'daily' as const, title: 'Плейлист дня', tracks: home.daily },
+      { key: 'wave' as const, title: 'Моя волна', tracks: home.wave },
+      { key: 'recent' as const, title: 'Недавно', tracks: home.recent },
+      { key: 'favorites' as const, title: 'Любимые', tracks: home.favorites },
     ].filter((section) => section.tracks.length > 0);
   }, [home]);
+
+  const isSearchMode = Boolean(query.trim().length >= 2 || searchResults);
 
   return (
     <main id="BygramMusic" className={styles.root}>
@@ -276,25 +324,7 @@ function BygramMusic() {
         <Button round color="translucent" iconName="arrow-left" ariaLabel="Назад к чатам" onClick={close} />
         <div className={styles.heading}>
           <strong className={styles.headingTitle}>Музыка</strong>
-          <span className={styles.headingSubtitle}>bygram</span>
         </div>
-        <div className={styles.search}>
-          <SearchInput
-            value={query}
-            isLoading={isSearching}
-            placeholder="Трек, исполнитель или альбом"
-            onChange={setQuery}
-            onEnter={search}
-            onReset={() => {
-              setQuery('');
-              setSearchResults(undefined);
-              setSelectedAlbum(undefined);
-            }}
-          />
-        </div>
-      </header>
-
-      <div className={styles.content}>
         <nav className={styles.tabs} aria-label="Разделы музыки">
           <button
             type="button"
@@ -314,36 +344,39 @@ function BygramMusic() {
               setSelectedPlaylist(undefined);
             }}
           >
-            Плейлисты
+            Медиатека
           </button>
         </nav>
+      </header>
 
+      <div className={styles.searchBar}>
+        <SearchInput
+          value={query}
+          isLoading={isSearching}
+          placeholder="Поиск треков и альбомов"
+          onChange={handleQueryChange}
+          onEnter={() => void runSearch(query)}
+          onReset={() => {
+            searchRequestIdRef.current += 1;
+            setQuery('');
+            setSearchResults(undefined);
+            setSelectedAlbum(undefined);
+            setIsSearching(false);
+          }}
+        />
+      </div>
+
+      <div className={styles.content}>
         {notice && (
           <button type="button" className={styles.notice} onClick={() => setNotice(undefined)}>
             {notice}
           </button>
         )}
         {error && <div className={styles.error}>{error}</div>}
-        {player.track && (
-          <NowPlaying
-            player={player}
-            isLiked={likedIds.has(player.track.id)}
-            isWaveLoading={isTrackWaveLoading}
-            onToggleLike={toggleLike}
-            onAddToPlaylist={setTrackToAdd}
-            onStartWave={startTrackWave}
-          />
-        )}
-        {!home && !error && <div className={styles.loader}><Spinner /></div>}
-        {!searchResults && view === 'discover' && home && (
-          <div className={styles.welcome}>
-            <span>{greeting()}</span>
-            <h1>Что послушаем?</h1>
-            <p>Персональные подборки меняются вместе с вашей историей прослушивания.</p>
-          </div>
-        )}
 
-        {isAlbumLoading ? <div className={styles.loader}><Spinner /></div> : selectedAlbum ? (
+        {isAlbumLoading && !selectedAlbum ? (
+          <div className={styles.loader}><Spinner /></div>
+        ) : selectedAlbum ? (
           <AlbumDetails
             album={selectedAlbum}
             player={player}
@@ -353,28 +386,37 @@ function BygramMusic() {
             onToggleLike={toggleLike}
             onAddToPlaylist={setTrackToAdd}
             onShareTrack={shareTrack}
+            onStartWave={startTrackWave}
           />
-        ) : searchResults && (searchResults.tracks.length || searchResults.albums.length) ? (
-          <>
-            {searchResults.albums.length > 0 && (
-              <AlbumSearchResults albums={searchResults.albums} onOpen={openAlbum} />
-            )}
-            {searchResults.tracks.length > 0 && (
-              <MusicSection
-                title={`Треки для «${query.trim()}»`}
-                tracks={searchResults.tracks}
-                source="search"
-                likedIds={likedIds}
-                player={player}
-                onPlay={playTrack}
-                onToggleLike={toggleLike}
-                onAddToPlaylist={setTrackToAdd}
-                onShareTrack={shareTrack}
-              />
-            )}
-          </>
-        ) : searchResults ? (
-          <EmptyState title="Ничего не найдено" text="Попробуйте изменить название трека, исполнителя или альбома." />
+        ) : isSearchMode ? (
+          isSearching && !searchResults ? (
+            <div className={styles.loader}>
+              <Spinner />
+              <span>Ищем в SoundCloud…</span>
+            </div>
+          ) : searchResults && (searchResults.tracks.length || searchResults.albums.length) ? (
+            <>
+              {searchResults.albums.length > 0 && (
+                <AlbumSearchResults albums={searchResults.albums} onOpen={openAlbum} />
+              )}
+              {searchResults.tracks.length > 0 && (
+                <MusicSection
+                  title="Треки"
+                  tracks={searchResults.tracks}
+                  source="search"
+                  likedIds={likedIds}
+                  player={player}
+                  onPlay={playTrack}
+                  onToggleLike={toggleLike}
+                  onAddToPlaylist={setTrackToAdd}
+                  onShareTrack={shareTrack}
+                  onStartWave={startTrackWave}
+                />
+              )}
+            </>
+          ) : (
+            <EmptyState title="Ничего не найдено" text="Попробуйте другое название или исполнителя" />
+          )
         ) : view === 'library' ? (
           selectedPlaylist ? (
             <PlaylistDetails
@@ -389,6 +431,7 @@ function BygramMusic() {
               onAddToPlaylist={setTrackToAdd}
               onRemoveTrack={removeTrackFromPlaylist}
               onShareTrack={shareTrack}
+              onStartWave={startTrackWave}
             />
           ) : (
             <PlaylistLibrary
@@ -397,6 +440,8 @@ function BygramMusic() {
               onOpen={setSelectedPlaylist}
             />
           )
+        ) : isHomeLoading && !home ? (
+          <div className={styles.loader}><Spinner /></div>
         ) : (
           <>
             {visibleSections.map((section) => (
@@ -404,7 +449,6 @@ function BygramMusic() {
                 <MusicShelf
                   key={section.key}
                   title={section.title}
-                  subtitle={section.subtitle}
                   tracks={section.tracks}
                   source={section.key}
                   likedIds={likedIds}
@@ -413,12 +457,12 @@ function BygramMusic() {
                   onToggleLike={toggleLike}
                   onAddToPlaylist={setTrackToAdd}
                   onShareTrack={shareTrack}
+                  onStartWave={startTrackWave}
                 />
               ) : (
                 <MusicSection
                   key={section.key}
                   title={section.title}
-                  subtitle={section.subtitle}
                   tracks={section.tracks}
                   source={section.key}
                   likedIds={likedIds}
@@ -427,15 +471,27 @@ function BygramMusic() {
                   onToggleLike={toggleLike}
                   onAddToPlaylist={setTrackToAdd}
                   onShareTrack={shareTrack}
+                  onStartWave={startTrackWave}
                 />
               )
             ))}
-            {home?.librarySize === 0 && (
-              <EmptyState title="Найдите первую песню" text="Поиск и стрим идут через SoundCloud, без регистрации." />
+            {home && visibleSections.length === 0 && (
+              <EmptyState title="Найдите первую песню" text="Введите название в поиск сверху" />
             )}
           </>
         )}
       </div>
+
+      {player.track && (
+        <MiniPlayer
+          player={player}
+          isLiked={likedIds.has(player.track.id)}
+          isWaveLoading={isTrackWaveLoading}
+          onToggleLike={toggleLike}
+          onAddToPlaylist={setTrackToAdd}
+          onStartWave={startTrackWave}
+        />
+      )}
 
       <Modal
         isOpen={isCreatePlaylistOpen}
@@ -471,11 +527,7 @@ function BygramMusic() {
               <PlaylistCover playlist={playlist} />
               <span>
                 <strong>{playlist.name}</strong>
-                <small>
-                  {playlist.tracks.length}
-                  {' '}
-                  треков
-                </small>
+                <small>{`${playlist.tracks.length} треков`}</small>
               </span>
               <Icon name="next" />
             </button>
@@ -506,7 +558,7 @@ function BygramMusic() {
   );
 }
 
-function NowPlaying({
+function MiniPlayer({
   player, isLiked, isWaveLoading, onToggleLike, onAddToPlaylist, onStartWave,
 }: {
   player: PlayerState;
@@ -517,116 +569,75 @@ function NowPlaying({
   onStartWave: (track: BygramMusicTrack) => void;
 }) {
   const track = player.track!;
-  const upcoming = player.queue.slice(player.queueIndex + 1, player.queueIndex + 4);
   return (
-    <section className={styles.nowPlaying}>
-      <TrackArtwork track={track} large />
-      <div className={styles.nowPlayingMain}>
-        <span className={styles.eyebrow}>Сейчас играет</span>
-        <h1>{track.title}</h1>
-        <p>{track.artist}</p>
-        <input
-          className={styles.progress}
-          type="range"
-          min="0"
-          max={Math.max(1, player.duration)}
-          value={Math.min(player.position, player.duration)}
-          aria-label="Позиция воспроизведения"
-          onChange={(event) => bygramMusicPlayer.seekTo(Number(event.currentTarget.value))}
+    <section className={styles.miniPlayer}>
+      <button type="button" className={styles.miniMain} onClick={() => bygramMusicPlayer.toggle()}>
+        <TrackArtwork track={track} />
+        <span className={styles.meta}>
+          <strong>{track.title}</strong>
+          <span>{track.artist}</span>
+        </span>
+      </button>
+      <div className={styles.miniControls}>
+        <Button
+          round
+          color="translucent"
+          size="smaller"
+          iconName={isLiked ? 'heart' : 'heart-outline'}
+          ariaLabel="Избранное"
+          onClick={() => onToggleLike(track)}
         />
-        <div className={styles.timeline}>
-          <span>{formatDuration(player.position)}</span>
-          <span>{formatDuration(player.duration)}</span>
-        </div>
-        <div className={styles.playerControls}>
-          <Button
-            className={`${styles.repeatControl} ${player.repeatMode !== 'off' ? styles.repeatActive : ''}`}
-            round
-            color="translucent"
-            ariaLabel={repeatModeLabel(player.repeatMode)}
-            onClick={() => bygramMusicPlayer.cycleRepeatMode()}
-          >
-            <Icon name="loop" />
-            {player.repeatMode !== 'off' && (
-              <span className={styles.repeatBadge}>{player.repeatMode === 'track' ? '1' : '∞'}</span>
-            )}
-          </Button>
-          <Button
-            round
-            color="translucent"
-            iconName="skip-previous"
-            ariaLabel="Предыдущий трек"
-            onClick={() => void bygramMusicPlayer.previous()}
-          />
-          <Button
-            round
-            ariaLabel={player.isPlaying ? 'Пауза' : 'Воспроизвести'}
-            onClick={() => bygramMusicPlayer.toggle()}
-          >
-            {player.isLoading ? <Spinner /> : <Icon name={player.isPlaying ? 'pause' : 'play'} />}
-          </Button>
-          <Button
-            round
-            color="translucent"
-            iconName="skip-next"
-            ariaLabel="Следующий трек"
-            disabled={player.queueIndex >= player.queue.length - 1 && player.repeatMode !== 'queue'}
-            onClick={() => void bygramMusicPlayer.next()}
-          />
-        </div>
-        <div className={styles.playerActions}>
-          <Button
-            className={styles.playerAction}
-            pill
-            color={isLiked ? 'translucent-primary' : 'translucent'}
-            size="smaller"
-            iconName={isLiked ? 'heart' : 'heart-outline'}
-            onClick={() => onToggleLike(track)}
-          >
-            {isLiked ? 'Понравилось' : 'Нравится'}
-          </Button>
-          <Button
-            className={styles.playerAction}
-            pill
-            color="translucent"
-            size="smaller"
-            iconName="add"
-            onClick={() => onAddToPlaylist(track)}
-          >
-            Плейлист
-          </Button>
-          <Button
-            className={styles.playerAction}
-            pill
-            color="translucent"
-            size="smaller"
-            iconName="diamond"
-            isLoading={isWaveLoading}
-            onClick={() => onStartWave(track)}
-          >
-            Волна
-          </Button>
-        </div>
-        {player.error && <span className={styles.playerError}>{player.error}</span>}
+        <Button
+          round
+          color="translucent"
+          size="smaller"
+          iconName="add"
+          ariaLabel="В плейлист"
+          onClick={() => onAddToPlaylist(track)}
+        />
+        <Button
+          round
+          color="translucent"
+          size="smaller"
+          iconName="diamond"
+          ariaLabel="Волна"
+          isLoading={isWaveLoading}
+          onClick={() => onStartWave(track)}
+        />
+        <Button
+          round
+          color="translucent"
+          size="smaller"
+          iconName="skip-previous"
+          ariaLabel="Назад"
+          onClick={() => void bygramMusicPlayer.previous()}
+        />
+        <Button
+          round
+          ariaLabel={player.isPlaying ? 'Пауза' : 'Играть'}
+          onClick={() => bygramMusicPlayer.toggle()}
+        >
+          {player.isLoading ? <Spinner /> : <Icon name={player.isPlaying ? 'pause' : 'play'} />}
+        </Button>
+        <Button
+          round
+          color="translucent"
+          size="smaller"
+          iconName="skip-next"
+          ariaLabel="Далее"
+          onClick={() => void bygramMusicPlayer.next()}
+        />
       </div>
-      {upcoming.length > 0 && (
-        <div className={styles.upNext}>
-          <strong>Далее</strong>
-          {upcoming.map((item, index) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => void bygramMusicPlayer.play(item, player.source, player.queue)}
-            >
-              <span>{index + 1}</span>
-              <div>
-                <strong>{item.title}</strong>
-                <small>{item.artist}</small>
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
+      <input
+        className={styles.miniProgress}
+        type="range"
+        min="0"
+        max={Math.max(1, player.duration)}
+        value={Math.min(player.position, player.duration)}
+        aria-label="Позиция"
+        onChange={(event) => bygramMusicPlayer.seekTo(Number(event.currentTarget.value))}
+      />
+      {player.error && <span className={styles.playerError}>{player.error}</span>}
     </section>
   );
 }
@@ -639,11 +650,8 @@ function PlaylistLibrary({ playlists, onCreate, onOpen }: {
   return (
     <section className={styles.library}>
       <div className={styles.libraryHeader}>
-        <div>
-          <h2>Ваши плейлисты</h2>
-          <span>Коллекции для любого настроения</span>
-        </div>
-        <Button pill size="smaller" iconName="add" onClick={onCreate}>Создать</Button>
+        <h2>Плейлисты</h2>
+        <Button round color="translucent" size="smaller" iconName="add" ariaLabel="Создать" onClick={onCreate} />
       </div>
       {playlists.length ? (
         <div className={styles.playlistGrid}>
@@ -651,22 +659,18 @@ function PlaylistLibrary({ playlists, onCreate, onOpen }: {
             <button key={playlist.id} type="button" className={styles.playlistCard} onClick={() => onOpen(playlist)}>
               <PlaylistCover playlist={playlist} />
               <strong>{playlist.name}</strong>
-              <span>
-                {playlist.tracks.length}
-                {' '}
-                треков
-              </span>
+              <span>{`${playlist.tracks.length} треков`}</span>
             </button>
           ))}
         </div>
-      ) : <EmptyState title="Соберите первый плейлист" text="Добавляйте найденные песни и делитесь подборками." />}
+      ) : <EmptyState title="Пока пусто" text="Создайте плейлист или добавьте трек из поиска" />}
     </section>
   );
 }
 
 function PlaylistDetails({
   playlist, player, likedIds, onBack, onPlay, onShare, onSave, onToggleLike, onAddToPlaylist, onRemoveTrack,
-  onShareTrack,
+  onShareTrack, onStartWave,
 }: {
   playlist: BygramMusicPlaylist;
   player: PlayerState;
@@ -679,40 +683,42 @@ function PlaylistDetails({
   onAddToPlaylist: (track: BygramMusicTrack) => void;
   onRemoveTrack: (playlist: BygramMusicPlaylist, track: BygramMusicTrack) => void;
   onShareTrack: (track: BygramMusicTrack) => void;
+  onStartWave: (track: BygramMusicTrack) => void;
 }) {
   return (
     <section className={styles.playlistDetails}>
       <div className={styles.playlistHero}>
-        <Button round color="translucent" iconName="arrow-left" ariaLabel="К плейлистам" onClick={onBack} />
+        <Button round color="translucent" iconName="arrow-left" ariaLabel="Назад" onClick={onBack} />
         <PlaylistCover playlist={playlist} large />
         <div className={styles.playlistHeroMeta}>
-          <span>Плейлист</span>
-          <h1>{playlist.name}</h1>
-          <p>
-            {playlist.ownerDisplayName || 'ByGram'}
-            {' '}
-            ·
-            {' '}
-            {playlist.tracks.length}
-            {' '}
-            треков
-          </p>
-          <div>
+          <h2>{playlist.name}</h2>
+          <p>{`${playlist.tracks.length} треков`}</p>
+          <div className={styles.heroActions}>
             {playlist.tracks.length > 0 && (
               <Button
-                pill
-                iconName="play"
+                round
+                ariaLabel="Слушать"
                 onClick={() => onPlay(playlist.tracks[0], 'playlist', playlist.tracks)}
               >
-                Слушать
+                <Icon name="play" />
               </Button>
             )}
             {playlist.isOwn ? (
-              <Button pill color="translucent" iconName="share-filled" onClick={() => onShare(playlist)}>
-                Поделиться
-              </Button>
+              <Button
+                round
+                color="translucent"
+                iconName="share-filled"
+                ariaLabel="Поделиться"
+                onClick={() => onShare(playlist)}
+              />
             ) : (
-              <Button pill color="translucent" iconName="add" onClick={() => onSave(playlist)}>Добавить себе</Button>
+              <Button
+                round
+                color="translucent"
+                iconName="add"
+                ariaLabel="Сохранить"
+                onClick={() => onSave(playlist)}
+              />
             )}
           </div>
         </div>
@@ -729,8 +735,9 @@ function PlaylistDetails({
           onAddToPlaylist={onAddToPlaylist}
           onRemoveFromPlaylist={playlist.isOwn ? (track) => onRemoveTrack(playlist, track) : undefined}
           onShareTrack={onShareTrack}
+          onStartWave={onStartWave}
         />
-      ) : <EmptyState title="Плейлист пока пуст" text="Добавьте песни из поиска или рекомендаций." />}
+      ) : <EmptyState title="Плейлист пуст" text="Добавьте песни из поиска" />}
     </section>
   );
 }
@@ -740,17 +747,14 @@ function AlbumSearchResults({ albums, onOpen }: {
   onOpen: (album: BygramMusicAlbum) => void;
 }) {
   return (
-    <section className={styles.albumResults}>
-      <div className={styles.sectionHeader}><div><h2>Альбомы</h2></div></div>
-      <div className={styles.albumGrid}>
+    <section className={styles.section}>
+      <div className={styles.sectionHeader}><h2>Альбомы и плейлисты</h2></div>
+      <div className={styles.shelfScroll}>
         {albums.map((album) => (
-          <button key={album.id} type="button" className={styles.albumCard} onClick={() => onOpen(album)}>
+          <button key={album.id} type="button" className={styles.shelfCard} onClick={() => onOpen(album)}>
             <AlbumArtwork album={album} />
-            <span>
-              <strong>{album.title}</strong>
-              <small>{`${album.artist} · ${album.trackCount} треков`}</small>
-            </span>
-            <Icon name="next" />
+            <strong className={styles.shelfTitle}>{album.title}</strong>
+            <span className={styles.shelfArtist}>{album.artist}</span>
           </button>
         ))}
       </div>
@@ -759,7 +763,7 @@ function AlbumSearchResults({ albums, onOpen }: {
 }
 
 function AlbumDetails({
-  album, player, likedIds, onBack, onPlay, onToggleLike, onAddToPlaylist, onShareTrack,
+  album, player, likedIds, onBack, onPlay, onToggleLike, onAddToPlaylist, onShareTrack, onStartWave,
 }: {
   album: BygramMusicAlbum;
   player: PlayerState;
@@ -769,23 +773,23 @@ function AlbumDetails({
   onToggleLike: (track: BygramMusicTrack) => void;
   onAddToPlaylist: (track: BygramMusicTrack) => void;
   onShareTrack: (track: BygramMusicTrack) => void;
+  onStartWave: (track: BygramMusicTrack) => void;
 }) {
   return (
     <section className={styles.playlistDetails}>
       <div className={styles.playlistHero}>
-        <Button round color="translucent" iconName="arrow-left" ariaLabel="К результатам поиска" onClick={onBack} />
+        <Button round color="translucent" iconName="arrow-left" ariaLabel="Назад" onClick={onBack} />
         <AlbumArtwork album={album} large />
         <div className={styles.playlistHeroMeta}>
-          <span>Альбом</span>
-          <h1>{album.title}</h1>
+          <h2>{album.title}</h2>
           <p>{`${album.artist} · ${album.trackCount} треков`}</p>
-          <div>
-            {album.tracks.length > 0 && (
-              <Button pill iconName="play" onClick={() => onPlay(album.tracks[0], 'album', album.tracks)}>
-                Слушать
+          {album.tracks.length > 0 && (
+            <div className={styles.heroActions}>
+              <Button round ariaLabel="Слушать" onClick={() => onPlay(album.tracks[0], 'album', album.tracks)}>
+                <Icon name="play" />
               </Button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
       {album.tracks.length ? (
@@ -799,18 +803,18 @@ function AlbumDetails({
           onToggleLike={onToggleLike}
           onAddToPlaylist={onAddToPlaylist}
           onShareTrack={onShareTrack}
+          onStartWave={onStartWave}
         />
-      ) : <EmptyState title="Треки не найдены" text="Для этого альбома пока нет доступных источников." />}
+      ) : <EmptyState title="Треки не найдены" text="Попробуйте открыть ещё раз" />}
     </section>
   );
 }
 
 function MusicSection({
-  title, subtitle, tracks, source, likedIds, player, onPlay, onToggleLike, onAddToPlaylist,
-  onRemoveFromPlaylist, onShareTrack,
+  title, tracks, source, likedIds, player, onPlay, onToggleLike, onAddToPlaylist,
+  onRemoveFromPlaylist, onShareTrack, onStartWave,
 }: {
   title: string;
-  subtitle?: string;
   tracks: BygramMusicTrack[];
   source: BygramMusicQueueSource;
   likedIds: Set<string>;
@@ -820,80 +824,50 @@ function MusicSection({
   onAddToPlaylist: (track: BygramMusicTrack) => void;
   onRemoveFromPlaylist?: (track: BygramMusicTrack) => void;
   onShareTrack: (track: BygramMusicTrack) => void;
+  onStartWave: (track: BygramMusicTrack) => void;
 }) {
   return (
     <section className={styles.section}>
       <div className={styles.sectionHeader}>
-        <div>
-          <h2>{title}</h2>
-          {subtitle && <span>{subtitle}</span>}
-        </div>
+        <h2>{title}</h2>
         {tracks.length > 1 && (
-          <Button pill size="smaller" iconName="play" onClick={() => onPlay(tracks[0], source, tracks)}>
-            Слушать
-          </Button>
+          <Button
+            round
+            color="translucent"
+            size="smaller"
+            iconName="play"
+            ariaLabel="Слушать всё"
+            onClick={() => onPlay(tracks[0], source, tracks)}
+          />
         )}
       </div>
       <div className={styles.trackList}>
-        {tracks.map((track) => {
-          const isCurrent = player.track?.id === track.id;
-          return (
-            <div key={track.id} className={`${styles.track} ${isCurrent ? styles.activeTrack : ''}`}>
-              <button type="button" className={styles.trackMain} onClick={() => onPlay(track, source, tracks)}>
-                <TrackArtwork track={track} />
-                <span className={styles.meta}>
-                  <strong>{track.title}</strong>
-                  <span>{track.artist}</span>
-                </span>
-              </button>
-              <span className={styles.duration}>{formatDuration(track.durationSeconds)}</span>
-              <Button
-                round
-                color="translucent"
-                size="smaller"
-                iconName={onRemoveFromPlaylist ? 'close' : 'add'}
-                ariaLabel={onRemoveFromPlaylist ? 'Удалить из плейлиста' : 'Добавить в плейлист'}
-                onClick={() => onRemoveFromPlaylist ? onRemoveFromPlaylist(track) : onAddToPlaylist(track)}
-              />
-              <Button
-                round
-                color="translucent"
-                size="smaller"
-                iconName={likedIds.has(track.id) ? 'heart' : 'heart-outline'}
-                ariaLabel="Избранное"
-                onClick={() => onToggleLike(track)}
-              />
-              <Button
-                round
-                color="translucent"
-                size="smaller"
-                iconName="share-filled"
-                ariaLabel="Отправить трек в чат"
-                onClick={() => onShareTrack(track)}
-              />
-              <Button
-                round
-                color="translucent"
-                size="smaller"
-                ariaLabel="Воспроизвести"
-                onClick={() => onPlay(track, source, tracks)}
-              >
-                {isCurrent && player.isLoading
-                  ? <Spinner /> : <Icon name={isCurrent && player.isPlaying ? 'pause' : 'play'} />}
-              </Button>
-            </div>
-          );
-        })}
+        {tracks.map((track, index) => (
+          <TrackRow
+            key={track.id}
+            index={index + 1}
+            track={track}
+            isCurrent={player.track?.id === track.id}
+            isPlaying={player.track?.id === track.id && player.isPlaying}
+            isLoading={player.track?.id === track.id && player.isLoading}
+            isLiked={likedIds.has(track.id)}
+            onPlay={() => onPlay(track, source, tracks)}
+            onToggleLike={() => onToggleLike(track)}
+            onAddToPlaylist={() => onAddToPlaylist(track)}
+            onRemoveFromPlaylist={onRemoveFromPlaylist ? () => onRemoveFromPlaylist(track) : undefined}
+            onShareTrack={() => onShareTrack(track)}
+            onStartWave={() => onStartWave(track)}
+          />
+        ))}
       </div>
     </section>
   );
 }
 
 function MusicShelf({
-  title, subtitle, tracks, source, likedIds, player, onPlay, onToggleLike, onAddToPlaylist, onShareTrack,
+  title, tracks, source, likedIds, player, onPlay, onToggleLike, onAddToPlaylist,
 }: {
   title: string;
-  subtitle?: string;
   tracks: BygramMusicTrack[];
   source: BygramMusicQueueSource;
   likedIds: Set<string>;
@@ -902,17 +876,20 @@ function MusicShelf({
   onToggleLike: (track: BygramMusicTrack) => void;
   onAddToPlaylist: (track: BygramMusicTrack) => void;
   onShareTrack: (track: BygramMusicTrack) => void;
+  onStartWave: (track: BygramMusicTrack) => void;
 }) {
   return (
-    <section className={styles.shelf}>
+    <section className={styles.section}>
       <div className={styles.sectionHeader}>
-        <div>
-          <h2>{title}</h2>
-          {subtitle && <span>{subtitle}</span>}
-        </div>
-        <Button pill size="smaller" iconName="play" onClick={() => onPlay(tracks[0], source, tracks)}>
-          Слушать
-        </Button>
+        <h2>{title}</h2>
+        <Button
+          round
+          color="translucent"
+          size="smaller"
+          iconName="play"
+          ariaLabel="Слушать"
+          onClick={() => onPlay(tracks[0], source, tracks)}
+        />
       </div>
       <div className={styles.shelfScroll}>
         {tracks.map((track) => {
@@ -940,17 +917,9 @@ function MusicShelf({
                   round
                   color="translucent"
                   size="tiny"
-                  iconName="add"
-                  ariaLabel="Добавить в плейлист"
+                  iconName="more"
+                  ariaLabel="Ещё"
                   onClick={() => onAddToPlaylist(track)}
-                />
-                <Button
-                  round
-                  color="translucent"
-                  size="tiny"
-                  iconName="share-filled"
-                  ariaLabel="Отправить в чат"
-                  onClick={() => onShareTrack(track)}
                 />
               </div>
             </article>
@@ -958,6 +927,78 @@ function MusicShelf({
         })}
       </div>
     </section>
+  );
+}
+
+function TrackRow({
+  index, track, isCurrent, isPlaying, isLoading, isLiked,
+  onPlay, onToggleLike, onAddToPlaylist, onRemoveFromPlaylist, onShareTrack, onStartWave,
+}: {
+  index: number;
+  track: BygramMusicTrack;
+  isCurrent: boolean;
+  isPlaying: boolean;
+  isLoading: boolean;
+  isLiked: boolean;
+  onPlay: NoneToVoidFunction;
+  onToggleLike: NoneToVoidFunction;
+  onAddToPlaylist: NoneToVoidFunction;
+  onRemoveFromPlaylist?: NoneToVoidFunction;
+  onShareTrack: NoneToVoidFunction;
+  onStartWave: NoneToVoidFunction;
+}) {
+  const contextActions = useMemo((): MenuItemContextAction[] => {
+    const actions: MenuItemContextAction[] = [
+      {
+        title: isLiked ? 'Убрать из любимых' : 'В любимые',
+        icon: isLiked ? 'heart' : 'heart-outline',
+        handler: onToggleLike,
+      },
+      { title: 'В плейлист', icon: 'add', handler: onAddToPlaylist },
+      { title: 'Волна по треку', icon: 'diamond', handler: onStartWave },
+      { title: 'Отправить в чат', icon: 'share-filled', handler: onShareTrack },
+    ];
+    if (onRemoveFromPlaylist) {
+      actions.push({
+        title: 'Удалить из плейлиста',
+        icon: 'delete',
+        destructive: true,
+        handler: onRemoveFromPlaylist,
+      });
+    }
+    return actions;
+  }, [isLiked, onAddToPlaylist, onRemoveFromPlaylist, onShareTrack, onStartWave, onToggleLike]);
+
+  const trackIndexContent = (() => {
+    if (!isCurrent) return index;
+    if (isLoading) return <Spinner />;
+    return <Icon name={isPlaying ? 'pause' : 'play'} />;
+  })();
+
+  return (
+    <ListItem
+      className={`${styles.trackItem} ${isCurrent ? styles.activeTrack : ''}`}
+      ripple
+      narrow
+      multiline
+      leftElement={(
+        <span className={styles.trackLeft}>
+          <span className={styles.trackIndex}>
+            {trackIndexContent}
+          </span>
+          <TrackArtwork track={track} />
+        </span>
+      )}
+      rightElement={<span className={styles.duration}>{formatDuration(track.durationSeconds)}</span>}
+      secondaryIcon="more"
+      contextActions={contextActions}
+      onClick={onPlay}
+    >
+      <div className={styles.trackText}>
+        <strong>{track.title}</strong>
+        <span>{track.artist}</span>
+      </div>
+    </ListItem>
   );
 }
 
@@ -998,7 +1039,7 @@ function AlbumArtwork({ album, large = false }: { album: BygramMusicAlbum; large
 function EmptyState({ title, text }: { title: string; text: string }) {
   return (
     <div className={styles.empty}>
-      <Icon name="record-play" />
+      <Icon name="search" />
       <strong>{title}</strong>
       <span>{text}</span>
     </div>
@@ -1006,21 +1047,7 @@ function EmptyState({ title, text }: { title: string; text: string }) {
 }
 
 function trackHue(id: string) {
-  return Number.parseInt(id.slice(0, 4), 36) % 360;
-}
-
-function greeting() {
-  const hour = new Date().getHours();
-  if (hour < 6) return 'Доброй ночи';
-  if (hour < 12) return 'Доброе утро';
-  if (hour < 18) return 'Добрый день';
-  return 'Добрый вечер';
-}
-
-function repeatModeLabel(mode: PlayerState['repeatMode']) {
-  if (mode === 'track') return 'Повторять текущий трек';
-  if (mode === 'queue') return 'Повторять плейлист';
-  return 'Включить повтор трека';
+  return Number.parseInt(id.replace(/\D/g, '').slice(0, 4) || '12', 10) % 360;
 }
 
 function formatDuration(seconds: number) {
