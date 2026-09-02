@@ -29,7 +29,9 @@ import type {
   ApiUser,
   ApiWebPage,
 } from '../../../api/types';
-import type { ByProtoBubbleParams } from '../../../byproto/types';
+import type {
+  ByProtoBubbleParams,
+} from '../../../byproto/types';
 import type { ObserveFn } from '../../../hooks/useIntersectionObserver';
 import type {
   ActiveEmojiInteraction,
@@ -46,7 +48,7 @@ import type {
 } from '../../../types';
 import type { Signal } from '../../../util/signals';
 import { MAIN_THREAD_ID } from '../../../api/types';
-import { AudioOrigin } from '../../../types';
+import { AudioOrigin, LeftColumnContent } from '../../../types';
 
 import { EMOJI_STATUS_LOOP_LIMIT, MESSAGE_APPEARANCE_DELAY } from '../../../config';
 import {
@@ -141,6 +143,13 @@ import { parseTranslationCacheKey } from '../../../util/keys/translationKey';
 import { getServerTime } from '../../../util/serverTime';
 import stopEvent from '../../../util/stopEvent';
 import { isElementInViewport } from '../../../util/visibility/isElementInViewport';
+import {
+  favoriteByProtoMusicTrack,
+  playByProtoMusicPlaylist,
+  playByProtoMusicTrack,
+  queueByProtoTrackForPlaylist,
+  saveByProtoMusicPlaylist,
+} from '../../../api/bygram/byprotoMusic';
 import { applyByProtoEnvelope } from '../../../byproto/runtime';
 import { calculateDimensionsForMessageMedia, getStickerDimensions, REM } from '../../common/helpers/mediaDimensions';
 import renderText from '../../common/helpers/renderText';
@@ -525,6 +534,7 @@ const Message = ({
     openThread,
     summarizeMessage,
     showNotification,
+    openLeftColumnContent,
   } = getActions();
 
   const message = withPremiumEmojiOverlay(rawMessage);
@@ -1784,6 +1794,53 @@ const Message = ({
   });
 
   const handleLocalInlineButtonClick = useLastCallback((button: ApiKeyboardButton) => {
+    if (button.type === 'byProtoMusic') {
+      const packet = message.byProto;
+      if (!packet) return;
+
+      if (packet.envelope.type === 'music.playlist') {
+        if (button.action === 'listen') {
+          openLeftColumnContent({ contentKey: LeftColumnContent.Music });
+          void playByProtoMusicPlaylist(packet.envelope.payload).catch(() => {
+            showNotification({ message: 'Не удалось начать воспроизведение плейлиста' });
+          });
+          return;
+        }
+        if (button.action === 'save') {
+          void saveByProtoMusicPlaylist(packet.envelope.payload).then(() => {
+            showNotification({ message: 'Плейлист сохранён в bygramMusic' });
+          }).catch(() => {
+            showNotification({ message: 'Не удалось сохранить плейлист' });
+          });
+        }
+        return;
+      }
+
+      if (packet.envelope.type !== 'music.track') return;
+
+      if (button.action === 'listen') {
+        openLeftColumnContent({ contentKey: LeftColumnContent.Music });
+        void playByProtoMusicTrack(packet.envelope.payload).catch(() => {
+          showNotification({ message: 'Не удалось начать воспроизведение' });
+        });
+        return;
+      }
+
+      if (button.action === 'favorite') {
+        void favoriteByProtoMusicTrack(packet.envelope.payload).then(() => {
+          showNotification({ message: 'Добавлено в избранное bygramMusic' });
+        }).catch(() => {
+          showNotification({ message: 'Не удалось добавить в избранное' });
+        });
+        return;
+      }
+
+      queueByProtoTrackForPlaylist(packet.envelope.payload);
+      openLeftColumnContent({ contentKey: LeftColumnContent.Music });
+      showNotification({ message: 'Выберите плейлист в bygramMusic' });
+      return;
+    }
+
     if (button.type === 'byProtoProfile') {
       if (button.action === 'preview') {
         handleMediaClick();
@@ -2016,7 +2073,20 @@ const Message = ({
       && message.byProto.envelope.type === 'profile.update'
       ? [[{ type: 'byProtoProfile', text: 'Применить оформление', action: 'apply', style: { type: 'primary' } }]]
       : undefined;
-  const localInlineButtons = additionalInlineButtons || byProtoProfileButtons;
+  const byProtoMusicButtons: ApiKeyboardButton[][] | undefined = message.byProto
+    && message.byProto.envelope.type === 'music.track'
+    ? [[
+      { type: 'byProtoMusic', text: 'Слушать', action: 'listen', style: { type: 'primary' } },
+      { type: 'byProtoMusic', text: 'В плейлист', action: 'addPlaylist' },
+      { type: 'byProtoMusic', text: 'В избранное', action: 'favorite' },
+    ]]
+    : message.byProto && message.byProto.envelope.type === 'music.playlist'
+      ? [[
+        { type: 'byProtoMusic', text: 'Слушать', action: 'listen', style: { type: 'primary' } },
+        { type: 'byProtoMusic', text: 'Сохранить', action: 'save' },
+      ]]
+      : undefined;
+  const localInlineButtons = additionalInlineButtons || byProtoMusicButtons || byProtoProfileButtons;
 
   return (
     <div

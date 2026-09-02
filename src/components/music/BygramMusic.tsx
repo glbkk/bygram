@@ -10,9 +10,10 @@ import type { MenuItemContextAction } from '../ui/ListItem';
 import { MAIN_THREAD_ID } from '../../api/types';
 import { LeftColumnContent } from '../../types';
 
-import { copyTextToClipboard } from '../../util/clipboard';
+import { takePendingPlaylistTrack } from '../../api/bygram/byprotoMusic';
 import { bygramMusicPlayer } from '../../api/bygram/musicPlayer';
 import { bygramMusicApi } from '../../api/bygram/serverlessMusic';
+import { createByProtoMusicPlaylistEnvelope, createByProtoMusicTrackEnvelope } from '../../byproto/outgoing';
 import buildAttachment from '../middle/composer/helpers/buildAttachment';
 
 import useBygramMusicPlayer from '../../hooks/useBygramMusicPlayer';
@@ -55,8 +56,14 @@ function BygramMusic() {
   const [newPlaylistName, setNewPlaylistName] = useState('');
   const [notice, setNotice] = useState<string>();
   const [error, setError] = useState<string>();
-  const [pendingShare, setPendingShare] = useState<{ track: BygramMusicTrack; attachment: ApiAttachment }>();
-  const [pendingPlaylistShareUrl, setPendingPlaylistShareUrl] = useState<string>();
+  const [pendingShare, setPendingShare] = useState<{
+    track?: BygramMusicTrack;
+    playlist?: BygramMusicPlaylist;
+    attachments?: ApiAttachment[];
+  }>();
+  const [shareTrackCandidate, setShareTrackCandidate] = useState<BygramMusicTrack>();
+  const [sharePlaylistCandidate, setSharePlaylistCandidate] = useState<BygramMusicPlaylist>();
+  const [isPreparingShareFile, setIsPreparingShareFile] = useState(false);
   const searchRequestIdRef = useRef(0);
 
   const applyHome = useLastCallback((nextHome: BygramMusicHome) => {
@@ -84,6 +91,11 @@ function BygramMusic() {
 
   useEffect(() => {
     void loadHome();
+    const pendingTrack = takePendingPlaylistTrack();
+    if (pendingTrack) {
+      setView('library');
+      setTrackToAdd(pendingTrack);
+    }
     const shareCode = new URLSearchParams(window.location.search).get('bygramPlaylist');
     if (shareCode) {
       setView('library');
@@ -234,43 +246,33 @@ function BygramMusic() {
     }
   });
 
-  const sharePlaylist = useLastCallback(async (playlist: BygramMusicPlaylist) => {
+  const sharePlaylist = useLastCallback((playlist: BygramMusicPlaylist) => {
+    setSharePlaylistCandidate(playlist);
+  });
+
+  const sharePlaylistAsFiles = useLastCallback(async () => {
+    if (!sharePlaylistCandidate?.tracks.length) return;
+    setIsPreparingShareFile(true);
+    setError(undefined);
     try {
-      const shared = await bygramMusicApi.shareMusicPlaylist(playlist.id);
-      const url = new URL(window.location.href);
-      url.searchParams.set('bygramPlaylist', shared.shareCode);
-      const shareUrl = url.toString();
-      const shareData = {
-        title: shared.name,
-        text: `Плейлист «${shared.name}» в bygram`,
-        url: shareUrl,
-      };
-      if (navigator.share) {
-        try {
-          await navigator.share(shareData);
-          setSelectedPlaylist(shared);
-          await loadHome();
-          return;
-        } catch (shareError) {
-          if ((shareError as Error).name === 'AbortError') return;
-        }
-      }
-      setPendingPlaylistShareUrl(shareUrl);
-      setSelectedPlaylist(shared);
-      await loadHome();
+      await bygramMusicApi.ensureSession();
+      const files = await bygramMusicApi.downloadMusicPlaylist(sharePlaylistCandidate);
+      const attachments = await Promise.all(
+        files.map((file) => buildAttachment(file.name, file)),
+      );
+      setPendingShare({ playlist: sharePlaylistCandidate, attachments });
+      setSharePlaylistCandidate(undefined);
     } catch {
-      setError('Не удалось поделиться плейлистом');
+      setError('Не удалось подготовить файлы плейлиста');
+    } finally {
+      setIsPreparingShareFile(false);
     }
   });
 
-  const sendSharedPlaylistLink = useLastCallback((chatId: string, threadId = MAIN_THREAD_ID) => {
-    if (!pendingPlaylistShareUrl) return;
-    sendMessage({
-      messageList: { chatId, threadId, type: 'thread' },
-      text: `🎵 Плейлист в bygram\n${pendingPlaylistShareUrl}`,
-    });
-    setNotice('Ссылка на плейлист отправляется');
-    setPendingPlaylistShareUrl(undefined);
+  const sharePlaylistAsByProto = useLastCallback(() => {
+    if (!sharePlaylistCandidate?.trackIds.length) return;
+    setPendingShare({ playlist: sharePlaylistCandidate });
+    setSharePlaylistCandidate(undefined);
   });
 
   const saveSharedPlaylist = useLastCallback(async (playlist: BygramMusicPlaylist) => {
@@ -288,18 +290,31 @@ function BygramMusic() {
     }
   });
 
-  const shareTrack = useLastCallback(async (track: BygramMusicTrack) => {
+  const shareTrack = useLastCallback((track: BygramMusicTrack) => {
+    setShareTrackCandidate(track);
+  });
+
+  const shareTrackAsFile = useLastCallback(async () => {
+    if (!shareTrackCandidate) return;
+    setIsPreparingShareFile(true);
+    setError(undefined);
     try {
-      setNotice('Подготавливаем трек…');
       await bygramMusicApi.ensureSession();
-      const file = await bygramMusicApi.downloadMusicTrack(track);
+      const file = await bygramMusicApi.downloadMusicTrack(shareTrackCandidate);
       const attachment = await buildAttachment(file.name, file);
-      setNotice(undefined);
-      setPendingShare({ track, attachment });
+      setPendingShare({ track: shareTrackCandidate, attachments: [attachment] });
+      setShareTrackCandidate(undefined);
     } catch {
-      setNotice(undefined);
-      setError('Не удалось подготовить трек для отправки');
+      setError('Не удалось подготовить файл трека');
+    } finally {
+      setIsPreparingShareFile(false);
     }
+  });
+
+  const shareTrackAsByProto = useLastCallback(() => {
+    if (!shareTrackCandidate) return;
+    setPendingShare({ track: shareTrackCandidate });
+    setShareTrackCandidate(undefined);
   });
 
   const startTrackWave = useLastCallback(async (track: BygramMusicTrack) => {
@@ -316,14 +331,60 @@ function BygramMusic() {
     }
   });
 
-  const sendSharedTrack = useLastCallback((chatId: string, threadId = MAIN_THREAD_ID) => {
+  const sendSharedContent = useLastCallback((chatId: string, threadId = MAIN_THREAD_ID) => {
     if (!pendingShare) return;
-    sendMessage({
-      messageList: { chatId, threadId, type: 'thread' },
-      text: `🎵 ${pendingShare.track.artist} — ${pendingShare.track.title}`,
-      attachments: [pendingShare.attachment],
-    });
-    setNotice('Трек отправляется');
+    const { track, playlist, attachments } = pendingShare;
+
+    if (attachments?.length) {
+      const caption = track
+        ? `🎵 ${track.artist} — ${track.title}`
+        : `🎵 Плейлист «${playlist?.name || 'bygramMusic'}» · ${attachments.length} треков`;
+      sendMessage({
+        messageList: { chatId, threadId, type: 'thread' },
+        text: caption,
+        attachments,
+      });
+      setNotice(track ? 'Музыкальный файл отправляется' : 'Файлы плейлиста отправляются');
+      setPendingShare(undefined);
+      return;
+    }
+
+    if (playlist) {
+      try {
+        sendMessage({
+          messageList: { chatId, threadId, type: 'thread' },
+          text: `🎵 Плейлист «${playlist.name}» · ${playlist.trackIds.length} треков\nОткрыть в bygramMusic`,
+          byProtoEnvelope: createByProtoMusicPlaylistEnvelope({
+            name: playlist.name,
+            trackIds: playlist.trackIds,
+          }),
+        });
+        setNotice('Плейлист bygramMusic отправляется');
+      } catch {
+        setError('Плейлист слишком большой для bygram proto');
+      }
+      setPendingShare(undefined);
+      return;
+    }
+
+    if (track) {
+      sendMessage({
+        messageList: { chatId, threadId, type: 'thread' },
+        text: `🎵 ${track.artist} — ${track.title}\nОткрыть в bygramMusic`,
+        byProtoEnvelope: createByProtoMusicTrackEnvelope({
+          id: track.id,
+          title: track.title,
+          artist: track.artist,
+          album: track.album,
+          genre: track.genre,
+          durationSeconds: track.durationSeconds,
+          artworkUrl: track.artworkUrl,
+          audioUrl: track.audioUrl,
+          mimeType: track.mimeType,
+        }),
+      });
+      setNotice('Трек bygramMusic отправляется');
+    }
     setPendingShare(undefined);
   });
 
@@ -413,7 +474,7 @@ function BygramMusic() {
           isSearching && !searchResults ? (
             <div className={styles.loader}>
               <Spinner />
-              <span>Ищем в SoundCloud…</span>
+              <span>Ищем в bygramMusic…</span>
             </div>
           ) : searchResults && (searchResults.tracks.length || searchResults.albums.length) ? (
             <>
@@ -569,25 +630,76 @@ function BygramMusic() {
         </div>
       </Modal>
 
+      <Modal
+        isOpen={Boolean(shareTrackCandidate)}
+        title="Поделиться треком"
+        hasCloseButton
+        onClose={() => setShareTrackCandidate(undefined)}
+      >
+        <div className={styles.modalBody}>
+          <p className={styles.shareHint}>
+            {shareTrackCandidate
+              ? `${shareTrackCandidate.artist} — ${shareTrackCandidate.title}`
+              : ''}
+          </p>
+          <Button
+            fluid
+            iconName="download"
+            isLoading={isPreparingShareFile}
+            onClick={() => void shareTrackAsFile()}
+          >
+            Отправить как файл
+          </Button>
+          <Button
+            fluid
+            color="primary"
+            onClick={shareTrackAsByProto}
+          >
+            Отправить через bygram
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={Boolean(sharePlaylistCandidate)}
+        title="Поделиться плейлистом"
+        hasCloseButton
+        onClose={() => setSharePlaylistCandidate(undefined)}
+      >
+        <div className={styles.modalBody}>
+          <p className={styles.shareHint}>
+            {sharePlaylistCandidate
+              ? `«${sharePlaylistCandidate.name}» · ${sharePlaylistCandidate.tracks.length} треков`
+              : ''}
+          </p>
+          <Button
+            fluid
+            iconName="download"
+            isLoading={isPreparingShareFile}
+            disabled={!sharePlaylistCandidate?.tracks.length}
+            onClick={() => void sharePlaylistAsFiles()}
+          >
+            Отправить файлами песен
+          </Button>
+          <Button
+            fluid
+            color="primary"
+            disabled={!sharePlaylistCandidate?.trackIds.length}
+            onClick={sharePlaylistAsByProto}
+          >
+            Отправить через bygram
+          </Button>
+        </div>
+      </Modal>
+
       <RecipientPicker
         isOpen={Boolean(pendingShare)}
-        title="Отправить трек"
+        title={pendingShare?.attachments?.length
+          ? (pendingShare.track ? 'Отправить файл' : 'Отправить файлы')
+          : 'Отправить в bygram'}
         searchPlaceholder="Поиск чатов"
-        onSelectRecipient={sendSharedTrack}
+        onSelectRecipient={sendSharedContent}
         onClose={() => setPendingShare(undefined)}
-      />
-      <RecipientPicker
-        isOpen={Boolean(pendingPlaylistShareUrl)}
-        title="Отправить плейлист"
-        searchPlaceholder="Поиск чатов"
-        onSelectRecipient={sendSharedPlaylistLink}
-        onClose={() => {
-          if (pendingPlaylistShareUrl) {
-            copyTextToClipboard(pendingPlaylistShareUrl);
-            setNotice('Ссылка на плейлист скопирована');
-          }
-          setPendingPlaylistShareUrl(undefined);
-        }}
       />
     </main>
   );

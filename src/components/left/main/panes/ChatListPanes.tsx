@@ -137,17 +137,15 @@ const ChatListPanes = ({
       }
     >
       {(isMobile || isTablet) && (
-        <>
-          <AudioPlayer
-            isCompact
-            onPaneStateChange={setPlayerState}
-          />
-          <BygramAudioPlayer
-            isCompact
-            onPaneStateChange={setBygramPlayerState}
-          />
-        </>
+        <AudioPlayer
+          isCompact
+          onPaneStateChange={setPlayerState}
+        />
       )}
+      <BygramAudioPlayer
+        isCompact
+        onPaneStateChange={setBygramPlayerState}
+      />
       {!noBanners && (
         <>
           <FrozenAccountPane

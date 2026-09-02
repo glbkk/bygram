@@ -3,6 +3,10 @@ import { getGlobal } from '../global';
 import type {
   ByProtoEmojiRange,
   ByProtoEnvelope,
+  ByProtoMusicPlaylistEnvelope,
+  ByProtoMusicPlaylistPayload,
+  ByProtoMusicTrackEnvelope,
+  ByProtoMusicTrackPayload,
   ByProtoProfileBannerEnvelope,
   ByProtoProfileUpdateEnvelope,
   ValidByProtoEnvelope,
@@ -85,6 +89,42 @@ export function createByProtoProfileUpdateEnvelope(): ByProtoProfileUpdateEnvelo
     bubbleParams: profile.bubbleParams,
     statusEmoji: profile.statusEmoji,
   }) as ByProtoProfileUpdateEnvelope;
+}
+
+export function createByProtoMusicTrackEnvelope(track: ByProtoMusicTrackPayload): ByProtoMusicTrackEnvelope {
+  return createEnvelope('music.track', {
+    id: track.id.slice(0, 80),
+    title: track.title.slice(0, 120),
+    artist: track.artist.slice(0, 120),
+    durationSeconds: Math.max(1, Math.round(track.durationSeconds) || 1),
+    audioUrl: track.audioUrl.slice(0, 260),
+    ...(track.album ? { album: track.album.slice(0, 120) } : {}),
+    ...(track.genre ? { genre: track.genre.slice(0, 64) } : {}),
+    ...(track.artworkUrl ? { artworkUrl: track.artworkUrl.slice(0, 260) } : {}),
+    ...(track.mimeType ? { mimeType: track.mimeType.slice(0, 64) } : {}),
+  }) as ByProtoMusicTrackEnvelope;
+}
+
+export function createByProtoMusicPlaylistEnvelope(
+  playlist: ByProtoMusicPlaylistPayload,
+): ByProtoMusicPlaylistEnvelope {
+  const name = playlist.name.trim().slice(0, 80);
+  const trackIds = Array.from(new Set(playlist.trackIds.map((id) => id.slice(0, 80)).filter(Boolean))).slice(0, 40);
+
+  for (let count = trackIds.length; count >= 1; count--) {
+    const envelope = createEnvelope('music.playlist', {
+      name,
+      trackIds: trackIds.slice(0, count),
+    }) as ByProtoMusicPlaylistEnvelope;
+    try {
+      ByProtoCodec.encode(envelope);
+      return envelope;
+    } catch {
+      // Shrink track list until the byproto packet fits.
+    }
+  }
+
+  throw new Error('BYPROTO_PLAYLIST_TOO_LARGE');
 }
 
 export function createByProtoEnvelope(type: string, payload: unknown): ByProtoEnvelope {

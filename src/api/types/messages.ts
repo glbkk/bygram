@@ -1103,6 +1103,12 @@ export interface KeyboardButtonByProtoProfile extends ApiKeyboardButtonBase {
   action: 'preview' | 'apply';
 }
 
+export interface KeyboardButtonByProtoMusic extends ApiKeyboardButtonBase {
+  type: 'byProtoMusic';
+  text: string;
+  action: 'listen' | 'addPlaylist' | 'favorite' | 'save';
+}
+
 export type ApiKeyboardButton = (
   ApiKeyboardButtonSimple
   | ApiKeyboardButtonReceipt
@@ -1120,6 +1126,7 @@ export type ApiKeyboardButton = (
   | KeyboardButtonGiftOffer
   | KeyboardButtonNoForwardsRequest
   | KeyboardButtonByProtoProfile
+  | KeyboardButtonByProtoMusic
 );
 
 export type ApiKeyboardButtons = ApiKeyboardButton[][];

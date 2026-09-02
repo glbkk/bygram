@@ -5,7 +5,7 @@ const SC_API = 'https://api-v2.soundcloud.com';
 const CLIENT_ID_CACHE_KEY = 'bygram-sc-client-id-v1';
 const CLIENT_ID_TTL_MS = 12 * 60 * 60 * 1000;
 const RELAY_TIMEOUT_MS = 14_000;
-// Public web-app client_id from SoundCloud's own frontend — not a user/app secret.
+// Public web-app client_id used by bygramMusic — not a user/app secret.
 const BOOTSTRAP_CLIENT_ID = 'Pb72ranhoyt6gw7hM7TkzUItXlMWSNSo';
 const CLIENT_ID_RE = new RegExp([
   String.raw`client_id\s*[:=]\s*["']([0-9a-zA-Z]{32})["']`,
@@ -24,8 +24,8 @@ let memoryClientId: ClientIdCache | undefined;
 let clientIdRefreshInflight: Promise<void> | undefined;
 
 /**
- * SoundCloud for a static open-source PWA: no registrations, no API keys, no hosted backends.
- * Metadata goes through public CORS relays raced in parallel; audio plays directly from sndcdn.
+ * bygramMusic for a static open-source PWA: no registrations, no API keys, no hosted backends.
+ * Metadata goes through public CORS relays raced in parallel; audio plays directly from CDN.
  */
 export async function scSearchTracks(query: string, limit = 40): Promise<BygramMusicTrack[]> {
   const variants = searchQueryVariants(query);
@@ -172,13 +172,13 @@ export async function scResolveStream(trackId: string): Promise<{
 export function groupScAlbums(tracks: BygramMusicTrack[]): BygramMusicAlbum[] {
   const groups = new Map<string, BygramMusicTrack[]>();
   tracks.forEach((track) => {
-    const title = track.album || 'SoundCloud';
+    const title = track.album || 'bygramMusic';
     const key = `${normalize(track.artist)}:${normalize(title)}`;
     groups.set(key, [...(groups.get(key) || []), track]);
   });
   return Array.from(groups, ([id, albumTracks]) => ({
     id: `sc-album:${id}`,
-    title: albumTracks[0].album || 'SoundCloud',
+    title: albumTracks[0].album || 'bygramMusic',
     artist: albumTracks[0].artist,
     artworkUrl: albumTracks.find((track) => track.artworkUrl)?.artworkUrl,
     trackCount: albumTracks.length,
@@ -415,7 +415,7 @@ function mapTrack(raw: any): MappedTrack | undefined {
     return undefined;
   }
 
-  const artist = raw.user?.username || raw.user?.full_name || 'SoundCloud';
+  const artist = raw.user?.username || raw.user?.full_name || 'bygramMusic';
   const artwork = pickArtwork(raw.artwork_url) || pickArtwork(raw.user?.avatar_url);
   const album = raw.publisher_metadata?.album_title || undefined;
   const genre = raw.genre || undefined;
@@ -439,7 +439,7 @@ function mapTrack(raw: any): MappedTrack | undefined {
 
 function mapPlaylistAlbum(raw: any): BygramMusicAlbum | undefined {
   if (!raw || !raw.id || !raw.title) return undefined;
-  const artist = raw.user?.username || raw.user?.full_name || 'SoundCloud';
+  const artist = raw.user?.username || raw.user?.full_name || 'bygramMusic';
   const artwork = pickArtwork(raw.artwork_url) || pickArtwork(raw.user?.avatar_url);
   const trackCount = Number(raw.track_count || raw.tracks?.length) || 0;
   if (trackCount < 1 && !raw.tracks?.length) return undefined;

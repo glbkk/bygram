@@ -55,6 +55,14 @@ const InlineButtons = ({ className, inlineButtons, onClick }: OwnProps) => {
         return <Icon className={styles.cornerIcon} name="copy" />;
       case 'byProtoProfile':
         return <Icon className={styles.leftIcon} name={button.action === 'preview' ? 'eye' : 'check'} />;
+      case 'byProtoMusic':
+        if (button.action === 'listen') {
+          return <Icon className={styles.leftIcon} name="play" />;
+        }
+        if (button.action === 'addPlaylist' || button.action === 'save') {
+          return <Icon className={styles.leftIcon} name="add" />;
+        }
+        return <Icon className={styles.leftIcon} name="heart" />;
       case 'suggestedMessage':
         if (button.buttonType === 'suggestChanges') {
           return <Icon className={styles.leftIcon} name="edit" />;

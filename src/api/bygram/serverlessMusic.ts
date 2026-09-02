@@ -50,7 +50,11 @@ class BygramServerlessMusic {
     return Promise.resolve(undefined);
   }
 
-  /** Instant paint from local cache — never waits on SoundCloud relays. */
+  rememberMusicTrack(track: BygramMusicTrack) {
+    cacheTracks([track]);
+  }
+
+  /** Instant paint from local cache — never waits on bygramMusic relays. */
   getCachedMusicHome(): BygramMusicHome | undefined {
     const state = loadState();
     const cached = readHomeCache();
@@ -126,7 +130,7 @@ class BygramServerlessMusic {
 
       // Personalize wave with related tracks when the user already has listening history.
       const waveSeed = favorites[0] || recent[0];
-      if (waveSeed && isSoundCloudId(waveSeed.id)) {
+      if (waveSeed && isBygramMusicRemoteId(waveSeed.id)) {
         const related = await Promise.race([
           scRelatedTracks(waveSeed.id, 40).catch(() => undefined),
           new Promise<undefined>((resolve) => {
@@ -204,7 +208,7 @@ class BygramServerlessMusic {
       return { tracks: found.slice(0, 40), albums: groupAlbums(found).slice(0, 20) };
     }
 
-    // Don't pretend "nothing found" when SoundCloud relays failed — UI should retry.
+    // Don't pretend "nothing found" when bygramMusic relays failed — UI should retry.
     if (remoteFailed) throw new Error('SEARCH_UNAVAILABLE');
     return { tracks: [], albums: [] };
   }
@@ -233,7 +237,7 @@ class BygramServerlessMusic {
   }
 
   async getMusicTrackWave(trackId: string) {
-    if (isSoundCloudId(trackId)) {
+    if (isBygramMusicRemoteId(trackId)) {
       const remote = await scRelatedTracks(trackId, 40).catch(() => undefined);
       if (remote?.length) {
         cacheTracks(remote);
@@ -311,7 +315,7 @@ class BygramServerlessMusic {
   async startMusicPlay(trackId: string): Promise<BygramMusicPlay> {
     rememberPlayed(trackId);
 
-    if (isSoundCloudId(trackId)) {
+    if (isBygramMusicRemoteId(trackId)) {
       const play = await scResolveStream(trackId);
       cacheTracks([play.track]);
       return {
@@ -338,7 +342,7 @@ class BygramServerlessMusic {
   async downloadMusicTrack(track: BygramMusicTrack) {
     let url = resolveAssetUrl(track.audioUrl);
     let mimeType = track.mimeType || 'audio/mpeg';
-    if (isSoundCloudId(track.id)) {
+    if (isBygramMusicRemoteId(track.id)) {
       const play = await scResolveStream(track.id);
       url = play.streamUrl;
       mimeType = play.mimeType || mimeType;
@@ -352,6 +356,47 @@ class BygramServerlessMusic {
     return new File([blob], `${safeFileName(track.artist)} - ${safeFileName(track.title)}.${extension}`, {
       type: mimeType,
     });
+  }
+
+  async downloadMusicPlaylist(playlist: BygramMusicPlaylist, limit = 20) {
+    const tracks = playlist.tracks.slice(0, limit);
+    const files: File[] = [];
+    for (const track of tracks) {
+      try {
+        files.push(await this.downloadMusicTrack(track));
+      } catch {
+        // Skip tracks that fail to download; send whatever we could prepare.
+      }
+    }
+    if (!files.length) throw new Error('PLAYLIST_DOWNLOAD_FAILED');
+    return files;
+  }
+
+  async resolveMusicPlaylistPayload(name: string, trackIds: string[]) {
+    const tracks = await resolveTracks(trackIds);
+    cacheTracks(tracks);
+    const now = new Date().toISOString();
+    return {
+      id: `byproto-${hash(trackIds.join(','))}`,
+      name,
+      trackIds: tracks.map((track) => track.id),
+      tracks,
+      createdAt: now,
+      updatedAt: now,
+      isOwn: false,
+      ownerTelegramUserId: '',
+      type: 'custom' as const,
+    } satisfies BygramMusicPlaylist;
+  }
+
+  async importMusicPlaylist(name: string, trackIds: string[]) {
+    const tracks = await resolveTracks(trackIds);
+    cacheTracks(tracks);
+    let playlist = await this.createMusicPlaylist(name.slice(0, 80) || 'Плейлист bygramMusic');
+    for (const track of tracks) {
+      playlist = await this.updateMusicPlaylist(playlist.id, track.id, true);
+    }
+    return playlist;
   }
 
   private async getPlaylist(id: string) {
@@ -379,7 +424,7 @@ async function resolveTracks(ids: string[]) {
   });
 
   if (missing.length) {
-    const scMissing = missing.filter(isSoundCloudId);
+    const scMissing = missing.filter(isBygramMusicRemoteId);
     if (scMissing.length) {
       try {
         cacheTracks(await scTracksByIds(scMissing));
@@ -389,14 +434,14 @@ async function resolveTracks(ids: string[]) {
     }
 
     const refreshed = loadTrackCache();
-    const stillMissing = missing.filter((id) => !refreshed[id] && !isSoundCloudId(id));
+    const stillMissing = missing.filter((id) => !refreshed[id] && !isBygramMusicRemoteId(id));
     if (stillMissing.length) {
       try {
         const catalog = await loadCatalog();
         const byId = new Map(catalog.map((track) => [track.id, track]));
         cacheTracks(stillMissing.map((id) => byId.get(id)).filter(Boolean));
       } catch {
-        // Local catalog is optional when SoundCloud is available.
+        // Local catalog is optional when bygramMusic is available.
       }
     }
   }
@@ -657,7 +702,7 @@ function resolveAssetUrl(path: string) {
   return new URL(path, document.baseURI).toString();
 }
 
-function isSoundCloudId(id: string) {
+function isBygramMusicRemoteId(id: string) {
   return id.startsWith('sc:') || /^\d{5,}$/.test(id);
 }
 

@@ -40,11 +40,25 @@ const NewChatButton: FC<OwnProps> = ({
       <Button
         round
         color="primary"
+        className="music-fab-button"
         onClick={handleClick}
         ariaLabel="Музыка"
         tabIndex={-1}
-        iconName="note"
-      />
+      >
+        <svg
+          className="music-fab-icon"
+          viewBox="0 0 24 24"
+          width="24"
+          height="24"
+          aria-hidden="true"
+          focusable="false"
+        >
+          <path
+            fill="currentColor"
+            d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"
+          />
+        </svg>
+      </Button>
     </div>
   );
 };

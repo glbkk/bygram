@@ -40,6 +40,10 @@ export function validateByProtoEnvelope(value: unknown, encodedSize?: number): V
       return validateProfileBanner(envelope);
     case 'client.capabilities':
       return validateCapabilities(envelope);
+    case 'music.track':
+      return validateMusicTrack(envelope);
+    case 'music.playlist':
+      return validateMusicPlaylist(envelope);
     default:
       return undefined;
   }
@@ -97,6 +101,49 @@ function validateCapabilities(envelope: ByProtoEnvelope): ValidByProtoEnvelope |
   if (!isRecord(payload) || payload.protocol !== BYPROTO_VERSION || !Array.isArray(payload.features)) return undefined;
   if (payload.features.length > BYPROTO_FEATURES.length) return undefined;
   if (!payload.features.every((feature) => typeof feature === 'string' && features.has(feature))) return undefined;
+  return envelope as ValidByProtoEnvelope;
+}
+
+function validateMusicTrack(envelope: ByProtoEnvelope): ValidByProtoEnvelope | undefined {
+  const payload = envelope.payload;
+  if (!isRecord(payload)) return undefined;
+  if (typeof payload.id !== 'string' || payload.id.length < 3 || payload.id.length > 80) return undefined;
+  if (typeof payload.title !== 'string' || !payload.title.trim() || payload.title.length > 120) return undefined;
+  if (typeof payload.artist !== 'string' || !payload.artist.trim() || payload.artist.length > 120) return undefined;
+  if (!isSafeInteger(payload.durationSeconds) || payload.durationSeconds < 1 || payload.durationSeconds > 36000) {
+    return undefined;
+  }
+  if (typeof payload.audioUrl !== 'string' || payload.audioUrl.length < 3 || payload.audioUrl.length > 260) {
+    return undefined;
+  }
+  if (payload.album !== undefined && (typeof payload.album !== 'string' || payload.album.length > 120)) {
+    return undefined;
+  }
+  if (payload.genre !== undefined && (typeof payload.genre !== 'string' || payload.genre.length > 64)) {
+    return undefined;
+  }
+  if (payload.artworkUrl !== undefined
+    && (typeof payload.artworkUrl !== 'string' || payload.artworkUrl.length > 260
+      || !/^https?:\/\//i.test(payload.artworkUrl))) {
+    return undefined;
+  }
+  if (payload.mimeType !== undefined
+    && (typeof payload.mimeType !== 'string' || payload.mimeType.length > 64)) {
+    return undefined;
+  }
+  return envelope as ValidByProtoEnvelope;
+}
+
+function validateMusicPlaylist(envelope: ByProtoEnvelope): ValidByProtoEnvelope | undefined {
+  const payload = envelope.payload;
+  if (!isRecord(payload)) return undefined;
+  if (typeof payload.name !== 'string' || !payload.name.trim() || payload.name.length > 80) return undefined;
+  if (!Array.isArray(payload.trackIds) || !payload.trackIds.length || payload.trackIds.length > 40) {
+    return undefined;
+  }
+  if (!payload.trackIds.every((id) => typeof id === 'string' && id.length >= 3 && id.length <= 80)) {
+    return undefined;
+  }
   return envelope as ValidByProtoEnvelope;
 }
 

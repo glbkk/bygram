@@ -13,10 +13,10 @@ npm run build
 
 Deploy the generated `dist/` directory as a static HTTPS site. The production build includes the PWA manifests, iPhone home-screen icons, and Service Worker. Optional API credentials and deployment URL overrides can be set through `.env` using `.env.example`.
 
-## SoundCloud music
+## bygramMusic
 
-Search and playback use SoundCloud from the browser with no accounts, API keys,
-or hosted workers. If SoundCloud is temporarily unreachable, bygram falls back to
+Search and playback use bygramMusic from the browser with no accounts, API keys,
+or hosted workers. If bygramMusic is temporarily unreachable, bygram falls back to
 the optional local `bygram-music` catalog bundled with the static build.
 
 ## Upstream

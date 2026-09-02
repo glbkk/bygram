@@ -6,6 +6,7 @@ export const BYPROTO_FEATURES = [
   'bubble-profile',
   'profile-banner',
   'custom-emoji',
+  'music-share',
 ] as const;
 
 export type ByProtoFeature = typeof BYPROTO_FEATURES[number];
@@ -94,11 +95,40 @@ export type ByProtoCapabilitiesEnvelope = ByProtoEnvelope & {
   };
 };
 
+export type ByProtoMusicTrackPayload = {
+  id: string;
+  title: string;
+  artist: string;
+  album?: string;
+  genre?: string;
+  durationSeconds: number;
+  artworkUrl?: string;
+  audioUrl: string;
+  mimeType?: string;
+};
+
+export type ByProtoMusicTrackEnvelope = ByProtoEnvelope & {
+  type: 'music.track';
+  payload: ByProtoMusicTrackPayload;
+};
+
+export type ByProtoMusicPlaylistPayload = {
+  name: string;
+  trackIds: string[];
+};
+
+export type ByProtoMusicPlaylistEnvelope = ByProtoEnvelope & {
+  type: 'music.playlist';
+  payload: ByProtoMusicPlaylistPayload;
+};
+
 export type ValidByProtoEnvelope =
   | ByProtoEmojiMessageEnvelope
   | ByProtoProfileUpdateEnvelope
   | ByProtoProfileBannerEnvelope
-  | ByProtoCapabilitiesEnvelope;
+  | ByProtoCapabilitiesEnvelope
+  | ByProtoMusicTrackEnvelope
+  | ByProtoMusicPlaylistEnvelope;
 
 export type ByProtoPeerProfile = {
   peerId: string;
