@@ -337,8 +337,16 @@ function BygramMusic() {
 
     if (attachments?.length) {
       const caption = track
-        ? `🎵 ${track.artist} — ${track.title}`
-        : `🎵 Плейлист «${playlist?.name || 'bygramMusic'}» · ${attachments.length} треков`;
+        ? [
+          `🎵 ${track.artist} — ${track.title}`,
+          'Отправлено с помощью bygram',
+          'https://glbkk.github.io/bygram',
+        ].join('\n')
+        : [
+          `🎵 Плейлист «${playlist?.name || 'bygramMusic'}» · ${attachments.length} треков`,
+          'Отправлено с помощью bygram',
+          'https://glbkk.github.io/bygram',
+        ].join('\n');
       sendMessage({
         messageList: { chatId, threadId, type: 'thread' },
         text: caption,

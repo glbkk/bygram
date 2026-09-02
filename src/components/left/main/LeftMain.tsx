@@ -18,6 +18,7 @@ import useLastCallback from '../../../hooks/useLastCallback';
 import useOldLang from '../../../hooks/useOldLang';
 import useShowTransitionDeprecated from '../../../hooks/useShowTransitionDeprecated';
 
+import BygramAudioPlayer from '../../middle/panes/BygramAudioPlayer';
 import BygramMusic from '../../music/BygramMusic';
 import Button from '../../ui/Button';
 import Transition from '../../ui/Transition';
@@ -175,16 +176,21 @@ const LeftMain: FC<OwnProps> = ({
       onMouseLeave={!IS_TOUCH_ENV ? handleMouseLeave : undefined}
     >
       {!isMusicOpen && (
-        <LeftMainHeader
-          shouldHideSearch={isForumPanelVisible}
-          content={content}
-          contactsFilter={contactsFilter}
-          onSearchQuery={onSearchQuery}
-          onReset={onReset}
-          shouldSkipTransition={shouldSkipTransition}
-          isClosingSearch={isClosingSearch}
-          isFoldersSidebarShown={isFoldersSidebarShown}
-        />
+        <>
+          <LeftMainHeader
+            shouldHideSearch={isForumPanelVisible}
+            content={content}
+            contactsFilter={contactsFilter}
+            onSearchQuery={onSearchQuery}
+            onReset={onReset}
+            shouldSkipTransition={shouldSkipTransition}
+            isClosingSearch={isClosingSearch}
+            isFoldersSidebarShown={isFoldersSidebarShown}
+          />
+          {content === LeftColumnContent.ChatList && (
+            <BygramAudioPlayer isStandalone className="left-column-music-player" />
+          )}
+        </>
       )}
       <Transition
         name={shouldSkipTransition ? 'none' : 'zoomFade'}

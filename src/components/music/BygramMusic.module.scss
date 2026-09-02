@@ -470,8 +470,6 @@
 }
 
 @media (max-width: 600px) {
-  .miniControls .miniBtn:nth-child(1),
-  .miniControls .miniBtn:nth-child(2),
   .miniControls .miniBtn:nth-child(3) {
     display: none;
   }

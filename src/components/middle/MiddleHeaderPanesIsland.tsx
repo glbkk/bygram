@@ -28,6 +28,7 @@ import {
 import GroupCallTopPane from '../calls/group/GroupCallTopPane';
 import BotAdPane from './panes/BotAdPane';
 import BotVerificationPane from './panes/BotVerificationPane';
+import BygramAudioPlayer from './panes/BygramAudioPlayer';
 import ChatReportPane from './panes/ChatReportPane';
 import HeaderPinnedMessage from './panes/HeaderPinnedMessage';
 import PaidMessageChargePane from './panes/PaidMessageChargePane';
@@ -105,10 +106,12 @@ const MiddleHeaderPanesIsland = ({
   const [getBotAdState, setBotAdState] = useSignal<PaneState>(FALLBACK_PANE_STATE);
   const [getBotVerificationState, setBotVerificationState] = useSignal<PaneState>(FALLBACK_PANE_STATE);
   const [getPaidMessageChargeState, setPaidMessageChargeState] = useSignal<PaneState>(FALLBACK_PANE_STATE);
+  const [getBygramPlayerState, setBygramPlayerState] = useSignal<PaneState>(FALLBACK_PANE_STATE);
 
   const isGroupCallShown = threadId === MAIN_THREAD_ID && !chat?.isForum;
 
   const paneStateGetters = [
+    getBygramPlayerState,
     isGroupCallShown ? getGroupCallState : getFallbackPaneState,
     getChatReportState, getBotVerificationState,
     getPinnedState, getBotAdState, getPaidMessageChargeState,
@@ -383,7 +386,7 @@ const MiddleHeaderPanesIsland = ({
 
     settleRef.current = settle;
     settle();
-  }, [cacheKey, getGroupCallState, getPinnedState,
+  }, [cacheKey, getBygramPlayerState, getGroupCallState, getPinnedState,
     getChatReportState, getBotAdState, getBotVerificationState, getPaidMessageChargeState]);
 
   if (!shouldRender) return undefined;
@@ -399,6 +402,10 @@ const MiddleHeaderPanesIsland = ({
         )
       }
     >
+      <BygramAudioPlayer
+        isHidden={isHidden}
+        onPaneStateChange={setBygramPlayerState}
+      />
       {isGroupCallShown && (
         <GroupCallTopPane
           chatId={chatId}

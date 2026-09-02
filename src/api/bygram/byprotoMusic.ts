@@ -43,6 +43,12 @@ export function queueByProtoTrackForPlaylist(payload: ByProtoMusicTrackPayload) 
   return pendingPlaylistTrack;
 }
 
+export function queueTrackForPlaylist(track: BygramMusicTrack) {
+  pendingPlaylistTrack = track;
+  bygramMusicApi.rememberMusicTrack(track);
+  return track;
+}
+
 export function takePendingPlaylistTrack() {
   const track = pendingPlaylistTrack;
   pendingPlaylistTrack = undefined;

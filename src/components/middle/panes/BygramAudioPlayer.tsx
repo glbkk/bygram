@@ -7,7 +7,9 @@ import { LeftColumnContent } from '../../../types';
 import { selectTabState } from '../../../global/selectors';
 import { IS_TOUCH_ENV } from '../../../util/browser/windowEnvironment';
 import buildClassName from '../../../util/buildClassName';
+import { queueTrackForPlaylist } from '../../../api/bygram/byprotoMusic';
 import { bygramMusicPlayer } from '../../../api/bygram/musicPlayer';
+import { bygramMusicApi } from '../../../api/bygram/serverlessMusic';
 
 import useAppLayout from '../../../hooks/useAppLayout';
 import useBygramMusicPlayer from '../../../hooks/useBygramMusicPlayer';
@@ -26,6 +28,8 @@ type OwnProps = {
   noUi?: boolean;
   isCompact?: boolean;
   isHidden?: boolean;
+  /** Static in-flow bar (left chat list under header). Skips header-pane absolute positioning. */
+  isStandalone?: boolean;
   onPaneStateChange?: (state: PaneState) => void;
 };
 
@@ -42,16 +46,17 @@ const BygramAudioPlayer: FC<OwnProps & StateProps> = ({
   noUi,
   isCompact,
   isHidden,
+  isStandalone,
   hasTelegramAudio,
   onPaneStateChange,
 }) => {
-  const { openLeftColumnContent } = getActions();
+  const { openLeftColumnContent, showNotification } = getActions();
   const lang = useOldLang();
   const { isMobile } = useAppLayout();
   const player = useBygramMusicPlayer();
 
   const isOpen = Boolean(player.track) && !hasTelegramAudio && !isHidden;
-  const isPane = !noUi;
+  const isPane = !noUi && !isStandalone;
 
   const { ref, shouldRender } = useHeaderPane({
     isOpen,
@@ -71,14 +76,76 @@ const BygramAudioPlayer: FC<OwnProps & StateProps> = ({
     openLeftColumnContent({ contentKey: LeftColumnContent.Music });
   });
 
-  if (noUi || !shouldRender || !player.track) {
+  const handleToggleLike = useLastCallback(() => {
+    const track = player.track;
+    if (!track) return;
+    const liked = !player.isLiked;
+    bygramMusicPlayer.reflectLiked(track.id, liked);
+    void bygramMusicApi.ensureSession()
+      .then(() => bygramMusicApi.setMusicLiked(track.id, liked))
+      .then(() => {
+        showNotification({ message: liked ? 'Добавлено в избранное' : 'Убрано из избранного' });
+      })
+      .catch(() => {
+        bygramMusicPlayer.reflectLiked(track.id, !liked);
+        showNotification({ message: 'Не удалось обновить избранное' });
+      });
+  });
+
+  const handleAddToPlaylist = useLastCallback(() => {
+    const track = player.track;
+    if (!track) return;
+    queueTrackForPlaylist(track);
+    openLeftColumnContent({ contentKey: LeftColumnContent.Music });
+    showNotification({ message: 'Выберите плейлист в bygramMusic' });
+  });
+
+  if (noUi) {
+    return undefined;
+  }
+
+  if (!isStandalone && (!shouldRender || !player.track)) {
+    return undefined;
+  }
+
+  if (isStandalone && !isOpen) {
+    return undefined;
+  }
+
+  if (!player.track) {
     return undefined;
   }
 
   const title = player.track.title;
   const subtitle = player.track.artist;
 
-  if (isCompact) {
+  const likeButton = (
+    <Button
+      round
+      ripple={!IS_TOUCH_ENV && !isMobile}
+      color="translucent"
+      size="smaller"
+      className="player-button"
+      onClick={handleToggleLike}
+      ariaLabel={player.isLiked ? 'Убрать из избранного' : 'В избранное'}
+      iconName={player.isLiked ? 'heart' : 'heart-outline'}
+    />
+  );
+
+  const playlistButton = (
+    <Button
+      round
+      ripple={!IS_TOUCH_ENV && !isMobile}
+      color="translucent"
+      size="smaller"
+      className="player-button"
+      onClick={handleAddToPlaylist}
+      ariaLabel="В плейлист"
+      iconName="add"
+    />
+  );
+
+  if (isCompact || isStandalone) {
     return (
       <div
         className={buildClassName(
@@ -86,11 +153,12 @@ const BygramAudioPlayer: FC<OwnProps & StateProps> = ({
           'full-width-player',
           'compact-player',
           'BygramAudioPlayer',
-          !isOpen && 'island-player-closing',
+          isStandalone && 'standalone-player',
+          !isOpen && !isStandalone && 'island-player-closing',
           className,
         )}
         dir={lang.isRtl ? 'rtl' : undefined}
-        ref={ref}
+        ref={isStandalone ? undefined : ref}
       >
         <Button
           round
@@ -108,6 +176,8 @@ const BygramAudioPlayer: FC<OwnProps & StateProps> = ({
           {renderMeta(title, subtitle)}
           <RippleEffect />
         </div>
+        {likeButton}
+        {playlistButton}
         <Button
           round
           className="player-close"
@@ -137,6 +207,9 @@ const BygramAudioPlayer: FC<OwnProps & StateProps> = ({
         {renderMeta(title, subtitle)}
         <RippleEffect />
       </div>
+
+      {likeButton}
+      {playlistButton}
 
       <Button
         round

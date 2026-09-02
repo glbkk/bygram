@@ -246,6 +246,13 @@
     text-align: center;
   }
 
+  &.standalone-player {
+    position: relative;
+    top: auto;
+    transform: none;
+    opacity: 1;
+  }
+
   &.island-player {
     --player-transform-transition: transform var(--layer-transition);
     --player-shift-x: 0px;
