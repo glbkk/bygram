@@ -11,7 +11,7 @@ import { getActions, getGlobal, withGlobal } from '../../global';
 import type { ApiChatFolder, ApiLimitTypeWithModal, ApiStarGiftAuctionState, ApiUser } from '../../api/types';
 import type { TabState } from '../../global/types';
 
-import { BASE_EMOJI_KEYWORD_LANG, DEBUG, FOLDERS_POSITION_LEFT, INACTIVE_MARKER } from '../../config';
+import { BASE_EMOJI_KEYWORD_LANG, DEBUG, FOLDERS_POSITION_LEFT, INACTIVE_MARKER, MOBILE_LAYER_ANIMATION_DURATION_MS } from '../../config';
 import { requestNextMutation } from '../../lib/fasterdom/fasterdom';
 import {
   selectAreFoldersPresent,
@@ -505,14 +505,16 @@ const Main = ({
       });
     }
 
-    const endHeavyAnimation = beginHeavyAnimation();
+    const endHeavyAnimation = isMobile
+      ? beginHeavyAnimation(MOBILE_LAYER_ANIMATION_DURATION_MS)
+      : beginHeavyAnimation();
 
     waitForTransitionEnd(document.getElementById('MiddleColumn')!, () => {
       endHeavyAnimation();
       willAnimateLeftColumnRef.current = false;
       forceUpdate();
-    });
-  }, [isLeftColumnOpen, withInterfaceAnimations, forceUpdate]);
+    }, 'transform', isMobile ? MOBILE_LAYER_ANIMATION_DURATION_MS : undefined);
+  }, [isLeftColumnOpen, withInterfaceAnimations, forceUpdate, isMobile]);
 
   useShowTransition({
     ref: containerRef,

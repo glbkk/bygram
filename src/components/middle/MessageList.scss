@@ -180,7 +180,7 @@
     position: relative;
     transform: scale(1);
     opacity: 1;
-    transition: opacity 0.2s ease, transform 0.2s ease;
+    transition: opacity 0.15s ease-out, transform 0.15s ease-out;
 
     &::before {
       content: "";
@@ -203,7 +203,7 @@
     }
 
     &:not(.open) {
-      transform: scale(0.8);
+      transform: translateY(0.5rem);
       opacity: 0;
     }
 

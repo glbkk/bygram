@@ -14,6 +14,7 @@ import {
   EDITABLE_INPUT_ID,
   GENERAL_TOPIC_ID,
   LAYER_TRANSITION_DURATION,
+  MOBILE_LAYER_ANIMATION_DURATION_MS,
   SUPPORTED_PHOTO_CONTENT_TYPES,
   SUPPORTED_VIDEO_CONTENT_TYPES,
   TMP_CHAT_ID,
@@ -64,7 +65,6 @@ import {
 import buildClassName from '../../util/buildClassName';
 import { getBygramChatWallpaperKey } from '../../util/bygramCustomization';
 import captureEscKeyListener from '../../util/captureEscKeyListener';
-import { waitForTransitionEnd } from '../../util/cssAnimationEndListeners';
 import { isUserId } from '../../util/entities/ids';
 import { resolveTransitionName } from '../../util/resolveTransitionName';
 import getHasMiddleFooter, { getHasFooterActionBar } from './helpers/getHasMiddleFooter';
@@ -184,7 +184,7 @@ function isVideo(item: DataTransferItem) {
 }
 
 const LAYER_ANIMATION_DURATION_MS = LAYER_TRANSITION_DURATION + ANIMATION_END_DELAY;
-const KEYBOARD_SETTLE_DURATION = 400;
+const KEYBOARD_SETTLE_DURATION = 200;
 const AT_BOTTOM_TOLERANCE_PX = 8;
 
 function MiddleColumn({
@@ -279,7 +279,7 @@ function MiddleColumn({
     getLoadingPinnedId,
   } = usePinnedMessage(chatId, threadId, pinnedIds);
 
-  const closeAnimationDuration = isMobile ? LAYER_ANIMATION_DURATION_MS : undefined;
+  const closeAnimationDuration = isMobile ? MOBILE_LAYER_ANIMATION_DURATION_MS : undefined;
 
   const renderingChatId = usePrevDuringAnimation(chatId, closeAnimationDuration);
   const renderingThreadId = usePrevDuringAnimation(threadId, closeAnimationDuration);
@@ -389,8 +389,6 @@ function MiddleColumn({
     prevTransitionKey,
     chatId,
     isMobile,
-    isLeftColumnShown,
-    middleColumnRef,
   );
 
   useEffect(() => {
@@ -943,11 +941,12 @@ function useIsReady(
   prevTransitionKey?: number,
   chatId?: string,
   isMobile?: boolean,
-  isLeftColumnShown?: boolean,
-  middleColumnRef?: ElementRef<HTMLDivElement>,
 ) {
-  const [isReady, setIsReady] = useState(!isMobile);
+  // Mobile used to stay "not ready" for the whole column slide (~340ms), which made open/back feel laggy.
+  // Mark ready as soon as a chat is selected so the list/composer are interactive during the short slide.
+  const [isReady, setIsReady] = useState(Boolean(chatId) || !isMobile);
   const forceUpdate = useForceUpdate();
+  const layerDurationMs = isMobile ? MOBILE_LAYER_ANIMATION_DURATION_MS : LAYER_ANIMATION_DURATION_MS;
 
   const willSwitchMessageList = prevTransitionKey !== undefined && prevTransitionKey !== currentTransitionKey;
   useSyncEffect(() => {
@@ -961,8 +960,8 @@ function useIsReady(
     // Make sure to end even if end callback was not called (which was some hardly-reproducible bug)
     window.setTimeout(() => {
       setIsReady(true);
-    }, LAYER_ANIMATION_DURATION_MS);
-  }, [willSwitchMessageList, withAnimations]);
+    }, layerDurationMs);
+  }, [willSwitchMessageList, withAnimations, layerDurationMs]);
 
   useSyncEffect(() => {
     if (!withAnimations) {
@@ -970,8 +969,8 @@ function useIsReady(
     }
   }, [withAnimations]);
 
-  // Mobile only: wait until `MiddleColumn` slides in after the left column closes
-  useSyncEffect(([prevIsLeftColumnShown, prevWillSwitchMessageList]) => {
+  // Mobile: become ready immediately when opening a chat (do not wait for transform end).
+  useSyncEffect(() => {
     if (!isMobile) {
       return;
     }
@@ -981,36 +980,17 @@ function useIsReady(
       return;
     }
 
-    if (!withAnimations) {
+    if (!withAnimations || !willSwitchMessageList) {
       setIsReady(true);
-      return;
     }
-
-    if (willSwitchMessageList || prevWillSwitchMessageList) {
-      return;
-    }
-
-    if (isLeftColumnShown) {
-      setIsReady(false);
-      return;
-    }
-
-    if (prevIsLeftColumnShown !== true) {
-      setIsReady(true);
-      return;
-    }
-
-    waitForTransitionEnd(middleColumnRef!.current!, () => {
-      setIsReady(true);
-    }, 'transform', LAYER_ANIMATION_DURATION_MS);
-  }, [isLeftColumnShown, willSwitchMessageList, chatId, isMobile, withAnimations, middleColumnRef]);
+  }, [willSwitchMessageList, chatId, isMobile, withAnimations]);
 
   function handleSlideTransitionStop() {
     setIsReady(true);
   }
 
   return {
-    isReady: isReady && !willSwitchMessageList,
+    isReady: isMobile ? isReady : (isReady && !willSwitchMessageList),
     handleSlideTransitionStop: withAnimations ? handleSlideTransitionStop : undefined,
   };
 }

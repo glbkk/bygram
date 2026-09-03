@@ -280,6 +280,10 @@ export const MENU_TRANSITION_DURATION = 200;
 // to cover, panes stay mounted after they have visually gone and controls stay inert after they settle.
 export const SLIDE_TRANSITION_DURATION = 240;
 export const LAYER_TRANSITION_DURATION = 240;
+// Mobile chat↔list must track the faster `--layer-transition` / `--slide-transition` under
+// `@media (max-width: 925px)`. Keep end padding small so interactivity returns near-instantly.
+export const MOBILE_LAYER_TRANSITION_DURATION = 140;
+export const MOBILE_LAYER_ANIMATION_DURATION_MS = MOBILE_LAYER_TRANSITION_DURATION + 40;
 
 export const BIRTHDAY_NUMBERS_SET = 'FestiveFontEmoji';
 export const RESTRICTED_EMOJI_SET = 'RestrictedEmoji';

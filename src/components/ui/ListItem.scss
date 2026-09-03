@@ -163,6 +163,8 @@
         &.active {
           --background-color: var(--color-chat-hover);
         }
+
+        transition: background-color 80ms ease-out;
       }
     }
   }

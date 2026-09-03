@@ -165,9 +165,20 @@ const ListItem = ({
     onClick(e, clickArg);
 
     if (IS_TOUCH_ENV && !ripple) {
+      // Keep a brief flash if touch-end already cleared the press state
       markIsTouched();
       requestMeasure(unmarkIsTouched);
     }
+  });
+
+  const handleTouchStart = useLastCallback(() => {
+    if (!IS_TOUCH_ENV || ripple || inactive || disabled) return;
+    markIsTouched();
+  });
+
+  const handleTouchEnd = useLastCallback(() => {
+    if (!IS_TOUCH_ENV || ripple) return;
+    unmarkIsTouched();
   });
 
   const {
@@ -243,6 +254,9 @@ const ListItem = ({
         tabIndex={!isStatic ? 0 : undefined}
         onClick={(!inactive && IS_TOUCH_ENV) ? handleClick : handleClickEvent}
         onMouseDown={handleMouseDown}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
         onContextMenu={onContextMenu || ((!inactive && contextActions) ? handleContextMenu : undefined)}
         aria-disabled={disabled || undefined}
       >

@@ -140,6 +140,7 @@ import { MEMO_EMPTY_ARRAY } from '../../util/memo';
 import { getServerTime } from '../../util/serverTime';
 import stopEvent from '../../util/stopEvent';
 import { getUtf8Length } from '../../util/textFormat';
+import { vibrateImpact } from '../../util/vibrate';
 import { prepareRoundVideo } from '../../util/videoRecording/prepareRoundVideo';
 import windowSize from '../../util/windowSize';
 import applyIosAutoCapitalizationFix from '../middle/composer/helpers/applyIosAutoCapitalizationFix';
@@ -1423,6 +1424,7 @@ const Composer = ({
 
       if (currentAttachments.length) {
         if (canSendAttachments(currentAttachments)) {
+          vibrateImpact();
           sendAttachments({
             attachments: currentAttachments,
             scheduledAt,
@@ -1453,6 +1455,7 @@ const Composer = ({
             richMessage: richMessageToSend,
           });
         } else {
+          vibrateImpact();
           sendMessage({
             messageList: currentMessageList,
             richMessage: richMessageToSend,
@@ -1494,6 +1497,7 @@ const Composer = ({
 
         if (areEffectsSupported) saveEffectInDraft({ chatId, threadId, effectId: undefined });
 
+        vibrateImpact();
         sendMessage({
           messageList: currentMessageList,
           text,

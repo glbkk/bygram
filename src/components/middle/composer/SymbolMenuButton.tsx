@@ -18,7 +18,7 @@ import ResponsiveHoverButton from '../../ui/ResponsiveHoverButton';
 import Spinner from '../../ui/Spinner';
 import SymbolMenu from './SymbolMenu.async';
 
-const MOBILE_KEYBOARD_HIDE_DELAY_MS = 100;
+const MOBILE_KEYBOARD_HIDE_DELAY_MS = 0;
 
 type OwnProps = {
   chatId: string;

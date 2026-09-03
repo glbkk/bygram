@@ -41,6 +41,11 @@
     --hover-color-reaction-chosen: #4096ec;
   }
 
+  &.is-swiping {
+    transition: none !important;
+    transform: translateX(var(--swipe-reply-offset, 0px)) !important;
+  }
+
   &.is-swiped {
     transform: translateX(-2.5rem) !important;
   }

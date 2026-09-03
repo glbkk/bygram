@@ -7,7 +7,9 @@ import type { Signal } from '../../../../util/signals';
 import { requestMeasure } from '../../../../lib/fasterdom/fasterdom';
 import { IS_ANDROID, IS_TOUCH_ENV } from '../../../../util/browser/windowEnvironment';
 import { captureEvents, SwipeDirection } from '../../../../util/captureEvents';
+import { clamp } from '../../../../util/math';
 import stopEvent from '../../../../util/stopEvent';
+import { vibrateImpact, vibrateShort } from '../../../../util/vibrate';
 import windowSize from '../../../../util/windowSize';
 import { REM } from '../../../common/helpers/mediaDimensions';
 import { preventMessageInputBlur } from '../../helpers/preventMessageInputBlur';
@@ -15,8 +17,10 @@ import { preventMessageInputBlur } from '../../helpers/preventMessageInputBlur';
 import useFlag from '../../../../hooks/useFlag';
 import useThrottledCallback from '../../../../hooks/useThrottledCallback';
 
-const ANDROID_KEYBOARD_HIDE_DELAY_MS = 350;
+const ANDROID_KEYBOARD_HIDE_DELAY_MS = 150;
 const SWIPE_ANIMATION_DURATION = 150;
+const REPLY_SWIPE_MAX_PX = 2.5 * REM;
+const REPLY_SWIPE_THRESHOLD_PX = 1.25 * REM;
 const QUICK_REACTION_DOUBLE_TAP_DELAY = 200;
 const QUICK_REACTION_AREA_WIDTH = 3 * REM;
 const QUICK_REACTION_AREA_HEIGHT = Number(REM);
@@ -152,31 +156,67 @@ export default function useOuterHandlers(
     }
 
     let startedAt: number | undefined;
+    let messageEl: HTMLElement | undefined;
+    let hasPassedThreshold = false;
+    let lastOffsetX = 0;
+
+    const clearSwipeStyle = () => {
+      if (!messageEl) return;
+      messageEl.classList.remove('is-swiping');
+      messageEl.style.removeProperty('--swipe-reply-offset');
+    };
+
     return captureEvents(containerRef.current!, {
       selectorToPreventScroll: '.MessageList',
       excludedClosestSelector: '.no-word-wrap',
       onSwipe: (e, direction) => {
-        if (direction === SwipeDirection.Left) {
-          if (!startedAt) {
-            startedAt = Date.now();
-          }
-
-          markSwiped();
-
-          return true;
+        if (direction !== SwipeDirection.Left) {
+          return false;
         }
 
-        return false;
+        if (!startedAt) {
+          startedAt = Date.now();
+          messageEl = (e.target as HTMLElement)?.closest?.('.Message') || containerRef.current || undefined;
+          hasPassedThreshold = false;
+          lastOffsetX = 0;
+          messageEl?.classList.add('is-swiping');
+        }
+
+        return true;
+      },
+      onDrag: (_e, _capture, offsets) => {
+        if (!startedAt || !messageEl) return;
+
+        const offsetX = clamp(offsets.dragOffsetX, -REPLY_SWIPE_MAX_PX, 0);
+        lastOffsetX = offsetX;
+        messageEl.style.setProperty('--swipe-reply-offset', `${offsetX}px`);
+
+        if (!hasPassedThreshold && Math.abs(offsetX) >= REPLY_SWIPE_THRESHOLD_PX) {
+          hasPassedThreshold = true;
+          vibrateShort();
+        }
       },
       onRelease: () => {
         if (!startedAt || !canReply) {
+          clearSwipeStyle();
+          startedAt = undefined;
           return;
         }
 
-        updateDraftReplyInfo({ replyToMsgId: messageId });
+        const shouldReply = hasPassedThreshold || Math.abs(lastOffsetX) >= REPLY_SWIPE_THRESHOLD_PX;
+        clearSwipeStyle();
 
-        setTimeout(unmarkSwiped, Math.max(0, SWIPE_ANIMATION_DURATION - (Date.now() - startedAt)));
+        if (shouldReply) {
+          markSwiped();
+          vibrateImpact();
+          updateDraftReplyInfo({ replyToMsgId: messageId });
+          setTimeout(unmarkSwiped, Math.max(0, SWIPE_ANIMATION_DURATION - (Date.now() - startedAt)));
+        }
+
         startedAt = undefined;
+        messageEl = undefined;
+        hasPassedThreshold = false;
+        lastOffsetX = 0;
       },
     });
   }, [

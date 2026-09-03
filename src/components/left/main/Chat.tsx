@@ -57,6 +57,7 @@ import buildClassName from '../../../util/buildClassName';
 import { isUserId } from '../../../util/entities/ids';
 import { getChatFolderIds } from '../../../util/folderManager';
 import { createLocationHash } from '../../../util/routing';
+import { vibrateShort } from '../../../util/vibrate';
 
 import { useSelectorSignal } from '../../../hooks/data/useSelector';
 import useAppLayout from '../../../hooks/useAppLayout';
@@ -299,6 +300,9 @@ const Chat: FC<OwnProps & StateProps> = ({
     }
 
     openChat({ id: chatId, noForumTopicPanel, shouldReplaceHistory: true }, { forceOnHeavyAnimation: true });
+    if (isMobile) {
+      vibrateShort();
+    }
 
     if (isSelected && canScrollDown && e.detail <= 1) {
       scrollMessageListToBottom();

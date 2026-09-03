@@ -14,7 +14,7 @@ import { type MessageListType, StoryViewerOrigin, type ThreadId } from '../../ty
 import {
   EDITABLE_INPUT_CSS_SELECTOR,
   MIN_SCREEN_WIDTH_FOR_STATIC_LEFT_COLUMN,
-  SLIDE_TRANSITION_DURATION,
+  MOBILE_LAYER_TRANSITION_DURATION,
 } from '../../config';
 import {
   getIsSavedDialog, isUserBot,
@@ -59,7 +59,7 @@ import HeaderActions from './HeaderActions';
 import './BygramGhostMode.scss';
 import './MiddleHeader.scss';
 
-const BACK_BUTTON_INACTIVE_TIME = SLIDE_TRANSITION_DURATION;
+const BACK_BUTTON_INACTIVE_TIME = MOBILE_LAYER_TRANSITION_DURATION;
 const EMOJI_STATUS_SIZE = 22;
 const SEARCH_LONGTAP_THRESHOLD = 500;
 

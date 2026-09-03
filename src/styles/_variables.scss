@@ -382,5 +382,25 @@
       --symbol-menu-width: 100vw;
       --symbol-menu-height: 17.6875rem;
     }
+
+    // Match Telegram iOS: chat open / back-to-list should feel near-instant. Keep a short slide so
+    // spatial continuity remains, but cut the old 240ms layer wait that made the UI feel sticky.
+    @media (max-width: 925px) {
+      --layer-transition: 140ms cubic-bezier(0.25, 1, 0.5, 1);
+      --layer-transition-behind: 140ms cubic-bezier(0.25, 1, 0.5, 1);
+      --slide-transition: 140ms cubic-bezier(0.25, 1, 0.5, 1);
+      --top-stack-transition: 140ms cubic-bezier(0.25, 1, 0.5, 1);
+      --chat-transform-transition: 0.14s ease-out;
+
+      body.is-ios {
+        --layer-transition: 140ms cubic-bezier(0.22, 1, 0.36, 1);
+        --layer-transition-behind: 140ms cubic-bezier(0.33, 1, 0.68, 1);
+        --slide-transition: 140ms cubic-bezier(0.25, 1, 0.5, 1);
+      }
+
+      body.is-android {
+        --slide-transition: 140ms cubic-bezier(0.16, 1, 0.3, 1);
+      }
+    }
   }
 }

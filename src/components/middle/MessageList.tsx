@@ -96,6 +96,7 @@ import { useStateRef } from '../../hooks/useStateRef';
 import useSyncEffect from '../../hooks/useSyncEffect';
 import { isBackgroundModeActive } from '../../hooks/window/useBackgroundMode';
 import useContainerHeight from './hooks/useContainerHeight';
+import useDismissKeyboardOnScroll from './hooks/useDismissKeyboardOnScroll';
 import useStickyDates from './hooks/useStickyDates';
 
 import Loading from '../ui/Loading';
@@ -196,7 +197,7 @@ const BOTTOM_SNAP_THRESHOLD = 7;
 
 const UNREAD_DIVIDER_TOP = 10;
 const SCROLL_DEBOUNCE = 200;
-const MESSAGE_ANIMATION_DURATION = 500;
+const MESSAGE_ANIMATION_DURATION = 220;
 const MIN_SEND_COLLAPSE_REVEAL_SHIFT = 1;
 const SEND_FOCUS_DURATION = SCROLL_MAX_DURATION + ANIMATION_END_DELAY;
 const BOTTOM_FOCUS_MARGIN = 0.5 * REM;
@@ -282,6 +283,8 @@ const MessageList = ({
   } = getActions();
 
   const containerRef = useRef<HTMLDivElement>();
+
+  useDismissKeyboardOnScroll(containerRef, isReady);
 
   useLayoutEffect(() => {
     const container = containerRef.current;
