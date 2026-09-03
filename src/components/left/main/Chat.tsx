@@ -330,6 +330,7 @@ const Chat: FC<OwnProps & StateProps> = ({
       return;
     }
 
+    vibrateShort();
     markRenderMuteModal();
     openMuteModal();
   });
@@ -340,6 +341,7 @@ const Chat: FC<OwnProps & StateProps> = ({
       return;
     }
 
+    vibrateShort();
     updateChatMutedState({ chatId, mutedUntil: UNMUTE_TIMESTAMP });
   });
 

@@ -78,7 +78,7 @@ enum ContentType {
 }
 
 const RENDER_COUNT = Object.keys(ContentType).length / 2;
-const RESET_TRANSITION_DELAY_MS = 250;
+const RESET_TRANSITION_DELAY_MS = 140;
 
 function LeftColumn({
   ref,

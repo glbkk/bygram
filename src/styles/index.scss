@@ -23,6 +23,10 @@ body {
   --font-weight-semibold: 500; // Note: Roboto is naturally quite bold, so 500 works well as default
 
   user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 
   overflow: hidden;
   overscroll-behavior: none;
@@ -47,6 +51,11 @@ body {
   @media (max-width: 600px) {
     height: calc(var(--vh, 1vh) * 100);
   }
+}
+
+::selection {
+  background-color: var(--color-selection-highlight);
+  color: inherit;
 }
 
 noscript {
@@ -154,6 +163,15 @@ body.cursor-ew-resize {
 
 .allow-selection {
   user-select: text;
+  -webkit-user-select: text;
+  -webkit-touch-callout: default;
+}
+
+input,
+textarea,
+[contenteditable="true"] {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .no-selection {
@@ -186,6 +204,7 @@ body.cursor-ew-resize {
 .custom-scroll-x {
   // Fix scroll lock on iOS
   pointer-events: auto;
+  overscroll-behavior: contain;
   scrollbar-color: transparent transparent;
   scrollbar-width: thin;
 

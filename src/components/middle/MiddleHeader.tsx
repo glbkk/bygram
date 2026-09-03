@@ -19,6 +19,7 @@ import {
 import {
   getIsSavedDialog, isUserBot,
 } from '../../global/helpers';
+import { vibrateShort } from '../../util/vibrate';
 import {
   selectChat,
   selectCustomEmoji,
@@ -200,6 +201,7 @@ const MiddleHeader = ({
     if (isMobile) {
       const messageInput = document.querySelector<HTMLDivElement>(EDITABLE_INPUT_CSS_SELECTOR);
       messageInput?.blur();
+      vibrateShort();
     }
 
     if (isSelectModeActive) {

@@ -7,6 +7,7 @@ import type { Signal } from '../util/signals';
 
 import { requestMutation } from '../lib/fasterdom/fasterdom';
 import { IS_IOS, IS_PWA, IS_TOUCH_ENV } from '../util/browser/windowEnvironment';
+import { vibrateShort } from '../util/vibrate';
 import useLastCallback from './useLastCallback';
 
 const LONG_TAP_DURATION_MS = 200;
@@ -66,6 +67,7 @@ const useContextMenuHandlers = (
     setIsContextMenuOpen(true);
     setContextMenuAnchor({ x: e.clientX, y: e.clientY });
     setContextMenuTarget(e.target as HTMLElement);
+    vibrateShort();
   });
 
   const handleContextMenuClose = useLastCallback(() => {
@@ -140,6 +142,7 @@ const useContextMenuHandlers = (
 
       setIsContextMenuOpen(true);
       setContextMenuAnchor({ x: clientX, y: clientY });
+      vibrateShort();
     };
 
     const startLongPressTimer = (e: TouchEvent) => {

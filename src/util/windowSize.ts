@@ -1,7 +1,6 @@
 import type { IDimensions } from '../types';
 
 import { requestMutation } from '../lib/fasterdom/fasterdom';
-import { IS_IOS } from './browser/windowEnvironment';
 import { throttle } from './schedulers';
 
 const WINDOW_ORIENTATION_CHANGE_THROTTLE_MS = 100;
@@ -27,25 +26,25 @@ const handleVisualViewportChange = () => {
 };
 
 window.addEventListener('orientationchange', handleOrientationChange);
-if (IS_IOS) {
-  window.visualViewport?.addEventListener('resize', handleVisualViewportChange);
-  window.visualViewport?.addEventListener('scroll', handleVisualViewportChange);
+if (window.visualViewport) {
+  // Prefer visualViewport on all platforms that expose it (iOS + modern Android Chrome).
+  // Throttling made the composer lag behind the keyboard; coalesce via requestMutation in updateSizes.
+  window.visualViewport.addEventListener('resize', handleVisualViewportChange);
+  window.visualViewport.addEventListener('scroll', handleVisualViewportChange);
 } else {
   window.addEventListener('resize', handleResize);
 }
 
 export function updateSizes(): IDimensions {
-  let height: number;
-  if (IS_IOS) {
-    height = window.visualViewport?.height || window.innerHeight;
-  } else {
-    height = window.innerHeight;
-  }
+  const hasVisualViewport = Boolean(window.visualViewport);
+  const height = hasVisualViewport
+    ? (window.visualViewport!.height || window.innerHeight)
+    : window.innerHeight;
 
   requestMutation(() => {
     const vh = height * 0.01;
     document.documentElement.style.setProperty('--vh', `${vh}px`);
-    if (IS_IOS) {
+    if (hasVisualViewport) {
       document.documentElement.style.setProperty('--visual-viewport-height', `${height}px`);
       document.documentElement.style.setProperty(
         '--visual-viewport-offset-top',

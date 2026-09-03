@@ -12,7 +12,7 @@ import {
   addExtraClass, removeExtraClass, setExtraStyles, toggleExtraClass,
 } from '../../../lib/teact/teact-dom';
 
-import { SLIDE_TRANSITION_DURATION } from '../../../config';
+import { MIN_SCREEN_WIDTH_FOR_STATIC_LEFT_COLUMN, MOBILE_LAYER_TRANSITION_DURATION, SLIDE_TRANSITION_DURATION } from '../../../config';
 import {
   getPhase, requestForcedReflow, requestMutation, requestNextMutation,
 } from '../../../lib/fasterdom/fasterdom';
@@ -35,9 +35,14 @@ export interface PaneState {
 // Both must track `--slide-transition`, which drives the island height glide in `transitionIslandVisual`.
 // If they outlast it, a closed pane stays mounted and reserved after it has visually gone, which leaves
 // the island height desynced from the message list reserve and the pinned row sitting in the wrong place.
-const CLOSE_DURATION = SLIDE_TRANSITION_DURATION;
+const CLOSE_DURATION = (
+  typeof window !== 'undefined'
+  && window.matchMedia(`(max-width: ${MIN_SCREEN_WIDTH_FOR_STATIC_LEFT_COLUMN}px)`).matches
+)
+  ? MOBILE_LAYER_TRANSITION_DURATION
+  : SLIDE_TRANSITION_DURATION;
 const RESIZE_THROTTLE = 100;
-const ROW_ANIMATION_SUPPRESS_MS = SLIDE_TRANSITION_DURATION;
+const ROW_ANIMATION_SUPPRESS_MS = CLOSE_DURATION;
 export const PANE_GAP_REM = 0.5;
 
 export default function useHeaderPane<RefType extends HTMLElement = HTMLDivElement>({

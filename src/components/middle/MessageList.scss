@@ -25,6 +25,7 @@
   container-type: size;
   overflow-x: hidden;
   overflow-y: scroll;
+  overscroll-behavior-y: contain;
   flex: 1;
 
   width: 100%;

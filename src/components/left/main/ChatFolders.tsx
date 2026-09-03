@@ -16,6 +16,7 @@ import buildClassName from '../../../util/buildClassName';
 import captureEscKeyListener from '../../../util/captureEscKeyListener';
 import { captureEvents, SwipeDirection } from '../../../util/captureEvents';
 import { resolveTransitionName } from '../../../util/resolveTransitionName';
+import { vibrateShort } from '../../../util/vibrate';
 
 import useDerivedState from '../../../hooks/useDerivedState';
 import useFolderTabs from '../../../hooks/useFolderTabs';
@@ -131,6 +132,9 @@ const ChatFolders: FC<OwnProps & StateProps> = ({
   const isInFirstFolder = FIRST_FOLDER_INDEX === activeChatFolder;
 
   const handleSwitchTab = useLastCallback((index: number) => {
+    if (activeChatFolder !== index) {
+      vibrateShort();
+    }
     setActiveChatFolder({ activeChatFolder: index }, { forceOnHeavyAnimation: true });
     if (activeChatFolder === index) {
       scrollToTop();

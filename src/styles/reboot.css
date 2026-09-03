@@ -131,8 +131,8 @@
   }
 
   a:hover {
-    color: #0056b3;
-    text-decoration: underline;
+    color: var(--color-links);
+    text-decoration: none;
   }
 
   a:not([href]):not([tabindex]),
@@ -215,8 +215,12 @@
   }
 
   button:focus {
-    outline: 1px dotted;
-    outline: 5px auto -webkit-focus-ring-color;
+    outline: none;
+  }
+
+  button:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
   }
 
   input,

@@ -83,6 +83,7 @@ import usePreviousDeprecated from '../../hooks/usePreviousDeprecated';
 import { useResize } from '../../hooks/useResize';
 import useSyncEffect from '../../hooks/useSyncEffect';
 import usePinnedMessage from './hooks/usePinnedMessage';
+import useEdgeSwipeBack from './hooks/useEdgeSwipeBack';
 import useFluidBackgroundFilter from './message/hooks/useFluidBackgroundFilter';
 
 import Composer from '../common/Composer';
@@ -322,6 +323,16 @@ function MiddleColumn({
   const previousViewportHeightRef = useRef<number>();
   const shouldKeepBottomAfterKeyboardRef = useRef(false);
   const telegramPlayerHeightRef = useRef(0);
+
+  useEdgeSwipeBack(
+    middleColumnRef,
+    Boolean(isMobile && chatId && !isSelectModeActive),
+    () => {
+      const messageInput = document.querySelector<HTMLDivElement>(EDITABLE_INPUT_CSS_SELECTOR);
+      messageInput?.blur();
+      openChat({ id: undefined }, { forceOnHeavyAnimation: true });
+    },
+  );
 
   const publishPlayerPaneHeight = useLastCallback(() => {
     onPlayerPaneStateChange({
