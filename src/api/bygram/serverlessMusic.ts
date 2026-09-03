@@ -358,6 +358,31 @@ class BygramServerlessMusic {
     });
   }
 
+  async saveTrackOffline(track: BygramMusicTrack) {
+    const { putOfflineTrack } = await import('./musicOfflineStore');
+    const file = await this.downloadMusicTrack(track);
+    await putOfflineTrack(track, file);
+    return track.id;
+  }
+
+  async removeTrackOffline(trackId: string) {
+    const { deleteOfflineTrack } = await import('./musicOfflineStore');
+    await deleteOfflineTrack(trackId);
+  }
+
+  async saveTracksOffline(tracks: BygramMusicTrack[]) {
+    const saved: string[] = [];
+    for (const track of tracks) {
+      try {
+        saved.push(await this.saveTrackOffline(track));
+      } catch {
+        // Continue with remaining tracks.
+      }
+    }
+    if (!saved.length) throw new Error('OFFLINE_SAVE_FAILED');
+    return saved;
+  }
+
   async downloadMusicPlaylist(playlist: BygramMusicPlaylist, limit = 20) {
     const tracks = playlist.tracks.slice(0, limit);
     const files: File[] = [];

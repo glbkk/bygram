@@ -3,9 +3,11 @@ import { getActions } from '../../global';
 import type { BygramMusicTrack } from './musicTypes';
 
 import { registerExternalAudioPauseHandler, stopCurrentAudio } from '../../util/audioPlayer';
+import { getOfflineTrackBlob } from './musicOfflineStore';
 import { bygramMusicApi } from './serverlessMusic';
 
 const HEARTBEAT_INTERVAL_MS = 10_000;
+const PREFETCH_LEAD_SECONDS = 25;
 
 export type BygramMusicQueueSource = (
   'daily' | 'wave' | 'track-wave' | 'recent' | 'favorites' | 'search' | 'album' | 'playlist'
@@ -26,6 +28,12 @@ export type BygramMusicPlayerState = {
   error?: string;
 };
 
+type PrefetchedTrack = {
+  trackId: string;
+  url: string;
+  isObjectUrl: boolean;
+};
+
 const INITIAL_STATE: BygramMusicPlayerState = {
   queue: [],
   queueIndex: -1,
@@ -44,37 +52,40 @@ class BygramMusicPlayer {
   private state: BygramMusicPlayerState = INITIAL_STATE;
   private playId?: string;
   private generation = 0;
+  private prefetchGeneration = 0;
   private readonly likedTrackIds = new Set<string>();
+  private currentObjectUrl?: string;
+  private prefetched?: PrefetchedTrack;
+  private didPrefetchForTrackId?: string;
 
   constructor() {
     this.audio.preload = 'auto';
     this.audio.setAttribute('playsinline', '');
+    this.audio.setAttribute('webkit-playsinline', '');
     this.audio.ontimeupdate = () => {
       this.patch({
         position: this.audio.currentTime,
         duration: finiteDuration(this.audio.duration, this.state.track?.durationSeconds),
       });
       this.updateMediaPosition();
+      this.maybePrefetchNearEnd();
     };
     this.audio.onwaiting = () => this.patch({ isLoading: true });
     this.audio.onplaying = () => {
       this.patch({ isPlaying: true, isLoading: false, error: undefined });
+      this.setPlaybackState('playing');
       this.reportProgress(true);
+      void this.prefetchNext();
     };
     this.audio.onpause = () => {
       this.patch({ isPlaying: false });
+      this.setPlaybackState('paused');
       this.reportProgress(false);
     };
     this.audio.onended = () => {
       this.patch({ isPlaying: false, position: this.state.duration });
       this.reportProgress(false, { completed: true });
-      if (this.state.repeatMode === 'track') {
-        void this.playAt(this.state.queueIndex, this.state.queue, this.state.source, false);
-      } else if (this.state.queueIndex < this.state.queue.length - 1) {
-        void this.next(false);
-      } else if (this.state.repeatMode === 'queue' && this.state.queue.length) {
-        void this.playAt(0, this.state.queue, this.state.source, false);
-      }
+      void this.advanceAfterEnded();
     };
     this.audio.onerror = () => this.patch({
       isPlaying: false,
@@ -119,7 +130,9 @@ class BygramMusicPlayer {
     if (this.audio.paused) {
       stopCurrentAudio();
       getActions().closeAudioPlayer();
-      void this.audio.play().catch(() => this.patch({
+      void this.audio.play().then(() => {
+        this.setPlaybackState('playing');
+      }).catch(() => this.patch({
         isLoading: false,
         error: 'Нажмите ещё раз, чтобы продолжить воспроизведение',
       }));
@@ -178,6 +191,8 @@ class BygramMusicPlayer {
     const queueIndex = queue.findIndex((track) => track.id === trackId);
     if (queueIndex < 0) return;
     this.patch({ source, queue: [...queue], queueIndex });
+    this.didPrefetchForTrackId = undefined;
+    void this.prefetchNext();
   }
 
   reflectLiked(trackId: string, liked: boolean) {
@@ -200,15 +215,33 @@ class BygramMusicPlayer {
 
   stop() {
     this.generation += 1;
+    this.prefetchGeneration += 1;
     this.reportProgress(false, { skipped: !this.audio.ended });
     this.audio.pause();
     this.audio.removeAttribute('src');
     this.audio.load();
     this.playId = undefined;
+    this.clearPrefetch();
+    this.revokeCurrentObjectUrl();
     this.state = INITIAL_STATE;
     this.emit();
+    this.setPlaybackState('none');
     // eslint-disable-next-line no-null/no-null
     if ('mediaSession' in navigator) navigator.mediaSession.metadata = null;
+  }
+
+  private async advanceAfterEnded() {
+    if (this.state.repeatMode === 'track') {
+      await this.playAt(this.state.queueIndex, this.state.queue, this.state.source, false);
+      return;
+    }
+    if (this.state.queueIndex < this.state.queue.length - 1) {
+      await this.playAt(this.state.queueIndex + 1, this.state.queue, this.state.source, false);
+      return;
+    }
+    if (this.state.repeatMode === 'queue' && this.state.queue.length) {
+      await this.playAt(0, this.state.queue, this.state.source, false);
+    }
   }
 
   private async playAt(
@@ -223,6 +256,7 @@ class BygramMusicPlayer {
     if (this.playId) this.reportProgress(false, { skipped: markPreviousSkipped && !this.audio.ended });
     this.audio.pause();
     this.playId = undefined;
+    this.didPrefetchForTrackId = undefined;
     this.patch({
       track,
       queue: [...queue],
@@ -238,17 +272,126 @@ class BygramMusicPlayer {
     this.updateMediaMetadata(track);
 
     try {
-      const play = await bygramMusicApi.startMusicPlay(track.id);
-      if (generation !== this.generation) return;
-      this.playId = play.id;
-      this.audio.src = bygramMusicApi.getMusicAudioUrl(play.streamUrl);
+      const resolved = await this.resolvePlayableUrl(track);
+      if (generation !== this.generation) {
+        if (resolved.isObjectUrl) URL.revokeObjectURL(resolved.url);
+        return;
+      }
+
+      this.revokeCurrentObjectUrl();
+      if (resolved.isObjectUrl) this.currentObjectUrl = resolved.url;
+
+      this.playId = crypto.randomUUID();
+      this.audio.src = resolved.url;
       stopCurrentAudio();
       getActions().closeAudioPlayer();
       await this.audio.play();
+      if (generation === this.generation) {
+        this.setPlaybackState('playing');
+        void this.prefetchNext();
+      }
     } catch {
       if (generation === this.generation) {
         this.patch({ isPlaying: false, isLoading: false, error: 'Не удалось загрузить трек' });
+        this.setPlaybackState('paused');
       }
+    }
+  }
+
+  private async resolvePlayableUrl(track: BygramMusicTrack): Promise<PrefetchedTrack> {
+    if (this.prefetched?.trackId === track.id) {
+      const ready = this.prefetched;
+      this.prefetched = undefined;
+      return ready;
+    }
+
+    const offlineBlob = await getOfflineTrackBlob(track.id);
+    if (offlineBlob) {
+      return {
+        trackId: track.id,
+        url: URL.createObjectURL(offlineBlob),
+        isObjectUrl: true,
+      };
+    }
+
+    // Prefer a direct stream for the track the user just tapped — fastest start.
+    // The next track is blob-prefetched so lock-screen handoff does not need a new network round-trip.
+    const play = await bygramMusicApi.startMusicPlay(track.id);
+    return {
+      trackId: track.id,
+      url: bygramMusicApi.getMusicAudioUrl(play.streamUrl),
+      isObjectUrl: false,
+    };
+  }
+
+  private maybePrefetchNearEnd() {
+    const duration = finiteDuration(this.audio.duration, this.state.track?.durationSeconds);
+    if (!duration || this.audio.paused) return;
+    if (duration - this.audio.currentTime > PREFETCH_LEAD_SECONDS) return;
+    void this.prefetchNext();
+  }
+
+  private async prefetchNext() {
+    const nextIndex = this.state.queueIndex + 1;
+    const nextTrack = this.state.queue[nextIndex]
+      || (this.state.repeatMode === 'queue' ? this.state.queue[0] : undefined);
+    if (!nextTrack || nextTrack.id === this.state.track?.id) return;
+    if (this.prefetched?.trackId === nextTrack.id) return;
+    if (this.didPrefetchForTrackId === this.state.track?.id && this.prefetched) return;
+
+    const generation = ++this.prefetchGeneration;
+    this.didPrefetchForTrackId = this.state.track?.id;
+
+    try {
+      const offlineBlob = await getOfflineTrackBlob(nextTrack.id);
+      if (generation !== this.prefetchGeneration) return;
+      if (offlineBlob) {
+        this.clearPrefetch();
+        this.prefetched = {
+          trackId: nextTrack.id,
+          url: URL.createObjectURL(offlineBlob),
+          isObjectUrl: true,
+        };
+        return;
+      }
+
+      const play = await bygramMusicApi.startMusicPlay(nextTrack.id);
+      if (generation !== this.prefetchGeneration) return;
+      const streamUrl = bygramMusicApi.getMusicAudioUrl(play.streamUrl);
+      try {
+        const response = await fetch(streamUrl);
+        if (!response.ok) throw new Error('PREFETCH_FAILED');
+        const blob = await response.blob();
+        if (generation !== this.prefetchGeneration) return;
+        this.clearPrefetch();
+        this.prefetched = {
+          trackId: nextTrack.id,
+          url: URL.createObjectURL(blob),
+          isObjectUrl: true,
+        };
+      } catch {
+        if (generation !== this.prefetchGeneration) return;
+        this.clearPrefetch();
+        this.prefetched = {
+          trackId: nextTrack.id,
+          url: streamUrl,
+          isObjectUrl: false,
+        };
+      }
+    } catch {
+      // Prefetch is best-effort; playback can still resolve on demand.
+    }
+  }
+
+  private clearPrefetch() {
+    if (this.prefetched?.isObjectUrl) URL.revokeObjectURL(this.prefetched.url);
+    this.prefetched = undefined;
+  }
+
+  private revokeCurrentObjectUrl() {
+    if (this.currentObjectUrl) {
+      URL.revokeObjectURL(this.currentObjectUrl);
+      this.currentObjectUrl = undefined;
     }
   }
 
@@ -271,10 +414,23 @@ class BygramMusicPlayer {
     this.listeners.forEach((listener) => listener());
   }
 
+  private setPlaybackState(state: MediaSessionPlaybackState) {
+    if (!('mediaSession' in navigator) || !navigator.mediaSession.playbackState) return;
+    try {
+      navigator.mediaSession.playbackState = state;
+    } catch {
+      // Safari may reject playbackState updates during track changes.
+    }
+  }
+
   private configureMediaSession() {
     if (!('mediaSession' in navigator)) return;
-    (['seekbackward', 'seekforward'] as MediaSessionAction[]).forEach((action) => {
+    (['seekbackward', 'seekforward', 'stop'] as MediaSessionAction[]).forEach((action) => {
       try {
+        if (action === 'stop') {
+          navigator.mediaSession.setActionHandler(action, () => this.stop());
+          return;
+        }
         // Media Session requires null (not undefined) to remove an existing handler.
         // eslint-disable-next-line no-null/no-null
         navigator.mediaSession.setActionHandler(action, null);
@@ -283,8 +439,12 @@ class BygramMusicPlayer {
       }
     });
     const actions: Partial<Record<MediaSessionAction, MediaSessionActionHandler>> = {
-      play: () => this.toggle(),
-      pause: () => this.toggle(),
+      play: () => {
+        if (this.audio.paused) this.toggle();
+      },
+      pause: () => {
+        if (!this.audio.paused) this.toggle();
+      },
       nexttrack: () => void this.next(),
       previoustrack: () => void this.previous(),
       seekto: (details) => this.seekTo(details.seekTime || 0),

@@ -11,6 +11,7 @@ import { MAIN_THREAD_ID } from '../../api/types';
 import { LeftColumnContent } from '../../types';
 
 import { takePendingPlaylistTrack } from '../../api/bygram/byprotoMusic';
+import { subscribeOfflineTrackIds } from '../../api/bygram/musicOfflineStore';
 import { bygramMusicPlayer } from '../../api/bygram/musicPlayer';
 import { bygramMusicApi } from '../../api/bygram/serverlessMusic';
 import { createByProtoMusicPlaylistEnvelope, createByProtoMusicTrackEnvelope } from '../../byproto/outgoing';
@@ -64,6 +65,9 @@ function BygramMusic() {
   const [shareTrackCandidate, setShareTrackCandidate] = useState<BygramMusicTrack>();
   const [sharePlaylistCandidate, setSharePlaylistCandidate] = useState<BygramMusicPlaylist>();
   const [isPreparingShareFile, setIsPreparingShareFile] = useState(false);
+  const [offlineIds, setOfflineIds] = useState<Set<string>>(() => new Set());
+  const [downloadingIds, setDownloadingIds] = useState<Set<string>>(() => new Set());
+  const [isSavingOfflineBatch, setIsSavingOfflineBatch] = useState(false);
   const searchRequestIdRef = useRef(0);
 
   const applyHome = useLastCallback((nextHome: BygramMusicHome) => {
@@ -105,6 +109,54 @@ function BygramMusic() {
         .catch(() => setError('Общий плейлист не найден'));
     }
   }, []);
+
+  useEffect(() => subscribeOfflineTrackIds(setOfflineIds), []);
+
+  const toggleOfflineTrack = useLastCallback(async (track: BygramMusicTrack) => {
+    if (downloadingIds.has(track.id)) return;
+    setError(undefined);
+    if (offlineIds.has(track.id)) {
+      try {
+        await bygramMusicApi.removeTrackOffline(track.id);
+        setNotice('Трек удалён из загрузок');
+      } catch {
+        setError('Не удалось удалить офлайн-копию');
+      }
+      return;
+    }
+    setDownloadingIds((current) => new Set(current).add(track.id));
+    try {
+      await bygramMusicApi.saveTrackOffline(track);
+      setNotice('Трек доступен без интернета');
+    } catch {
+      setError('Не удалось скачать трек для офлайна');
+    } finally {
+      setDownloadingIds((current) => {
+        const next = new Set(current);
+        next.delete(track.id);
+        return next;
+      });
+    }
+  });
+
+  const saveTracksOffline = useLastCallback(async (tracks: BygramMusicTrack[], label: string) => {
+    if (!tracks.length || isSavingOfflineBatch) return;
+    setIsSavingOfflineBatch(true);
+    setError(undefined);
+    try {
+      const missing = tracks.filter((track) => !offlineIds.has(track.id));
+      if (!missing.length) {
+        setNotice(`${label}: все треки уже скачаны`);
+        return;
+      }
+      const saved = await bygramMusicApi.saveTracksOffline(missing);
+      setNotice(`${label}: скачано ${saved.length} из ${missing.length}`);
+    } catch {
+      setError(`Не удалось скачать ${label.toLowerCase()}`);
+    } finally {
+      setIsSavingOfflineBatch(false);
+    }
+  });
 
   const close = useLastCallback(() => {
     openLeftColumnContent({ contentKey: LeftColumnContent.ChatList });
@@ -506,6 +558,9 @@ function BygramMusic() {
               playlist={selectedPlaylist}
               player={player}
               likedIds={likedIds}
+              offlineIds={offlineIds}
+              downloadingIds={downloadingIds}
+              isSavingOffline={isSavingOfflineBatch}
               onBack={() => setSelectedPlaylist(undefined)}
               onPlay={playTrack}
               onShare={sharePlaylist}
@@ -515,6 +570,8 @@ function BygramMusic() {
               onRemoveTrack={removeTrackFromPlaylist}
               onShareTrack={shareTrack}
               onStartWave={startTrackWave}
+              onToggleOffline={toggleOfflineTrack}
+              onDownloadAll={() => void saveTracksOffline(selectedPlaylist.tracks, 'Плейлист')}
             />
           ) : (
             <PlaylistLibrary
@@ -550,12 +607,20 @@ function BygramMusic() {
                   tracks={section.tracks}
                   source={section.key}
                   likedIds={likedIds}
+                  offlineIds={section.key === 'favorites' || section.key === 'recent' ? offlineIds : undefined}
+                  downloadingIds={section.key === 'favorites' || section.key === 'recent' ? downloadingIds : undefined}
+                  canOffline={section.key === 'favorites'}
+                  isSavingOffline={isSavingOfflineBatch}
                   player={player}
                   onPlay={playTrack}
                   onToggleLike={toggleLike}
                   onAddToPlaylist={setTrackToAdd}
                   onShareTrack={shareTrack}
                   onStartWave={startTrackWave}
+                  onToggleOffline={section.key === 'favorites' ? toggleOfflineTrack : undefined}
+                  onDownloadAll={section.key === 'favorites'
+                    ? () => void saveTracksOffline(section.tracks, 'Избранное')
+                    : undefined}
                 />
               )
             ))}
@@ -839,12 +904,16 @@ function PlaylistLibrary({ playlists, onCreate, onOpen, onShare }: {
 }
 
 function PlaylistDetails({
-  playlist, player, likedIds, onBack, onPlay, onShare, onSave, onToggleLike, onAddToPlaylist, onRemoveTrack,
-  onShareTrack, onStartWave,
+  playlist, player, likedIds, offlineIds, downloadingIds, isSavingOffline,
+  onBack, onPlay, onShare, onSave, onToggleLike, onAddToPlaylist, onRemoveTrack,
+  onShareTrack, onStartWave, onToggleOffline, onDownloadAll,
 }: {
   playlist: BygramMusicPlaylist;
   player: PlayerState;
   likedIds: Set<string>;
+  offlineIds: Set<string>;
+  downloadingIds: Set<string>;
+  isSavingOffline: boolean;
   onBack: NoneToVoidFunction;
   onPlay: (track: BygramMusicTrack, source: BygramMusicQueueSource, queue: BygramMusicTrack[]) => void;
   onShare: (playlist: BygramMusicPlaylist) => void;
@@ -854,6 +923,8 @@ function PlaylistDetails({
   onRemoveTrack: (playlist: BygramMusicPlaylist, track: BygramMusicTrack) => void;
   onShareTrack: (track: BygramMusicTrack) => void;
   onStartWave: (track: BygramMusicTrack) => void;
+  onToggleOffline: (track: BygramMusicTrack) => void;
+  onDownloadAll: NoneToVoidFunction;
 }) {
   return (
     <section className={styles.playlistDetails}>
@@ -872,6 +943,16 @@ function PlaylistDetails({
               >
                 <Icon name="play" />
               </Button>
+            )}
+            {playlist.tracks.length > 0 && (
+              <Button
+                round
+                color="translucent"
+                iconName="download"
+                ariaLabel="Скачать для офлайна"
+                isLoading={isSavingOffline}
+                onClick={onDownloadAll}
+              />
             )}
             {playlist.isOwn ? (
               <Button
@@ -899,6 +980,9 @@ function PlaylistDetails({
           tracks={playlist.tracks}
           source="playlist"
           likedIds={likedIds}
+          offlineIds={offlineIds}
+          downloadingIds={downloadingIds}
+          canOffline
           player={player}
           onPlay={onPlay}
           onToggleLike={onToggleLike}
@@ -906,6 +990,7 @@ function PlaylistDetails({
           onRemoveFromPlaylist={playlist.isOwn ? (track) => onRemoveTrack(playlist, track) : undefined}
           onShareTrack={onShareTrack}
           onStartWave={onStartWave}
+          onToggleOffline={onToggleOffline}
         />
       ) : <EmptyState title="Плейлист пуст" text="Добавьте песни из поиска" />}
     </section>
@@ -981,13 +1066,18 @@ function AlbumDetails({
 }
 
 function MusicSection({
-  title, tracks, source, likedIds, player, onPlay, onToggleLike, onAddToPlaylist,
-  onRemoveFromPlaylist, onShareTrack, onStartWave,
+  title, tracks, source, likedIds, offlineIds, downloadingIds, canOffline, isSavingOffline,
+  player, onPlay, onToggleLike, onAddToPlaylist,
+  onRemoveFromPlaylist, onShareTrack, onStartWave, onToggleOffline, onDownloadAll,
 }: {
   title: string;
   tracks: BygramMusicTrack[];
   source: BygramMusicQueueSource;
   likedIds: Set<string>;
+  offlineIds?: Set<string>;
+  downloadingIds?: Set<string>;
+  canOffline?: boolean;
+  isSavingOffline?: boolean;
   player: PlayerState;
   onPlay: (track: BygramMusicTrack, source: BygramMusicQueueSource, queue: BygramMusicTrack[]) => void;
   onToggleLike: (track: BygramMusicTrack) => void;
@@ -995,21 +1085,36 @@ function MusicSection({
   onRemoveFromPlaylist?: (track: BygramMusicTrack) => void;
   onShareTrack: (track: BygramMusicTrack) => void;
   onStartWave: (track: BygramMusicTrack) => void;
+  onToggleOffline?: (track: BygramMusicTrack) => void;
+  onDownloadAll?: NoneToVoidFunction;
 }) {
   return (
     <section className={styles.section}>
       <div className={styles.sectionHeader}>
         <h2>{title}</h2>
-        {tracks.length > 1 && (
-          <Button
-            round
-            color="translucent"
-            size="smaller"
-            iconName="play"
-            ariaLabel="Слушать всё"
-            onClick={() => onPlay(tracks[0], source, tracks)}
-          />
-        )}
+        <div className={styles.sectionActions}>
+          {canOffline && onDownloadAll && tracks.length > 0 && (
+            <Button
+              round
+              color="translucent"
+              size="smaller"
+              iconName="download"
+              ariaLabel="Скачать для офлайна"
+              isLoading={isSavingOffline}
+              onClick={onDownloadAll}
+            />
+          )}
+          {tracks.length > 1 && (
+            <Button
+              round
+              color="translucent"
+              size="smaller"
+              iconName="play"
+              ariaLabel="Слушать всё"
+              onClick={() => onPlay(tracks[0], source, tracks)}
+            />
+          )}
+        </div>
       </div>
       <div className={styles.trackList}>
         {tracks.map((track, index) => (
@@ -1021,12 +1126,16 @@ function MusicSection({
             isPlaying={player.track?.id === track.id && player.isPlaying}
             isLoading={player.track?.id === track.id && player.isLoading}
             isLiked={likedIds.has(track.id)}
+            isOffline={Boolean(offlineIds?.has(track.id))}
+            isDownloading={Boolean(downloadingIds?.has(track.id))}
+            canOffline={canOffline}
             onPlay={() => onPlay(track, source, tracks)}
             onToggleLike={() => onToggleLike(track)}
             onAddToPlaylist={() => onAddToPlaylist(track)}
             onRemoveFromPlaylist={onRemoveFromPlaylist ? () => onRemoveFromPlaylist(track) : undefined}
             onShareTrack={() => onShareTrack(track)}
             onStartWave={() => onStartWave(track)}
+            onToggleOffline={onToggleOffline ? () => onToggleOffline(track) : undefined}
           />
         ))}
       </div>
@@ -1101,8 +1210,8 @@ function MusicShelf({
 }
 
 function TrackRow({
-  index, track, isCurrent, isPlaying, isLoading, isLiked,
-  onPlay, onToggleLike, onAddToPlaylist, onRemoveFromPlaylist, onShareTrack, onStartWave,
+  index, track, isCurrent, isPlaying, isLoading, isLiked, isOffline, isDownloading, canOffline,
+  onPlay, onToggleLike, onAddToPlaylist, onRemoveFromPlaylist, onShareTrack, onStartWave, onToggleOffline,
 }: {
   index: number;
   track: BygramMusicTrack;
@@ -1110,12 +1219,16 @@ function TrackRow({
   isPlaying: boolean;
   isLoading: boolean;
   isLiked: boolean;
+  isOffline?: boolean;
+  isDownloading?: boolean;
+  canOffline?: boolean;
   onPlay: NoneToVoidFunction;
   onToggleLike: NoneToVoidFunction;
   onAddToPlaylist: NoneToVoidFunction;
   onRemoveFromPlaylist?: NoneToVoidFunction;
   onShareTrack: NoneToVoidFunction;
   onStartWave: NoneToVoidFunction;
+  onToggleOffline?: NoneToVoidFunction;
 }) {
   const contextActions = useMemo((): MenuItemContextAction[] => {
     const actions: MenuItemContextAction[] = [
@@ -1128,6 +1241,15 @@ function TrackRow({
       { title: 'Волна по треку', icon: 'diamond', handler: onStartWave },
       { title: 'Отправить в чат', icon: 'share-filled', handler: onShareTrack },
     ];
+    if (canOffline && onToggleOffline) {
+      actions.push({
+        title: isDownloading
+          ? 'Скачивание…'
+          : isOffline ? 'Удалить из загрузок' : 'Скачать для офлайна',
+        icon: isOffline ? 'delete' : 'download',
+        handler: isDownloading ? undefined : onToggleOffline,
+      });
+    }
     if (onRemoveFromPlaylist) {
       actions.push({
         title: 'Удалить из плейлиста',
@@ -1137,7 +1259,10 @@ function TrackRow({
       });
     }
     return actions;
-  }, [isLiked, onAddToPlaylist, onRemoveFromPlaylist, onShareTrack, onStartWave, onToggleLike]);
+  }, [
+    canOffline, isDownloading, isLiked, isOffline, onAddToPlaylist, onRemoveFromPlaylist,
+    onShareTrack, onStartWave, onToggleLike, onToggleOffline,
+  ]);
 
   const trackIndexContent = (() => {
     if (!isCurrent) return index;
@@ -1159,7 +1284,12 @@ function TrackRow({
           <TrackArtwork track={track} />
         </span>
       )}
-      rightElement={<span className={styles.duration}>{formatDuration(track.durationSeconds)}</span>}
+      rightElement={(
+        <span className={styles.trackRight}>
+          {isOffline && <Icon name="download" className={styles.offlineBadge} />}
+          <span className={styles.duration}>{formatDuration(track.durationSeconds)}</span>
+        </span>
+      )}
       secondaryIcon="more"
       contextActions={contextActions}
       onClick={onPlay}
