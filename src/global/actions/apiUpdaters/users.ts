@@ -4,6 +4,7 @@ import type { ApiUserStatus } from '../../../api/types';
 import type { ActionReturnType } from '../../types';
 
 import { isUserId } from '../../../util/entities/ids';
+import { recordObservedOnline } from '../../../util/bygramObservedOnline';
 import { addActionHandler, getGlobal, setGlobal } from '../../index';
 import {
   deleteContact,
@@ -85,6 +86,15 @@ addActionHandler('apiUpdate', (global, actions, update): ActionReturnType => {
     case 'updateUserStatus': {
       // Status updates come very often so we throttle them
       pendingStatusUpdates[update.userId] = update.status;
+      if (update.status.type === 'userStatusOnline') {
+        recordObservedOnline(getGlobal().currentUserId, update.userId);
+      } else if (update.status.type === 'userStatusOffline' && update.status.wasOnline) {
+        recordObservedOnline(
+          getGlobal().currentUserId,
+          update.userId,
+          update.status.wasOnline * 1000,
+        );
+      }
       updateStatusesOnFullyIdle();
       return undefined;
     }

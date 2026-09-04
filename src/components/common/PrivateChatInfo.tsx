@@ -9,7 +9,7 @@ import type { IconName } from '../../types/icons';
 import { MediaViewerOrigin } from '../../types';
 
 import {
-  getMainUsername, getUserStatus, isSystemBot, isUserOnline,
+  getMainUsername, isSystemBot, isUserOnline,
 } from '../../global/helpers';
 import {
   selectChatMessages,
@@ -18,12 +18,18 @@ import {
   selectUserStatus,
 } from '../../global/selectors';
 import { selectThreadMessagesCount } from '../../global/selectors/threads';
+import { subscribeBygramSettings } from '../../util/bygramArchive';
+import {
+  getBygramDisplayUserStatus,
+  subscribeObservedOnline,
+} from '../../util/bygramObservedOnline';
 import buildClassName from '../../util/buildClassName';
 import { hasRank } from './helpers/chatMember';
 import { REM } from './helpers/mediaDimensions';
 import renderText from './helpers/renderText';
 
 import useIntervalForceUpdate from '../../hooks/schedulers/useIntervalForceUpdate';
+import useForceUpdate from '../../hooks/useForceUpdate';
 import useLang from '../../hooks/useLang';
 import useLastCallback from '../../hooks/useLastCallback';
 import useOldLang from '../../hooks/useOldLang';
@@ -87,6 +93,7 @@ type StateProps = {
   user?: ApiUser;
   userStatus?: ApiUserStatus;
   self?: ApiUser;
+  currentUserId?: string;
   isSavedMessages?: boolean;
   areMessagesLoaded: boolean;
   isSynced?: boolean;
@@ -119,6 +126,7 @@ const PrivateChatInfo = ({
   user,
   userStatus,
   self,
+  currentUserId,
   topic,
   messagesCount,
   isSavedMessages,
@@ -145,6 +153,7 @@ const PrivateChatInfo = ({
 
   const oldLang = useOldLang();
   const lang = useLang();
+  const forceUpdate = useForceUpdate();
 
   const isTopic = Boolean(user?.isBotForum && topic);
   const hasAvatarMediaViewer = withMediaViewer && !isSavedMessages;
@@ -155,6 +164,15 @@ const PrivateChatInfo = ({
       if (withMediaViewer) loadMoreProfilePhotos({ peerId: userId, isPreload: true });
     }
   }, [userId, withFullInfo, withMediaViewer, isSynced]);
+
+  useEffect(() => {
+    const unsubObserved = subscribeObservedOnline(forceUpdate);
+    const unsubSettings = subscribeBygramSettings(forceUpdate);
+    return () => {
+      unsubObserved();
+      unsubSettings();
+    };
+  }, [forceUpdate]);
 
   useIntervalForceUpdate(UPDATE_INTERVAL);
 
@@ -235,7 +253,9 @@ const PrivateChatInfo = ({
       return undefined;
     }
 
-    const translatedStatus = noUserStatus ? undefined : getUserStatus(oldLang, user, userStatus);
+    const translatedStatus = noUserStatus
+      ? undefined
+      : getBygramDisplayUserStatus(oldLang, user, userStatus, currentUserId);
     const mainUserNameClassName = buildClassName('handle', translatedStatus && 'withStatus');
     return (
       <span className={buildClassName('status', !noUserStatus && isUserOnline(user, userStatus, true) && 'online')}>
@@ -364,6 +384,7 @@ export default memo(withGlobal<OwnProps>(
       isSavedMessages,
       areMessagesLoaded,
       self,
+      currentUserId: global.currentUserId,
       isSynced,
       topic,
       messagesCount,

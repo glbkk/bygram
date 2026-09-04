@@ -19,7 +19,7 @@ import { MediaViewerOrigin } from '../../../types/index';
 
 import { SERVICE_NOTIFICATIONS_USER_ID } from '../../../config.ts';
 import {
-  getUserStatus, isAnonymousForwardsChat, isChatChannel, isSystemBot, isUserOnline,
+  isAnonymousForwardsChat, isChatChannel, isSystemBot, isUserOnline,
 } from '../../../global/helpers/index';
 import { getActions, withGlobal } from '../../../global/index';
 import {
@@ -38,6 +38,11 @@ import {
   selectUserFullInfo,
   selectUserStatus,
 } from '../../../global/selectors/index';
+import { subscribeBygramSettings } from '../../../util/bygramArchive';
+import {
+  getBygramDisplayUserStatus,
+  subscribeObservedOnline,
+} from '../../../util/bygramObservedOnline';
 import { selectSharedSettings } from '../../../global/selectors/sharedState';
 import { selectThreadMessagesCount } from '../../../global/selectors/threads.ts';
 import { IS_TOUCH_ENV } from '../../../util/browser/windowEnvironment';
@@ -56,6 +61,7 @@ import useIntervalForceUpdate from '../../../hooks/schedulers/useIntervalForceUp
 import useBygramCustomizationMedia from '../../../hooks/useBygramCustomizationMedia';
 import useLang from '../../../hooks/useLang';
 import useLastCallback from '../../../hooks/useLastCallback';
+import useForceUpdate from '../../../hooks/useForceUpdate';
 import useOldLang from '../../../hooks/useOldLang';
 import usePreviousDeprecated from '../../../hooks/usePreviousDeprecated';
 import useCustomEmoji from '../hooks/useCustomEmoji';
@@ -160,8 +166,18 @@ const ProfileInfo = ({
 
   const oldLang = useOldLang();
   const lang = useLang();
+  const forceUpdate = useForceUpdate();
 
   useIntervalForceUpdate(user ? STATUS_UPDATE_INTERVAL : undefined);
+
+  useEffect(() => {
+    const unsubObserved = subscribeObservedOnline(forceUpdate);
+    const unsubSettings = subscribeBygramSettings(forceUpdate);
+    return () => {
+      unsubObserved();
+      unsubSettings();
+    };
+  }, [forceUpdate]);
 
   const { createVtnStyle } = useVtn();
 
@@ -470,7 +486,7 @@ const ProfileInfo = ({
         >
           {renderUserRating()}
           <span className={styles.userStatus} dir="auto">
-            {getUserStatus(oldLang, user, userStatus)}
+            {getBygramDisplayUserStatus(oldLang, user, userStatus, currentUserId)}
           </span>
           {userStatus?.isReadDateRestrictedByMe && !isSystemAccount && (
             <span className={styles.getStatus} onClick={handleOpenGetReadDateModal}>

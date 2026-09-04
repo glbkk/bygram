@@ -234,6 +234,12 @@ function SettingsBygram({ isActive, onReset }: OwnProps) {
           checked={settings.isGhostStoryPromptEnabled}
           onCheck={(value) => handleSettingChange('isGhostStoryPromptEnabled', value)}
         />
+        <Checkbox
+          label={lang('BygramObservedLastSeen')}
+          subLabel={lang('BygramObservedLastSeenDesc')}
+          checked={settings.isObservedLastSeenEnabled}
+          onCheck={(value) => handleSettingChange('isObservedLastSeenEnabled', value)}
+        />
       </Island>
 
       <IslandTitle>Связь bygram</IslandTitle>

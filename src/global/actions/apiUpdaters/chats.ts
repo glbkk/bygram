@@ -3,6 +3,8 @@ import type { ActionReturnType } from '../../types';
 import { MAIN_THREAD_ID } from '../../../api/types';
 
 import { ARCHIVED_FOLDER_ID, MAX_ACTIVE_PINNED_CHATS, SERVICE_NOTIFICATIONS_USER_ID } from '../../../config';
+import { recordObservedOnline } from '../../../util/bygramObservedOnline';
+import { isUserId } from '../../../util/entities/ids';
 import { buildCollectionByKey, omit } from '../../../util/iteratees';
 import { isLocalMessageId } from '../../../util/keys/messageKey';
 import { closeMessageNotifications, notifyAboutMessage } from '../../../util/notifications';
@@ -187,6 +189,10 @@ addActionHandler('apiUpdate', (global, actions, update): ActionReturnType => {
         : { [peerId]: typingStatus };
       global = replaceThreadLocalStateParam(global, id, threadId, 'typingStatusByPeerId', updatedTypingStatusByPeerId);
       setGlobal(global);
+
+      if (peerId && isUserId(peerId)) {
+        recordObservedOnline(getGlobal().currentUserId, peerId);
+      }
 
       setTimeout(() => {
         global = getGlobal();

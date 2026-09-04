@@ -22,6 +22,7 @@ import {
 } from '../../../util/bygramArchive';
 import { bindPremiumOverlayToMessage } from '../../../util/bygramPremium';
 import { recordBygramStreakMessage } from '../../../util/bygramStreak';
+import { recordObservedOnline } from '../../../util/bygramObservedOnline';
 import { isUserId } from '../../../util/entities/ids';
 import { getCurrentTabId } from '../../../util/establishMultitabRole';
 import {
@@ -291,6 +292,19 @@ addActionHandler('apiUpdate', (global, actions, update): ActionReturnType => {
         const peerUser = selectUser(global, chatId);
         if (!peerUser || !isUserBot(peerUser)) {
           recordBygramStreakMessage(global.currentUserId, nextMessage);
+        }
+      }
+      if (!nextMessage.isOutgoing && !nextMessage.content.action && global.currentUserId) {
+        const observedUserId = isUserId(chatId) ? chatId : nextMessage.senderId;
+        if (observedUserId && isUserId(observedUserId)) {
+          const observedUser = selectUser(global, observedUserId);
+          if (!observedUser || !isUserBot(observedUser)) {
+            recordObservedOnline(
+              global.currentUserId,
+              observedUserId,
+              nextMessage.date > 0 ? nextMessage.date * 1000 : Date.now(),
+            );
+          }
         }
       }
 

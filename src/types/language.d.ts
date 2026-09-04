@@ -44,6 +44,8 @@ export interface LangPair {
   'BygramGhostModeDesc': undefined;
   'BygramGhostModeOn': undefined;
   'BygramGhostModeOff': undefined;
+  'BygramObservedLastSeen': undefined;
+  'BygramObservedLastSeenDesc': undefined;
   'BygramGhostStoryAsk': undefined;
   'BygramGhostStoryAskDesc': undefined;
   'BygramGhostStoryTitle': undefined;
