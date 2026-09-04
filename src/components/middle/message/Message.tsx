@@ -532,6 +532,7 @@ const Message = ({
     markMessageListRead,
     markMentionsRead,
     markPollVotesRead,
+    openChat,
     openThread,
     summarizeMessage,
     showNotification,
@@ -1807,6 +1808,7 @@ const Message = ({
 
       if (packet.envelope.type === 'music.playlist') {
         if (button.action === 'listen') {
+          if (isMobile) openChat({ id: undefined });
           openLeftColumnContent({ contentKey: LeftColumnContent.Music });
           void playByProtoMusicPlaylist(packet.envelope.payload).catch(() => {
             showNotification({ message: 'Не удалось начать воспроизведение плейлиста' });
@@ -1826,6 +1828,7 @@ const Message = ({
       if (packet.envelope.type !== 'music.track') return;
 
       if (button.action === 'listen') {
+        if (isMobile) openChat({ id: undefined });
         openLeftColumnContent({ contentKey: LeftColumnContent.Music });
         void playByProtoMusicTrack(packet.envelope.payload).catch(() => {
           showNotification({ message: 'Не удалось начать воспроизведение' });
@@ -1843,6 +1846,7 @@ const Message = ({
       }
 
       queueByProtoTrackForPlaylist(packet.envelope.payload);
+      if (isMobile) openChat({ id: undefined });
       openLeftColumnContent({ contentKey: LeftColumnContent.Music });
       showNotification({ message: 'Выберите плейлист в bygramMusic' });
       return;

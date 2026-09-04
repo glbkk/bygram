@@ -444,6 +444,11 @@ export interface ActionPayloads {
   markChatUnread: { id: string };
   markChatRead: { id: string };
   markChatMessagesRead: { id: string };
+  loadBygramChannelFeed: undefined;
+  markBygramFeedMessageRead: {
+    chatId: string;
+    messageId: number;
+  };
   loadChatFolders: undefined;
   loadRecommendedChatFolders: undefined;
   editChatFolder: {

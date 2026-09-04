@@ -1,6 +1,7 @@
 import './api/initial';
 import './api/chats';
 import './api/messages';
+import './api/bygramFeed';
 import './api/symbols';
 import './api/globalSearch';
 import './api/middleSearch';

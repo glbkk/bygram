@@ -1,9 +1,14 @@
 import type { ApiChat, ApiMessage } from '../api/types';
+import { MAIN_THREAD_ID } from '../api/types';
 
 import { isChatChannel } from '../global/helpers';
+import { selectThreadReadState } from '../global/selectors/threads';
 import type { GlobalState } from '../global/types';
 
 export const BYGRAM_FEED_CHAT_ID = 'bygram-feed';
+export const BYGRAM_FEED_MAX_CHANNELS = 80;
+export const BYGRAM_FEED_MAX_PER_CHANNEL = 100;
+export const BYGRAM_FEED_MESSAGE_LIMIT = 200;
 
 export function isBygramFeedChatId(chatId?: string) {
   return chatId === BYGRAM_FEED_CHAT_ID;
@@ -18,8 +23,38 @@ export function getBygramFeedChat(): ApiChat {
   };
 }
 
+export function getChannelUnreadState(global: GlobalState, chatId: string) {
+  const readState = selectThreadReadState(global, chatId, MAIN_THREAD_ID);
+  return {
+    unreadCount: readState?.unreadCount || 0,
+    lastReadInboxMessageId: readState?.lastReadInboxMessageId || 0,
+  };
+}
+
+export function collectUnreadChannelIds(global: GlobalState, limit = BYGRAM_FEED_MAX_CHANNELS): string[] {
+  return Object.values(global.chats.byId)
+    .filter((chat) => {
+      if (
+        !chat
+        || isBygramFeedChatId(chat.id)
+        || !isChatChannel(chat)
+        || chat.isNotJoined
+        || chat.isForbidden
+      ) {
+        return false;
+      }
+      return getChannelUnreadState(global, chat.id).unreadCount > 0;
+    })
+    .sort((a, b) => (
+      getChannelUnreadState(global, b.id).unreadCount
+      - getChannelUnreadState(global, a.id).unreadCount
+    ))
+    .slice(0, limit)
+    .map((chat) => chat.id);
+}
+
 /** Unread channel posts already present in local message store, newest first. */
-export function collectBygramFeedMessages(global: GlobalState, limit = 80): ApiMessage[] {
+export function collectBygramFeedMessages(global: GlobalState, limit = BYGRAM_FEED_MESSAGE_LIMIT): ApiMessage[] {
   const result: ApiMessage[] = [];
 
   Object.values(global.chats.byId).forEach((chat) => {
@@ -27,16 +62,15 @@ export function collectBygramFeedMessages(global: GlobalState, limit = 80): ApiM
       return;
     }
 
-    const unreadCount = chat.unreadCount || 0;
+    const { unreadCount, lastReadInboxMessageId } = getChannelUnreadState(global, chat.id);
     if (unreadCount <= 0) return;
 
-    const lastReadId = chat.lastReadInboxMessageId || 0;
     const byId = global.messages.byChatId[chat.id]?.byId;
     if (!byId) return;
 
     Object.values(byId).forEach((message) => {
       if (!message || message.isOutgoing) return;
-      if (message.id <= lastReadId) return;
+      if (message.id <= lastReadInboxMessageId) return;
       if (message.content.action) return;
       result.push(message);
     });
@@ -45,21 +79,6 @@ export function collectBygramFeedMessages(global: GlobalState, limit = 80): ApiM
   return result
     .sort((a, b) => b.date - a.date || b.id - a.id)
     .slice(0, limit);
-}
-
-export function collectUnreadChannelIds(global: GlobalState, limit = 24): string[] {
-  return Object.values(global.chats.byId)
-    .filter((chat) => (
-      chat
-      && !isBygramFeedChatId(chat.id)
-      && isChatChannel(chat)
-      && !chat.isNotJoined
-      && !chat.isForbidden
-      && (chat.unreadCount || 0) > 0
-    ))
-    .sort((a, b) => (b.unreadCount || 0) - (a.unreadCount || 0))
-    .slice(0, limit)
-    .map((chat) => chat.id);
 }
 
 export function getBygramFeedUnreadCount(global: GlobalState) {
@@ -73,6 +92,6 @@ export function getBygramFeedUnreadCount(global: GlobalState) {
     ) {
       return sum;
     }
-    return sum + (chat.unreadCount || 0);
+    return sum + getChannelUnreadState(global, chat.id).unreadCount;
   }, 0);
 }

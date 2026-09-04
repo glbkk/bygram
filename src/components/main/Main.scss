@@ -324,18 +324,27 @@ body.is-edge-swiping {
 
   #MiddleColumn {
     transition: none !important;
+    will-change: transform;
   }
 
-  // Reveal the chat list underneath as the chat slides away
+  // Reveal the chat list underneath as the chat slides away — keep it fully interactive
   @media (max-width: 600px) {
     #LeftColumn {
       transition: none !important;
       transform: translate3d(0, 0, 0) !important;
+      pointer-events: auto !important;
     }
 
     #LeftColumn::after {
       transition: none !important;
       opacity: calc((1 - var(--edge-swipe-progress, 0)) * var(--layer-blackout-opacity)) !important;
+      pointer-events: none !important;
+    }
+
+    #LeftColumn .chat-list,
+    #LeftColumn .ChatFolders,
+    #LeftColumn .ListItem {
+      pointer-events: auto !important;
     }
   }
 }

@@ -12,9 +12,9 @@ import useLastCallback from '../../../hooks/useLastCallback';
 const EDGE_ZONE_PX = 24;
 const CLAIM_DX_PX = 10;
 const FAIL_VERTICAL_PX = 36;
-const COMMIT_PROGRESS = 0.32;
-const VELOCITY_COMMIT = 0.55;
-const SNAP_MS = 140;
+const COMMIT_PROGRESS = 0.28;
+const VELOCITY_COMMIT = 0.45;
+const SNAP_MS = 90;
 const EXCLUDED_SELECTOR = [
   '.Composer',
   '.SymbolMenu',
@@ -138,29 +138,33 @@ export default function useEdgeSwipeBack(
     const finishCommit = () => {
       markEdgeSwipeCommit();
       const main = getMain();
-      requestMutation(() => {
-        main?.classList.add('history-animation-disabled');
-      });
-      applyProgress(1);
-      handleBack();
 
-      const startedAt = performance.now();
-      const settle = () => {
-        const ready = Boolean(main?.classList.contains('left-column-open'))
-          || performance.now() - startedAt > 120;
-        if (!ready) {
-          requestAnimationFrame(settle);
-          return;
-        }
-        clearInlineStyles();
-        resetSession();
+      // Instant end-state: do not wait for React/class settle — list is already visible under the swipe.
+      requestMutation(() => {
+        main?.classList.add('history-animation-disabled', 'left-column-open', 'left-column-shown');
+        main?.classList.remove('is-edge-swiping');
+        document.body.classList.remove('is-edge-swiping');
+        document.body.style.removeProperty('--edge-swipe-progress');
+        container.style.transition = 'none';
+        container.style.transform = 'translate3d(100vw, 0, 0)';
+        container.style.boxShadow = '';
+      });
+
+      handleBack();
+      resetSession();
+
+      requestAnimationFrame(() => {
+        requestMutation(() => {
+          container.style.removeProperty('transition');
+          container.style.removeProperty('transform');
+          container.style.removeProperty('box-shadow');
+        });
         requestAnimationFrame(() => {
           requestMutation(() => {
             main?.classList.remove('history-animation-disabled');
           });
         });
-      };
-      requestAnimationFrame(settle);
+      });
     };
 
     const onTouchStart = (e: TouchEvent) => {
@@ -239,6 +243,7 @@ export default function useEdgeSwipeBack(
 
       if (shouldCommit) {
         vibrateShort();
+        // Skip snap animation — jump straight to committed state.
         finishCommit();
         return;
       }

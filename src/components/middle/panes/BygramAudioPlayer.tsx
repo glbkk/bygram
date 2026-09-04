@@ -50,7 +50,7 @@ const BygramAudioPlayer: FC<OwnProps & StateProps> = ({
   hasTelegramAudio,
   onPaneStateChange,
 }) => {
-  const { openLeftColumnContent, showNotification } = getActions();
+  const { openChat, openLeftColumnContent, showNotification } = getActions();
   const lang = useOldLang();
   const { isMobile } = useAppLayout();
   const player = useBygramMusicPlayer();
@@ -72,8 +72,15 @@ const BygramAudioPlayer: FC<OwnProps & StateProps> = ({
     bygramMusicPlayer.stop();
   });
 
-  const handleOpenMusic = useLastCallback(() => {
+  const openMusicTab = useLastCallback(() => {
+    if (isMobile && !isStandalone) {
+      openChat({ id: undefined });
+    }
     openLeftColumnContent({ contentKey: LeftColumnContent.Music });
+  });
+
+  const handleOpenMusic = useLastCallback(() => {
+    openMusicTab();
   });
 
   const handleToggleLike = useLastCallback(() => {
@@ -96,7 +103,7 @@ const BygramAudioPlayer: FC<OwnProps & StateProps> = ({
     const track = player.track;
     if (!track) return;
     queueTrackForPlaylist(track);
-    openLeftColumnContent({ contentKey: LeftColumnContent.Music });
+    openMusicTab();
     showNotification({ message: 'Выберите плейлист в bygramMusic' });
   });
 

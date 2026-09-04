@@ -14,7 +14,9 @@ import { takePendingPlaylistTrack } from '../../api/bygram/byprotoMusic';
 import { subscribeOfflineTrackIds } from '../../api/bygram/musicOfflineStore';
 import { bygramMusicPlayer } from '../../api/bygram/musicPlayer';
 import { bygramMusicApi } from '../../api/bygram/serverlessMusic';
+import { IS_TOUCH_ENV } from '../../util/browser/windowEnvironment';
 import { createByProtoMusicPlaylistEnvelope, createByProtoMusicTrackEnvelope } from '../../byproto/outgoing';
+import { captureControlledSwipe } from '../../util/swipeController';
 import buildAttachment from '../middle/composer/helpers/buildAttachment';
 
 import useBygramMusicPlayer from '../../hooks/useBygramMusicPlayer';
@@ -161,6 +163,23 @@ function BygramMusic() {
   const close = useLastCallback(() => {
     openLeftColumnContent({ contentKey: LeftColumnContent.ChatList });
   });
+
+  const rootRef = useRef<HTMLDivElement>();
+
+  useEffect(() => {
+    if (!IS_TOUCH_ENV || !rootRef.current) {
+      return undefined;
+    }
+
+    return captureControlledSwipe(rootRef.current, {
+      excludedClosestSelector: '.Modal, .Menu, .RecipientPicker',
+      selectorToPreventScroll: '.custom-scroll',
+      onSwipeRightStart: close,
+      onCancel: () => {
+        openLeftColumnContent({ contentKey: LeftColumnContent.Music });
+      },
+    });
+  }, [close, openLeftColumnContent]);
 
   const runSearch = useLastCallback(async (rawQuery: string) => {
     const trimmed = rawQuery.trim();
@@ -454,7 +473,7 @@ function BygramMusic() {
   const isSearchMode = Boolean(query.trim().length >= 2 || searchResults);
 
   return (
-    <main id="BygramMusic" className={styles.root}>
+    <main id="BygramMusic" ref={rootRef} className={styles.root}>
       <header className={styles.header}>
         <Button round color="translucent" iconName="arrow-left" ariaLabel="Назад к чатам" onClick={close} />
         <div className={styles.heading}>
