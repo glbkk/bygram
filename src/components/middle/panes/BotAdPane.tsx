@@ -47,7 +47,7 @@ const BotAdPane = ({
 
   const lang = useLang();
 
-  const isOpen = Boolean(isBot && sponsoredMessage && messageListType === 'thread');
+  const isOpen = false;
 
   const { sponsoredMessage: renderingSponsoredMessage } = useFrozenProps({ sponsoredMessage }, !isOpen);
 

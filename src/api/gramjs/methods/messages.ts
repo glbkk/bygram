@@ -2371,27 +2371,13 @@ export function saveDefaultSendAs({
 }
 
 export async function fetchSponsoredMessages({ peer }: { peer: ApiPeer }) {
-  const result = await invokeRequest(new GramJs.messages.GetSponsoredMessages({
-    peer: buildInputPeer(peer.id, peer.accessHash),
-  }));
-
-  if (!result || result instanceof GramJs.messages.SponsoredMessagesEmpty || !result.messages.length) {
-    return undefined;
-  }
-
-  const messages = result.messages
-    .map((message) => buildApiSponsoredMessage(message, peer.id))
-    .filter(Boolean);
-
-  return {
-    messages,
-  };
+  // bygram: never request sponsored messages from Telegram.
+  void peer;
+  return undefined;
 }
 
 export async function viewSponsoredMessage({ random }: { random: string }) {
-  await invokeRequest(new GramJs.messages.ViewSponsoredMessage({
-    randomId: deserializeBytes(random),
-  }));
+  void random;
 }
 
 export function clickSponsoredMessage({
@@ -2403,11 +2389,10 @@ export function clickSponsoredMessage({
   isMedia?: boolean;
   isFullscreen?: boolean;
 }) {
-  return invokeRequest(new GramJs.messages.ClickSponsoredMessage({
-    media: isMedia || undefined,
-    fullscreen: isFullscreen || undefined,
-    randomId: deserializeBytes(random),
-  }));
+  void random;
+  void isMedia;
+  void isFullscreen;
+  return undefined;
 }
 
 export async function reportSponsoredMessage({

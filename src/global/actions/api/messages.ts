@@ -2453,27 +2453,9 @@ addActionHandler('loadSendPaidReactionsAs', async (global, actions, payload): Pr
   setGlobal(global);
 });
 
-addActionHandler('loadSponsoredMessages', async (global, actions, payload): Promise<void> => {
-  if (selectIsCurrentUserFrozen(global)) return;
-
-  const { peerId } = payload;
-  const peer = selectPeer(global, peerId);
-  if (!peer) {
-    return;
-  }
-
-  if (isApiPeerUser(peer) && selectIsChatBotNotStarted(global, peer.id)) {
-    return;
-  }
-
-  const result = await callApi('fetchSponsoredMessages', { peer });
-  if (!result) {
-    return;
-  }
-
-  global = getGlobal();
-  global = updateSponsoredMessage(global, peerId, result.messages[0]);
-  setGlobal(global);
+addActionHandler('loadSponsoredMessages', async (): Promise<void> => {
+  // bygram: Telegram ads are disabled client-side.
+  return undefined;
 });
 
 addActionHandler('viewSponsored', (global, actions, payload): ActionReturnType => {

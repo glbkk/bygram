@@ -2116,9 +2116,9 @@ export function updatePaidMessagesPrice({
 }
 
 export async function fetchSponsoredPeer({ query }: { query: string }) {
-  const result = await invokeRequest(new GramJs.contacts.GetSponsoredPeers({ q: query }));
-  if (!result || result instanceof GramJs.contacts.SponsoredPeersEmpty) return undefined;
-  return buildApiSponsoredPeer(result.peers[0]);
+  // bygram: never request sponsored peers in search.
+  void query;
+  return undefined;
 }
 
 export function toggleAutoTranslation({

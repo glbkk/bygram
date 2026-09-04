@@ -42,7 +42,6 @@ import {
   selectIsChatProtected,
   selectIsChatWithSelf,
   selectIsCurrentUserFrozen,
-  selectIsCurrentUserPremium,
   selectIsInSelectMode,
   selectIsViewportNewest,
   selectMonoforumChannel,
@@ -1391,8 +1390,8 @@ export default memo(withGlobal<OwnProps>(
     const chatFullInfo = !isUserId(chatId) ? selectChatFullInfo(global, chatId) : undefined;
     const isEmptyThread = selectThreadInfo(global, chatId, threadId)?.messagesCount === 0;
 
-    const isCurrentUserPremium = selectIsCurrentUserPremium(global);
-    const areAdsEnabled = !isCurrentUserPremium || selectUserFullInfo(global, currentUserId)?.areAdsEnabled;
+    // bygram: never show Telegram sponsored ads (channels, bots, search).
+    const areAdsEnabled = false;
     const isAccountFrozen = selectIsCurrentUserFrozen(global);
 
     const hasCustomGreeting = Boolean(userFullInfo?.businessIntro);
