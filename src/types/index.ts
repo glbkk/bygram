@@ -204,6 +204,7 @@ export interface ShippingOption {
 export enum SettingsScreens {
   Main,
   Bygram,
+  BygramFeatures,
   EditProfile,
   Notifications,
   DataStorage,
@@ -304,6 +305,7 @@ export type StickerSetOrReactionsSetOrRecent = Pick<ApiStickerSet, (
 export enum LeftColumnContent {
   ChatList,
   Music,
+  Feed,
   GlobalSearch,
   Settings,
   Contacts,

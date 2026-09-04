@@ -1,0 +1,19 @@
+.item {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--color-borders);
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.title {
+  margin-bottom: 0.25rem;
+  font-weight: 600;
+}
+
+.text {
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.35;
+}

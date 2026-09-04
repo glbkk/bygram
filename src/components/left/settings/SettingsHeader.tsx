@@ -83,6 +83,8 @@ const SettingsHeader: FC<OwnProps> = ({
     switch (currentScreen) {
       case SettingsScreens.Bygram:
         return <h3>{lang('BygramSettings')}</h3>;
+      case SettingsScreens.BygramFeatures:
+        return <h3>{lang('BygramFeaturesTitle')}</h3>;
       case SettingsScreens.EditProfile:
         return <h3>{oldLang('lng_settings_information')}</h3>;
       case SettingsScreens.General:

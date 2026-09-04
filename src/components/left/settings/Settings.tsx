@@ -20,6 +20,7 @@ import PrivacyMessages from './PrivacyMessages';
 import SettingsActiveSessions from './SettingsActiveSessions';
 import SettingsActiveWebsites from './SettingsActiveWebsites';
 import SettingsBygram from './SettingsBygram';
+import SettingsBygramFeatures from './SettingsBygramFeatures';
 import SettingsCustomEmoji from './SettingsCustomEmoji';
 import SettingsDataStorage from './SettingsDataStorage';
 import SettingsDoNotTranslate from './SettingsDoNotTranslate';
@@ -254,6 +255,10 @@ const Settings: FC<OwnProps> = ({
       case SettingsScreens.Bygram:
         return (
           <SettingsBygram isActive={isScreenActive} onReset={handleReset} />
+        );
+      case SettingsScreens.BygramFeatures:
+        return (
+          <SettingsBygramFeatures isActive={isScreenActive} onReset={handleReset} />
         );
       case SettingsScreens.EditProfile:
         return (

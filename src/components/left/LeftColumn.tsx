@@ -183,6 +183,7 @@ function LeftColumn({
       switch (settingsScreen) {
         case SettingsScreens.EditProfile:
         case SettingsScreens.Bygram:
+        case SettingsScreens.BygramFeatures:
         case SettingsScreens.Folders:
         case SettingsScreens.General:
         case SettingsScreens.Notifications:

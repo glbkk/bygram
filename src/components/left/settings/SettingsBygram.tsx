@@ -254,6 +254,25 @@ function SettingsBygram({ isActive, onReset }: OwnProps) {
         />
       </Island>
 
+      <IslandTitle dir={lang.isRtl ? 'rtl' : undefined}>{lang('BygramShortcutsTitle')}</IslandTitle>
+      <Island>
+        <Checkbox
+          label={lang('BygramMusicButton')}
+          subLabel={lang('BygramMusicButtonDesc')}
+          checked={settings.isMusicButtonEnabled}
+          onCheck={(value) => handleSettingChange('isMusicButtonEnabled', value)}
+        />
+        <Checkbox
+          label={lang('BygramFeedButton')}
+          subLabel={lang('BygramFeedButtonDesc')}
+          checked={settings.isFeedButtonEnabled}
+          onCheck={(value) => handleSettingChange('isFeedButtonEnabled', value)}
+        />
+      </Island>
+      <IslandDescription dir={lang.isRtl ? 'rtl' : undefined}>
+        {lang('BygramShortcutsDesc')}
+      </IslandDescription>
+
       <IslandTitle>Связь bygram</IslandTitle>
       <Island>
         <Checkbox

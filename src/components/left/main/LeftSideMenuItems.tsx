@@ -4,6 +4,7 @@ import { getActions, withGlobal } from '../../../global';
 import type { ApiUser } from '../../../api/types';
 import type { GlobalState } from '../../../global/types';
 import type { AnimationLevel, ThemeKey } from '../../../types';
+import { LeftColumnContent, SettingsScreens } from '../../../types';
 
 import {
   ANIMATION_LEVEL_MAX,
@@ -76,9 +77,10 @@ const LeftSideMenuItems = ({
     openChat,
     setSharedSettingOption,
     updatePerformanceSettings,
-    openChatByUsername,
     openUrl,
     openChatWithInfo,
+    openLeftColumnContent,
+    openSettingsScreen,
   } = getActions();
   const lang = useLang();
 
@@ -132,7 +134,8 @@ const LeftSideMenuItems = ({
   });
 
   const handleOpenTipsChat = useLastCallback(() => {
-    openChatByUsername({ username: lang('TelegramFeaturesUsername') });
+    openLeftColumnContent({ contentKey: LeftColumnContent.Settings });
+    openSettingsScreen({ screen: SettingsScreens.BygramFeatures });
   });
 
   const handleBugReportClick = useLastCallback(() => {
@@ -224,7 +227,7 @@ const LeftSideMenuItems = ({
               icon="help"
               onClick={handleOpenTipsChat}
             >
-              {lang('MenuTelegramFeatures')}
+              {lang('MenuBygramFeatures')}
             </MenuItem>
             <MenuItem
               icon="bug"

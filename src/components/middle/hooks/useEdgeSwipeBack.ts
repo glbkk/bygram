@@ -4,6 +4,7 @@ import { useEffect } from '../../../lib/teact/teact';
 import { requestMutation } from '../../../lib/fasterdom/fasterdom';
 import { animateNumber, timingFunctions } from '../../../util/animation';
 import { IS_TOUCH_ENV } from '../../../util/browser/windowEnvironment';
+import { markEdgeSwipeCommit } from '../../../util/bygramEdgeSwipe';
 import { vibrateShort } from '../../../util/vibrate';
 
 import useLastCallback from '../../../hooks/useLastCallback';
@@ -12,8 +13,8 @@ const EDGE_ZONE_PX = 24;
 const CLAIM_DX_PX = 10;
 const FAIL_VERTICAL_PX = 36;
 const COMMIT_PROGRESS = 0.32;
-const VELOCITY_COMMIT = 0.55; // px/ms rightward
-const SNAP_MS = 160;
+const VELOCITY_COMMIT = 0.55;
+const SNAP_MS = 140;
 const EXCLUDED_SELECTOR = [
   '.Composer',
   '.SymbolMenu',
@@ -27,9 +28,8 @@ const EXCLUDED_SELECTOR = [
 ].join(', ');
 
 /**
- * Interactive edge swipe to leave a chat (Telegram iOS-like).
- * Drives #MiddleColumn / #LeftColumn transforms with the finger, then either
- * snaps back or commits into openChat(undefined).
+ * Interactive edge swipe-back. Only #MiddleColumn follows the finger; the chat
+ * list is revealed underneath without being transformed (avoids multi-second freezes).
  */
 export default function useEdgeSwipeBack(
   containerRef: ElementRef<HTMLElement>,
@@ -61,38 +61,27 @@ export default function useEdgeSwipeBack(
     let cancelSnap: NoneToVoidFunction | undefined;
     let moveListenerAttached = false;
 
-    const getLeftColumn = () => document.getElementById('LeftColumn');
     const getMain = () => document.getElementById('Main');
 
     const applyProgress = (next: number) => {
       progress = Math.max(0, Math.min(1, next));
-      const middle = container;
-      const left = getLeftColumn();
-
       requestMutation(() => {
-        middle.style.transition = 'none';
-        middle.style.transform = `translate3d(${progress * 100}vw, 0, 0)`;
-        if (left) {
-          left.style.transition = 'none';
-          left.style.transform = `translate3d(${(-1 + progress) * 100}%, 0, 0)`;
-          left.style.setProperty('--edge-swipe-blackout', String(progress));
-        }
+        container.style.transition = 'none';
+        container.style.transform = `translate3d(${progress * 100}vw, 0, 0)`;
+        container.style.boxShadow = progress > 0
+          ? `-8px 0 24px rgba(0,0,0,${0.18 * progress})`
+          : '';
+        document.body.style.setProperty('--edge-swipe-progress', String(progress));
       });
     };
 
     const clearInlineStyles = () => {
-      const middle = container;
-      const left = getLeftColumn();
       const main = getMain();
-
       requestMutation(() => {
-        middle.style.removeProperty('transition');
-        middle.style.removeProperty('transform');
-        if (left) {
-          left.style.removeProperty('transition');
-          left.style.removeProperty('transform');
-          left.style.removeProperty('--edge-swipe-blackout');
-        }
+        container.style.removeProperty('transition');
+        container.style.removeProperty('transform');
+        container.style.removeProperty('box-shadow');
+        document.body.style.removeProperty('--edge-swipe-progress');
         main?.classList.remove('is-edge-swiping');
         document.body.classList.remove('is-edge-swiping');
       });
@@ -144,6 +133,34 @@ export default function useEdgeSwipeBack(
           if (!canceled) onDone();
         },
       });
+    };
+
+    const finishCommit = () => {
+      markEdgeSwipeCommit();
+      const main = getMain();
+      requestMutation(() => {
+        main?.classList.add('history-animation-disabled');
+      });
+      applyProgress(1);
+      handleBack();
+
+      const startedAt = performance.now();
+      const settle = () => {
+        const ready = Boolean(main?.classList.contains('left-column-open'))
+          || performance.now() - startedAt > 120;
+        if (!ready) {
+          requestAnimationFrame(settle);
+          return;
+        }
+        clearInlineStyles();
+        resetSession();
+        requestAnimationFrame(() => {
+          requestMutation(() => {
+            main?.classList.remove('history-animation-disabled');
+          });
+        });
+      };
+      requestAnimationFrame(settle);
     };
 
     const onTouchStart = (e: TouchEvent) => {
@@ -222,16 +239,7 @@ export default function useEdgeSwipeBack(
 
       if (shouldCommit) {
         vibrateShort();
-        applyProgress(1);
-        // Keep end-state transforms for a frame so openChat's left-column-open
-        // CSS lands at the same visual position (no double-slide flash).
-        handleBack();
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            clearInlineStyles();
-            resetSession();
-          });
-        });
+        finishCommit();
         return;
       }
 

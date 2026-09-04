@@ -8,6 +8,7 @@ import {
   ALL_FOLDER_ID, ARCHIVED_FOLDER_ID, MEMBERS_LOAD_SLICE, SAVED_FOLDER_ID, SERVICE_NOTIFICATIONS_USER_ID,
 } from '../../config';
 import { IS_TRANSLATION_SUPPORTED } from '../../util/browser/windowEnvironment';
+import { getBygramFeedChat, isBygramFeedChatId } from '../../util/bygramChannelFeed';
 import { isUserId } from '../../util/entities/ids';
 import { getCurrentTabId } from '../../util/establishMultitabRole';
 import {
@@ -28,6 +29,9 @@ import {
 } from './users';
 
 export function selectChat<T extends GlobalState>(global: T, chatId: string): ApiChat | undefined {
+  if (isBygramFeedChatId(chatId)) {
+    return getBygramFeedChat();
+  }
   return global.chats.byId[chatId];
 }
 

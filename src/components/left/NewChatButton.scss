@@ -3,6 +3,9 @@
   z-index: var(--z-chat-float-button);
   right: 1rem;
   bottom: 1rem;
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
   transform: translateY(5rem);
 
   transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -10,6 +13,28 @@
   &[dir="rtl"] {
     right: auto;
     left: 1rem;
+    flex-direction: row-reverse;
+  }
+
+  &.bygram-fabs-both {
+    right: 1rem;
+    left: 1rem;
+    justify-content: space-between;
+
+    &[dir="rtl"] {
+      flex-direction: row-reverse;
+    }
+  }
+
+  /* Feed alone → left corner; Music alone stays right (default) */
+  &:not(.bygram-fabs-both):has(.feed-fab-button):not(:has(.music-fab-button)) {
+    right: auto;
+    left: 1rem;
+
+    &[dir="rtl"] {
+      right: 1rem;
+      left: auto;
+    }
   }
 
   body.no-page-transitions & {
@@ -26,14 +51,14 @@
     transform: translateY(0);
   }
 
-  &.music-fab > .Button {
+  .bygram-fab-button.Button {
     display: flex;
     align-items: center;
     justify-content: center;
     box-shadow: 0 0.25rem 0.75rem var(--color-default-shadow);
   }
 
-  .music-fab-icon {
+  .bygram-fab-icon {
     display: block;
     flex-shrink: 0;
 

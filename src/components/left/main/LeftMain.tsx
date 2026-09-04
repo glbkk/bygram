@@ -18,6 +18,7 @@ import useLastCallback from '../../../hooks/useLastCallback';
 import useOldLang from '../../../hooks/useOldLang';
 import useShowTransitionDeprecated from '../../../hooks/useShowTransitionDeprecated';
 
+import BygramChannelFeed from '../../middle/BygramChannelFeed';
 import BygramAudioPlayer from '../../middle/panes/BygramAudioPlayer';
 import BygramMusic from '../../music/BygramMusic';
 import Button from '../../ui/Button';
@@ -168,6 +169,8 @@ const LeftMain: FC<OwnProps> = ({
 
   const lang = useOldLang();
   const isMusicOpen = content === LeftColumnContent.Music;
+  const isFeedOpen = content === LeftColumnContent.Feed;
+  const isOverlayPanelOpen = isMusicOpen || isFeedOpen;
 
   return (
     <div
@@ -175,7 +178,7 @@ const LeftMain: FC<OwnProps> = ({
       onMouseEnter={!IS_TOUCH_ENV ? handleMouseEnter : undefined}
       onMouseLeave={!IS_TOUCH_ENV ? handleMouseLeave : undefined}
     >
-      {!isMusicOpen && (
+      {!isOverlayPanelOpen && (
         <>
           <LeftMainHeader
             shouldHideSearch={isForumPanelVisible}
@@ -213,6 +216,8 @@ const LeftMain: FC<OwnProps> = ({
               );
             case LeftColumnContent.Music:
               return <BygramMusic />;
+            case LeftColumnContent.Feed:
+              return <BygramChannelFeed isReady={isActive} />;
             case LeftColumnContent.GlobalSearch:
               return (
                 <LeftSearch
@@ -250,7 +255,7 @@ const LeftMain: FC<OwnProps> = ({
         />
       )}
       <NewChatButton
-        isShown={isNewChatButtonShown && !isMusicOpen}
+        isShown={isNewChatButtonShown && !isOverlayPanelOpen}
         isAccountFrozen={isAccountFrozen}
       />
     </div>

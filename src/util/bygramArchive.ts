@@ -37,6 +37,8 @@ export type BygramSettings = {
   isObservedLastSeenEnabled: boolean;
   isLocalVoiceTranscribeEnabled: boolean;
   isUnrestrictedForwardEnabled: boolean;
+  isMusicButtonEnabled: boolean;
+  isFeedButtonEnabled: boolean;
   isByProtoEnabled: boolean;
   isByProtoAutoAcceptProfiles: boolean;
   mediaArchiveLimitMb: number;
@@ -235,6 +237,8 @@ const DEFAULT_SETTINGS: BygramSettings = {
   isObservedLastSeenEnabled: true,
   isLocalVoiceTranscribeEnabled: true,
   isUnrestrictedForwardEnabled: true,
+  isMusicButtonEnabled: true,
+  isFeedButtonEnabled: true,
   isByProtoEnabled: true,
   isByProtoAutoAcceptProfiles: true,
   mediaArchiveLimitMb: 256,

@@ -36,6 +36,7 @@ import { IS_TAURI } from '../../util/browser/globalEnvironment';
 import { IS_ANDROID, IS_MAC_OS, IS_WAVE_TRANSFORM_SUPPORTED } from '../../util/browser/windowEnvironment';
 import buildClassName from '../../util/buildClassName';
 import { lockBygramChats } from '../../util/bygramChatSecurity';
+import { consumeSkipLeftColumnAnimation } from '../../util/bygramEdgeSwipe';
 import { waitForTransitionEnd } from '../../util/cssAnimationEndListeners';
 import { processDeepLink } from '../../util/deeplink';
 import { Bundles, loadBundle } from '../../util/moduleLoader';
@@ -494,6 +495,11 @@ const Main = ({
   // Handle opening middle column
   useSyncEffect(([prevIsLeftColumnOpen]) => {
     if (prevIsLeftColumnOpen === undefined || isLeftColumnOpen === prevIsLeftColumnOpen || !withInterfaceAnimations) {
+      return;
+    }
+
+    if (consumeSkipLeftColumnAnimation()) {
+      willAnimateLeftColumnRef.current = false;
       return;
     }
 
