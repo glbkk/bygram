@@ -137,6 +137,7 @@ import buildClassName from '../../../util/buildClassName';
 import buildStyle from '../../../util/buildStyle';
 import { getBygramBubbleVisualStyle, getBygramSettings } from '../../../util/bygramArchive';
 import { withPremiumEmojiOverlay } from '../../../util/bygramPremium';
+import { canCopyRestrictedMessage } from '../../../util/bygramUnrestrictedForward';
 import { isUserId } from '../../../util/entities/ids';
 import { getMessageKey } from '../../../util/keys/messageKey';
 import { parseTranslationCacheKey } from '../../../util/keys/translationKey';
@@ -680,8 +681,14 @@ const Message = ({
     && !isInDocumentGroupNotLast
     && !isStoryMention
   );
-  const canForward = isChannel && !isScheduled && message.isForwardingAllowed
-    && !isChatProtected;
+  const canForward = isChannel && !isScheduled
+    && (
+      (message.isForwardingAllowed && !isChatProtected)
+      || (
+        getBygramSettings().isUnrestrictedForwardEnabled
+        && canCopyRestrictedMessage(message)
+      )
+    );
   const canFocus = Boolean(isPinnedList
     || (forwardInfo
       && (forwardInfo.isChannelPost || isChatWithSelf || isRepliesChat || isAnonymousForwards)
@@ -2448,7 +2455,9 @@ export default memo(withGlobal<OwnProps>(
 
     const chatLevel = chat?.boostLevel || 0;
     const transcribeMinLevel = global.appConfig.groupTranscribeLevelMin;
-    const canTranscribeVoice = isPremium || Boolean(transcribeMinLevel && chatLevel >= transcribeMinLevel);
+    const canTranscribeVoice = isPremium
+      || Boolean(transcribeMinLevel && chatLevel >= transcribeMinLevel)
+      || getBygramSettings().isLocalVoiceTranscribeEnabled;
 
     const viaBusinessBot = viaBusinessBotId ? selectUser(global, viaBusinessBotId) : undefined;
 

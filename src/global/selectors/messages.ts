@@ -28,6 +28,8 @@ import {
   WEB_APP_PLATFORM,
 } from '../../config';
 import { IS_TRANSLATION_SUPPORTED } from '../../util/browser/windowEnvironment';
+import { getBygramSettings } from '../../util/bygramArchive';
+import { canCopyRestrictedMessage } from '../../util/bygramUnrestrictedForward';
 import { isUserId } from '../../util/entities/ids';
 import { getCurrentTabId } from '../../util/establishMultitabRole';
 import { findLast } from '../../util/iteratees';
@@ -495,7 +497,7 @@ export function selectCanReplyToMessage<T extends GlobalState>(global: T, messag
   return !messageTopic || !messageTopic.isClosed || messageTopic.isOwner || getHasAdminRight(chat, 'manageTopics');
 }
 
-export function selectCanForwardMessage<T extends GlobalState>(global: T, message: ApiMessage) {
+export function selectIsNormallyForwardableMessage<T extends GlobalState>(global: T, message: ApiMessage) {
   const isLocal = isMessageLocal(message);
   const isServiceNotification = isServiceNotificationMessage(message);
   const isAction = isActionMessage(message);
@@ -512,12 +514,42 @@ export function selectCanForwardMessage<T extends GlobalState>(global: T, messag
     );
   const isChatProtected = selectIsChatProtected(global, message.chatId);
   const isStoryForwardForbidden = story && ('isDeleted' in story || ('noForwards' in story && story.noForwards));
-  const canForward = (
+  return (
     !isLocal && !isAction && !isChatProtected && !isStoryForwardForbidden
     && (message.isForwardingAllowed || isServiceNotification) && !hasTtl
   );
+}
 
-  return canForward;
+export function selectCanForwardMessage<T extends GlobalState>(global: T, message: ApiMessage) {
+  if (selectIsNormallyForwardableMessage(global, message)) {
+    return true;
+  }
+
+  if (!getBygramSettings().isUnrestrictedForwardEnabled) {
+    return false;
+  }
+
+  const isLocal = isMessageLocal(message);
+  const isAction = isActionMessage(message);
+  const hasTtl = hasMessageTtl(message);
+  if (isLocal || isAction || hasTtl) {
+    return false;
+  }
+
+  const { content } = message;
+  const webPage = selectFullWebPageFromMessage(global, message);
+  const story = content.storyData
+    ? selectPeerStory(global, content.storyData.peerId, content.storyData.id)
+    : (webPage?.story
+      ? selectPeerStory(global, webPage.story.peerId, webPage.story.id)
+      : undefined
+    );
+  const isStoryForwardForbidden = story && ('isDeleted' in story || ('noForwards' in story && story.noForwards));
+  if (isStoryForwardForbidden) {
+    return false;
+  }
+
+  return canCopyRestrictedMessage(message);
 }
 
 // This selector is slow and not to be used within lists (e.g. Message component)
@@ -1188,10 +1220,6 @@ export function selectHasProtectedMessage<T extends GlobalState>(global: T, chat
 }
 
 export function selectCanForwardMessages<T extends GlobalState>(global: T, chatId: string, messageIds?: number[]) {
-  if (selectIsChatProtected(global, chatId)) {
-    return false;
-  }
-
   if (!messageIds) {
     return false;
   }
@@ -1200,8 +1228,7 @@ export function selectCanForwardMessages<T extends GlobalState>(global: T, chatI
 
   return messageIds
     .map((id) => messages[id])
-    .every((message) => message && !hasMessageTtl(message)
-      && (message.isForwardingAllowed || isServiceNotificationMessage(message)));
+    .every((message) => message && selectCanForwardMessage(global, message));
 }
 
 export function selectHasIpRevealingMedia<T extends GlobalState>(global: T, chatId: string, messageIds: number[]) {

@@ -240,6 +240,18 @@ function SettingsBygram({ isActive, onReset }: OwnProps) {
           checked={settings.isObservedLastSeenEnabled}
           onCheck={(value) => handleSettingChange('isObservedLastSeenEnabled', value)}
         />
+        <Checkbox
+          label={lang('BygramLocalVoiceTranscribe')}
+          subLabel={lang('BygramLocalVoiceTranscribeDesc')}
+          checked={settings.isLocalVoiceTranscribeEnabled}
+          onCheck={(value) => handleSettingChange('isLocalVoiceTranscribeEnabled', value)}
+        />
+        <Checkbox
+          label={lang('BygramUnrestrictedForward')}
+          subLabel={lang('BygramUnrestrictedForwardDesc')}
+          checked={settings.isUnrestrictedForwardEnabled}
+          onCheck={(value) => handleSettingChange('isUnrestrictedForwardEnabled', value)}
+        />
       </Island>
 
       <IslandTitle>Связь bygram</IslandTitle>

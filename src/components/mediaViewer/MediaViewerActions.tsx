@@ -25,6 +25,8 @@ import {
   selectPerformanceSettingsValue,
   selectTabState,
 } from '../../global/selectors';
+import { getBygramSettings } from '../../util/bygramArchive';
+import { canCopyRestrictedMessage } from '../../util/bygramUnrestrictedForward';
 import { isUserId } from '../../util/entities/ids';
 import selectViewableMedia from './helpers/getViewableMedia';
 
@@ -113,6 +115,16 @@ const MediaViewerActions: FC<OwnProps & StateProps> = ({
   const isMessage = item?.type === 'message';
   const message = item?.type === 'message' ? item.message : undefined;
   const isTtlMedia = message?.content.ttlSeconds !== undefined;
+  const canForward = Boolean(
+    isMessage
+    && message
+    && !message.content.action
+    && !isTtlMedia
+    && (
+      (message.isForwardingAllowed && !isChatProtected)
+      || (getBygramSettings().isUnrestrictedForwardEnabled && canCopyRestrictedMessage(message))
+    ),
+  );
 
   const { canSendPhotos } = getAllowedAttachmentOptions(chat, chatFullInfo);
   const canEditViewedMedia = Boolean(
@@ -267,7 +279,7 @@ const MediaViewerActions: FC<OwnProps & StateProps> = ({
 
   if (isMobile) {
     const menuItems: MenuItemProps[] = [];
-    if (isMessage && item.message.isForwardingAllowed && !item.message.content.action && !isChatProtected) {
+    if (canForward) {
       menuItems.push({
         icon: 'forward',
         onClick: onForward,
@@ -359,7 +371,7 @@ const MediaViewerActions: FC<OwnProps & StateProps> = ({
           iconName="edit"
         />
       )}
-      {isMessage && item.message.isForwardingAllowed && !isChatProtected && (
+      {canForward && (
         <Button
           round
           size="smaller"

@@ -3257,6 +3257,10 @@
 "BygramGhostModeOff" = "Режим призрака выключен";
 "BygramObservedLastSeen" = "Время в сети";
 "BygramObservedLastSeenDesc" = "Показывать точное время, когда собеседник был замечен онлайн, даже если Telegram пишет «был недавно». Считается локально на этом устройстве по статусу, сообщениям и набору текста";
+"BygramLocalVoiceTranscribe" = "Расшифровка голосовых";
+"BygramLocalVoiceTranscribeDesc" = "Расшифровывать голосовые и кружки без Premium. Сначала пробуется Telegram, иначе Whisper прямо в браузере (модель скачивается один раз, ~40 МБ)";
+"BygramUnrestrictedForward" = "Пересылка любых сообщений";
+"BygramUnrestrictedForwardDesc" = "Пересылать сообщения даже с запретом пересылки: bygram отправит копию без пометки «переслано»";
 "BygramGhostStoryAsk" = "Спрашивать перед историей";
 "BygramGhostStoryAskDesc" = "Перед открытием истории предлагать выбрать, увидит ли автор отметку о просмотре";
 "BygramGhostStoryTitle" = "Как смотреть историю?";

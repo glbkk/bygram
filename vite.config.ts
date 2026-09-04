@@ -189,7 +189,7 @@ export default defineConfig(({ mode }): UserConfig => {
     envPrefix: ['VITE_', 'TG_'],
     assetsInclude: ['**/*.tgs'],
     optimizeDeps: {
-      exclude: ['temml'],
+      exclude: ['temml', '@huggingface/transformers'],
     },
     define: {
       APP_VERSION: JSON.stringify(APP_VERSION),
@@ -197,6 +197,11 @@ export default defineConfig(({ mode }): UserConfig => {
     resolve: {
       tsconfigPaths: true,
       alias: [
+        {
+          // Browser build must never pull the Node ONNX binding.
+          find: 'onnxruntime-node',
+          replacement: resolve(DIR_NAME, 'src/util/emptyModule.ts'),
+        },
         ...(appMockedClient === '1' ? [{
           find: /^(?:\.\/client|(?:\.\.\/)*lib\/gramjs\/client)\/TelegramClient$/,
           replacement: resolve(DIR_NAME, 'src/lib/gramjs/client/MockClient.ts'),
@@ -300,7 +305,7 @@ function buildCsp(appEnv: string) {
   connect-src 'self' wss://*.web.telegram.org blob: http: https: ${appEnv === 'development' ? 'wss: ipc:' : ''};
   script-src 'self' 'wasm-unsafe-eval'
     https://t.me/_websync_ https://telegram.me/_websync_ https://telegram.dog/_websync_;
-  worker-src 'self'${appEnv === 'development' ? ' blob:' : ''};
+  worker-src 'self' blob:;
   style-src 'self' 'unsafe-inline';
   font-src 'self' data:;
   img-src 'self' data: blob: https: http:;

@@ -35,6 +35,8 @@ export type BygramSettings = {
   isGhostStoryPromptEnabled: boolean;
   isChatStreakEnabled: boolean;
   isObservedLastSeenEnabled: boolean;
+  isLocalVoiceTranscribeEnabled: boolean;
+  isUnrestrictedForwardEnabled: boolean;
   isByProtoEnabled: boolean;
   isByProtoAutoAcceptProfiles: boolean;
   mediaArchiveLimitMb: number;
@@ -231,6 +233,8 @@ const DEFAULT_SETTINGS: BygramSettings = {
   isGhostStoryPromptEnabled: true,
   isChatStreakEnabled: true,
   isObservedLastSeenEnabled: true,
+  isLocalVoiceTranscribeEnabled: true,
+  isUnrestrictedForwardEnabled: true,
   isByProtoEnabled: true,
   isByProtoAutoAcceptProfiles: true,
   mediaArchiveLimitMb: 256,

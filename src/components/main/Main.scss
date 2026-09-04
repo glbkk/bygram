@@ -164,6 +164,12 @@
       body.android-left-blackout-open & {
         opacity: var(--layer-blackout-opacity);
       }
+
+      // Interactive edge-swipe: finger drives blackout via CSS variable
+      body.is-edge-swiping & {
+        transition: none !important;
+        opacity: calc(var(--edge-swipe-blackout, 0) * var(--layer-blackout-opacity));
+      }
     }
 
     #Main.left-column-animating & {
@@ -306,5 +312,18 @@
         left: calc(var(--folders-sidebar-width) + 1.5rem) !important;
       }
     }
+  }
+}
+
+// Interactive edge swipe-back: suppress list scroll / composer while dragging columns
+body.is-edge-swiping {
+  #MiddleColumn .MessageList,
+  #MiddleColumn .Composer {
+    pointer-events: none !important;
+  }
+
+  #LeftColumn,
+  #MiddleColumn {
+    transition: none !important;
   }
 }

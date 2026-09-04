@@ -29,6 +29,7 @@ import { MAIN_THREAD_ID, MESSAGE_DELETED } from '../../../api/types';
 import { LoadMoreDirection } from '../../../types';
 
 import {
+  DEBUG,
   GIF_MIME_TYPE,
   MAX_MEDIA_FILES_FOR_ALBUM,
   MESSAGE_ID_REQUIRED_ERROR,
@@ -46,6 +47,15 @@ import { IS_IOS } from '../../../util/browser/windowEnvironment';
 import { getArchivedRetainedMessages, getBygramSettings } from '../../../util/bygramArchive';
 import { applyBygramPremiumSend } from '../../../util/bygramPremium';
 import { recordBygramStreakMessage } from '../../../util/bygramStreak';
+import {
+  buildUnrestrictedForwardSendParams,
+  createClientGroupedId,
+  groupMessagesForUnrestrictedForward,
+} from '../../../util/bygramUnrestrictedForward';
+import {
+  createLocalTranscriptionId,
+  transcribeVoiceLocally,
+} from '../../../util/bygramVoiceTranscribe';
 import { copyTextToClipboardFromPromise } from '../../../util/clipboard';
 import { isDeepLink } from '../../../util/deepLinkParser';
 import { isUserId } from '../../../util/entities/ids';
@@ -84,7 +94,7 @@ import {
   splitMessagesForForwarding,
 } from '../../helpers';
 import { isChatAdmin } from '../../helpers/chats';
-import { isApiPeerChat, isApiPeerUser } from '../../helpers/peers';
+import { isApiPeerChat } from '../../helpers/peers';
 import {
   addActionHandler, getActions, getGlobal, getPromiseActions, setGlobal,
 } from '../../index';
@@ -114,7 +124,6 @@ import {
   updateRequestedMessageTranslation,
   updateScheduledMessage,
   updateScheduledMessages,
-  updateSponsoredMessage,
   updateTopicWithState,
   updateUnreadCounters,
   updateUploadByMessageKey,
@@ -145,12 +154,12 @@ import {
   selectForwardsCanBeSentToChat,
   selectForwardsContainVoiceMessages,
   selectHasTelegramPremium,
-  selectIsChatBotNotStarted,
   selectIsChatRestricted,
   selectIsChatWithSelf,
   selectIsCurrentUserFrozen,
   selectIsCurrentUserPremium,
   selectIsMonoforumAdmin,
+  selectIsNormallyForwardableMessage,
   selectLanguageCode,
   selectListedIds,
   selectMessageIdsByGroupId,
@@ -1851,23 +1860,96 @@ addActionHandler('transcribeAudio', async (global, actions, payload): Promise<vo
   const { messageId, chatId } = payload;
 
   const chat = selectChat(global, chatId);
+  const message = selectChatMessage(global, chatId, messageId);
 
-  if (!chat) return;
+  if (!chat || !message) return;
+
+  const isPremium = selectIsCurrentUserPremium(global);
+  const chatLevel = chat.boostLevel || 0;
+  const transcribeMinLevel = global.appConfig.groupTranscribeLevelMin;
+  const canUseTelegramTranscribe = isPremium
+    || Boolean(transcribeMinLevel && chatLevel >= transcribeMinLevel);
+  const canUseLocalTranscribe = getBygramSettings().isLocalVoiceTranscribeEnabled;
+
+  const localTranscriptionId = createLocalTranscriptionId(chatId, messageId);
 
   global = updateChatMessage(global, chatId, messageId, {
-    transcriptionId: '',
+    transcriptionId: localTranscriptionId,
+    isTranscriptionError: undefined,
   });
-
+  global = {
+    ...global,
+    transcriptions: {
+      ...global.transcriptions,
+      [localTranscriptionId]: {
+        transcriptionId: localTranscriptionId,
+        text: '',
+        isPending: true,
+      },
+    },
+  };
   setGlobal(global);
 
-  const result = await callApi('transcribeAudio', { chat, messageId });
+  if (canUseTelegramTranscribe) {
+    const result = await callApi('transcribeAudio', { chat, messageId });
+    if (result) {
+      global = getGlobal();
+      global = updateChatMessage(global, chatId, messageId, {
+        transcriptionId: result,
+        isTranscriptionError: undefined,
+      });
+      setGlobal(global);
+      return;
+    }
+  }
+
+  if (!canUseLocalTranscribe) {
+    global = getGlobal();
+    global = updateChatMessage(global, chatId, messageId, {
+      transcriptionId: localTranscriptionId,
+      isTranscriptionError: true,
+    });
+    global = {
+      ...global,
+      transcriptions: {
+        ...global.transcriptions,
+        [localTranscriptionId]: {
+          transcriptionId: localTranscriptionId,
+          text: '',
+          isPending: false,
+        },
+      },
+    };
+    setGlobal(global);
+    return;
+  }
+
+  let text: string | undefined;
+  try {
+    text = await transcribeVoiceLocally(message);
+  } catch (error) {
+    if (DEBUG) {
+      // eslint-disable-next-line no-console
+      console.warn('bygram local voice transcription failed', error);
+    }
+  }
 
   global = getGlobal();
   global = updateChatMessage(global, chatId, messageId, {
-    transcriptionId: result,
-    isTranscriptionError: !result,
+    transcriptionId: localTranscriptionId,
+    isTranscriptionError: !text,
   });
-
+  global = {
+    ...global,
+    transcriptions: {
+      ...global.transcriptions,
+      [localTranscriptionId]: {
+        transcriptionId: localTranscriptionId,
+        text: text || '',
+        isPending: false,
+      },
+    },
+  };
   setGlobal(global);
 });
 
@@ -1941,11 +2023,15 @@ async function executeForwardMessages(global: GlobalState, sendParams: SendMessa
   const localMessages: SendMessageParams[] = [];
 
   const [realMessages, serviceMessages] = partition(messages, (m) => !isServiceNotificationMessage(m));
-  const forwardableRealMessages = realMessages.filter((message) => selectCanForwardMessage(global, message));
-  if (forwardableRealMessages.length) {
+  const normallyForwardable = realMessages.filter((message) => selectIsNormallyForwardableMessage(global, message));
+  const needCopy = realMessages.filter((message) => (
+    !selectIsNormallyForwardableMessage(global, message) && selectCanForwardMessage(global, message)
+  ));
+
+  if (normallyForwardable.length) {
     const messageSlices = global.config?.maxForwardedCount
-      ? splitMessagesForForwarding(forwardableRealMessages, global.config.maxForwardedCount)
-      : [forwardableRealMessages];
+      ? splitMessagesForForwarding(normallyForwardable, global.config.maxForwardedCount)
+      : [normallyForwardable];
     for (const slice of messageSlices) {
       const forwardParams: ForwardMessagesParams = {
         fromChat,
@@ -1976,6 +2062,37 @@ async function executeForwardMessages(global: GlobalState, sendParams: SendMessa
           forwardParams: { ...forwardParams, forwardedLocalMessagesSlice },
           forwardedLocalMessagesSlice,
         });
+      }
+    }
+  }
+
+  if (needCopy.length) {
+    const replyInfo = selectMessageReplyInfo(global, toChat.id, toThreadId);
+    const copyGroups = groupMessagesForUnrestrictedForward(needCopy);
+
+    for (const group of copyGroups) {
+      const groupedId = group.length > 1 ? createClientGroupedId() : undefined;
+
+      for (const message of group) {
+        const copyParams = await buildUnrestrictedForwardSendParams(message, {
+          noCaptions,
+          groupedId,
+        });
+        if (!copyParams) continue;
+
+        const params: SendMessageParams = {
+          chat: toChat,
+          replyInfo,
+          isSilent,
+          scheduledAt,
+          scheduleRepeatPeriod,
+          sendAs,
+          lastMessageId,
+          messagePriceInStars,
+          ...copyParams,
+        };
+
+        await sendMessageOrReduceLocal(global, params, localMessages);
       }
     }
   }
@@ -2453,9 +2570,9 @@ addActionHandler('loadSendPaidReactionsAs', async (global, actions, payload): Pr
   setGlobal(global);
 });
 
-addActionHandler('loadSponsoredMessages', async (): Promise<void> => {
+addActionHandler('loadSponsoredMessages', (): Promise<void> => {
   // bygram: Telegram ads are disabled client-side.
-  return undefined;
+  return Promise.resolve();
 });
 
 addActionHandler('viewSponsored', (global, actions, payload): ActionReturnType => {
@@ -3046,10 +3163,15 @@ function forwardMessagesToChat({
     });
   }
 
-  if (realMessages.length) {
+  const normallyForwardable = realMessages.filter((message) => selectIsNormallyForwardableMessage(global, message));
+  const needCopy = realMessages.filter((message) => (
+    !selectIsNormallyForwardableMessage(global, message) && selectCanForwardMessage(global, message)
+  ));
+
+  if (normallyForwardable.length) {
     const messageSlices = global.config?.maxForwardedCount
-      ? splitMessagesForForwarding(realMessages, global.config.maxForwardedCount)
-      : [realMessages];
+      ? splitMessagesForForwarding(normallyForwardable, global.config.maxForwardedCount)
+      : [normallyForwardable];
 
     for (const slice of messageSlices) {
       const forwardParams: ForwardMessagesParams = {
@@ -3073,6 +3195,20 @@ function forwardMessagesToChat({
     }
   }
 
+  if (needCopy.length) {
+    void copyRestrictedMessagesToChat({
+      global,
+      toChat,
+      toThreadId,
+      messages: needCopy,
+      noCaptions,
+      sendAs,
+      lastMessageId,
+      messagePriceInStars,
+      isSilent: true,
+    });
+  }
+
   for (const message of serviceMessages) {
     const { text, entities } = message.content.text || {};
     const { sticker } = message.content;
@@ -3088,6 +3224,59 @@ function forwardMessagesToChat({
       lastMessageId,
       messagePriceInStars,
     });
+  }
+}
+
+async function copyRestrictedMessagesToChat({
+  global,
+  toChat,
+  toThreadId = MAIN_THREAD_ID,
+  messages,
+  noCaptions,
+  sendAs,
+  lastMessageId,
+  messagePriceInStars,
+  isSilent,
+  scheduledAt,
+  scheduleRepeatPeriod,
+}: {
+  global: GlobalState;
+  toChat: ApiChat;
+  toThreadId?: ThreadId;
+  messages: ApiMessage[];
+  noCaptions?: boolean;
+  sendAs?: SendMessageParams['sendAs'];
+  lastMessageId?: number;
+  messagePriceInStars?: number;
+  isSilent?: boolean;
+  scheduledAt?: number;
+  scheduleRepeatPeriod?: number;
+}) {
+  const replyInfo = selectMessageReplyInfo(global, toChat.id, toThreadId);
+  const copyGroups = groupMessagesForUnrestrictedForward(messages);
+
+  for (const group of copyGroups) {
+    const groupedId = group.length > 1 ? createClientGroupedId() : undefined;
+
+    for (const message of group) {
+      const copyParams = await buildUnrestrictedForwardSendParams(message, {
+        noCaptions,
+        groupedId,
+      });
+      if (!copyParams) continue;
+
+      await sendMessage(global, {
+        chat: toChat,
+        replyInfo,
+        isSilent,
+        scheduledAt,
+        scheduleRepeatPeriod,
+        sendAs,
+        lastMessageId,
+        messagePriceInStars,
+        ...copyParams,
+      });
+    }
   }
 }
 
