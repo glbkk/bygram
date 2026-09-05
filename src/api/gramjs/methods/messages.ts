@@ -2609,22 +2609,36 @@ export async function transcribeAudio({
   chat, messageId,
 }: {
   chat: ApiChat; messageId: number;
-}) {
-  const result = await invokeRequest(new GramJs.messages.TranscribeAudio({
-    msgId: messageId,
-    peer: buildInputPeer(chat.id, chat.accessHash),
-  }));
+}): Promise<string | undefined> {
+  try {
+    const result = await invokeRequest(new GramJs.messages.TranscribeAudio({
+      msgId: messageId,
+      peer: buildInputPeer(chat.id, chat.accessHash),
+    }), {
+      shouldThrow: true,
+    });
 
-  if (!result) return undefined;
+    if (!result) return undefined;
 
-  sendApiUpdate({
-    '@type': 'updateTranscribedAudio',
-    isPending: result.pending,
-    transcriptionId: result.transcriptionId.toString(),
-    text: result.text,
-  });
+    sendApiUpdate({
+      '@type': 'updateTranscribedAudio',
+      isPending: Boolean(result.pending),
+      transcriptionId: result.transcriptionId.toString(),
+      text: result.text || '',
+    });
 
-  return result.transcriptionId.toString();
+    return result.transcriptionId.toString();
+  } catch (err: unknown) {
+    // Free accounts get a weekly trial; when it is exhausted Telegram returns this.
+    // Caller falls back to local Whisper.
+    if (err instanceof RPCError && err.errorMessage === 'PREMIUM_ACCOUNT_REQUIRED') {
+      return undefined;
+    }
+    if (err instanceof RPCError && err.errorMessage === 'TRANSCRIPTION_FAILED') {
+      return undefined;
+    }
+    return undefined;
+  }
 }
 
 export async function translateText(params: TranslateTextParams) {
