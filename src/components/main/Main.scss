@@ -208,12 +208,10 @@
 
     box-shadow: none;
 
-    // iOS home-screen PWA: columns are position:fixed to the viewport, so they must
-    // clear Dynamic Island / home indicator themselves (black-translucent status bar).
-    html.is-ios-pwa &,
-    body.is-ios-pwa & {
-      top: var(--safe-area-top, env(safe-area-inset-top, 0px));
-      bottom: var(--safe-area-bottom, env(safe-area-inset-bottom, 0px));
+    // Only when WebKit reports env(safe-area-*) as 0 (rare iOS PWA bug).
+    // Do not inset the bottom — composer already uses safe-area padding.
+    html.is-ios-pwa-env-broken & {
+      top: var(--bygram-safe-area-top, 59px);
     }
 
     // Fix: when opening the SymbolMenu, the chat list flashes in the background
@@ -271,10 +269,8 @@
 
     max-width: none;
 
-    html.is-ios-pwa &,
-    body.is-ios-pwa & {
-      top: var(--safe-area-top, env(safe-area-inset-top, 0px));
-      bottom: var(--safe-area-bottom, env(safe-area-inset-bottom, 0px));
+    html.is-ios-pwa-env-broken & {
+      top: var(--bygram-safe-area-top, 59px);
     }
 
     #Main.left-column-animating & {
@@ -327,38 +323,6 @@
       }
     }
   }
-}
-
-// Status-bar / home-indicator fill behind the inset columns in iOS PWA
-html.is-ios-pwa,
-body.is-ios-pwa {
-  background-color: var(--color-background);
-}
-
-html.is-ios-pwa::before,
-body.is-ios-pwa::before {
-  content: '';
-  position: fixed;
-  z-index: 0;
-  top: 0;
-  right: 0;
-  left: 0;
-  height: var(--safe-area-top, env(safe-area-inset-top, 0px));
-  background: var(--color-background);
-  pointer-events: none;
-}
-
-html.is-ios-pwa::after,
-body.is-ios-pwa::after {
-  content: '';
-  position: fixed;
-  z-index: 0;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  height: var(--safe-area-bottom, env(safe-area-inset-bottom, 0px));
-  background: var(--color-background);
-  pointer-events: none;
 }
 
 // Interactive edge swipe-back: only middle column moves; keep list interactive-ready

@@ -27,6 +27,15 @@
   }
 }
 
+html.is-ios-pwa-env-broken {
+  @media (max-width: 600px) {
+    --composer-min-bottom-reserve:
+      calc(
+        var(--composer-height) + var(--composer-bottom-gap-mobile) + var(--bygram-safe-area-bottom, 34px)
+      );
+  }
+}
+
 body.keyboard-visible {
   @media (max-width: 600px) {
     --composer-min-bottom-reserve: calc(var(--composer-height) + var(--composer-bottom-gap-mobile));

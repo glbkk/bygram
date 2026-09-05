@@ -1,7 +1,8 @@
 import { IS_IOS, IS_PWA } from './browser/windowEnvironment';
 
-/** Typical Dynamic Island / notch status-bar inset when WebKit reports 0 (iOS 26.x PWA bug). */
+/** Typical Dynamic Island / notch inset when WebKit reports env() as 0. */
 const IOS_PWA_SAFE_AREA_TOP_FALLBACK_PX = 59;
+/** Home indicator inset when WebKit reports env() as 0. */
 const IOS_PWA_SAFE_AREA_BOTTOM_FALLBACK_PX = 34;
 
 function readCssEnvPx(name: string): number {
@@ -23,8 +24,9 @@ function readCssEnvPx(name: string): number {
 }
 
 /**
- * iOS home-screen PWAs use black-translucent status bar (content under Dynamic Island).
- * Some iOS 26.x builds report env(safe-area-inset-*) as 0 — fall back to hardware-sized insets.
+ * iOS home-screen PWAs use black-translucent status bar.
+ * When WebKit reports real safe-area insets, do nothing — existing env() padding is enough.
+ * Only if both insets are 0 (known PWA bug), apply pixel fallbacks without overlay strips.
  */
 export function applyIosPwaSafeAreaInsets() {
   if (!IS_IOS || !IS_PWA) return;
@@ -35,9 +37,18 @@ export function applyIosPwaSafeAreaInsets() {
   const envTop = readCssEnvPx('safe-area-inset-top');
   const envBottom = readCssEnvPx('safe-area-inset-bottom');
 
-  const top = envTop > 0 ? envTop : IOS_PWA_SAFE_AREA_TOP_FALLBACK_PX;
-  const bottom = envBottom > 0 ? envBottom : IOS_PWA_SAFE_AREA_BOTTOM_FALLBACK_PX;
+  // Normal iPhone 15 / 16 / 17: trust WebKit — never invent extra bottom chrome.
+  if (envTop > 0 || envBottom > 0) {
+    document.documentElement.classList.remove('is-ios-pwa-env-broken');
+    document.documentElement.style.removeProperty('--bygram-safe-area-top');
+    document.documentElement.style.removeProperty('--bygram-safe-area-bottom');
+    return;
+  }
 
-  document.documentElement.style.setProperty('--bygram-safe-area-top', `${top}px`);
-  document.documentElement.style.setProperty('--bygram-safe-area-bottom', `${bottom}px`);
+  document.documentElement.classList.add('is-ios-pwa-env-broken');
+  document.documentElement.style.setProperty('--bygram-safe-area-top', `${IOS_PWA_SAFE_AREA_TOP_FALLBACK_PX}px`);
+  document.documentElement.style.setProperty(
+    '--bygram-safe-area-bottom',
+    `${IOS_PWA_SAFE_AREA_BOTTOM_FALLBACK_PX}px`,
+  );
 }

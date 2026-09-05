@@ -53,7 +53,7 @@
 
   <script  src="./redirect.js"></script>
   <script>
-    // iOS home-screen PWA: paint-time safe-area fallback (WebKit may report env() as 0).
+    // Mark iOS PWA early; safe-area pixel fallbacks are applied later only if env() is 0.
     (function () {
       try {
         var isIos = /iPad|iPhone|iPod/.test(navigator.userAgent)
@@ -62,8 +62,6 @@
           || window.matchMedia('(display-mode: standalone)').matches;
         if (!isIos || !isPwa) return;
         document.documentElement.classList.add('is-ios-pwa');
-        document.documentElement.style.setProperty('--bygram-safe-area-top', '59px');
-        document.documentElement.style.setProperty('--bygram-safe-area-bottom', '34px');
       } catch (e) {}
     })();
   </script>
@@ -73,7 +71,7 @@
       @layer tablist, spinner, button, input, layout;
     }
   </style>
-  <script type="module" crossorigin src="./assets/index-7RJNaIx0.js"></script>
+  <script type="module" crossorigin src="./assets/index-GOHmttbE.js"></script>
   <link rel="modulepreload" crossorigin href="./assets/rolldown-runtime-hePW80VL.js">
   <link rel="modulepreload" crossorigin href="./assets/core-DFiqCqIj.js">
   <link rel="modulepreload" crossorigin href="./assets/dist-_Qfs_Cb4.js">
@@ -89,13 +87,13 @@
   <link rel="modulepreload" crossorigin href="./assets/parseEmojiOnlyString-sWninYZo.js">
   <link rel="modulepreload" crossorigin href="./assets/reducers-9OdRDODg.js">
   <link rel="modulepreload" crossorigin href="./assets/useWindowSize-BwI0uYRm.js">
-  <link rel="modulepreload" crossorigin href="./assets/DropdownMenu-CvOB-M1g.js">
+  <link rel="modulepreload" crossorigin href="./assets/DropdownMenu-BzUIb2ix.js">
   <link rel="modulepreload" crossorigin href="./assets/codeLanguages-DLzBVKgX.js">
   <link rel="modulepreload" crossorigin href="./assets/Loading-B94EU7_R.js">
-  <link rel="modulepreload" crossorigin href="./assets/usePrevious-Cd99_ViL.js">
+  <link rel="modulepreload" crossorigin href="./assets/usePrevious-CRSB3fMH.js">
   <link rel="modulepreload" crossorigin href="./assets/animatedAssets-DGakmVlt.js">
-  <link rel="modulepreload" crossorigin href="./assets/lock-qKH7LRHp.js">
-  <link rel="modulepreload" crossorigin href="./assets/initial-BXTqahP2.js">
+  <link rel="modulepreload" crossorigin href="./assets/lock-BhW7z4Mx.js">
+  <link rel="modulepreload" crossorigin href="./assets/initial-BhLCWE-j.js">
   <link rel="stylesheet" crossorigin href="./assets/helpers-DSDGF-nr.css">
   <link rel="stylesheet" crossorigin href="./assets/InputText-BnEb_xO6.css">
   <link rel="stylesheet" crossorigin href="./assets/Checkbox-C1BFVkex.css">
@@ -104,7 +102,7 @@
   <link rel="stylesheet" crossorigin href="./assets/Loading-CzX-7jrR.css">
   <link rel="stylesheet" crossorigin href="./assets/usePrevious-CmLlWxcr.css">
   <link rel="stylesheet" crossorigin href="./assets/lock-CFec2QyT.css">
-  <link rel="stylesheet" crossorigin href="./assets/index-Btuig0YL.css">
+  <link rel="stylesheet" crossorigin href="./assets/index-CsJ8Nbyv.css">
 </head>
 
 <body id="root">

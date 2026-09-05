@@ -237,16 +237,15 @@
       padding-bottom: 0;
 
       @media (max-width: 600px) {
-        padding-bottom: env(safe-area-inset-bottom);
+        padding-bottom: env(safe-area-inset-bottom, 0px);
 
         body.keyboard-visible & {
           padding-bottom: 0;
         }
 
-        // Column itself is already inset on iOS PWA — avoid double home-indicator gap.
-        html.is-ios-pwa &,
-        body.is-ios-pwa & {
-          padding-bottom: 0;
+        // WebKit env() is 0 — use measured pixel fallback (no column bottom inset).
+        html.is-ios-pwa-env-broken & {
+          padding-bottom: var(--bygram-safe-area-bottom, 34px);
         }
       }
     }
