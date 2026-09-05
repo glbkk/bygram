@@ -346,6 +346,14 @@
     --safe-area-bottom: env(safe-area-inset-bottom);
     --safe-area-left: env(safe-area-inset-left);
 
+    // iOS home-screen PWA: content draws under Dynamic Island (black-translucent).
+    // Prefer real env() when WebKit reports it; otherwise use JS fallback vars.
+    html.is-ios-pwa &,
+    body.is-ios-pwa & {
+      --safe-area-top: max(env(safe-area-inset-top, 0px), var(--bygram-safe-area-top, 59px));
+      --safe-area-bottom: max(env(safe-area-inset-bottom, 0px), var(--bygram-safe-area-bottom, 34px));
+    }
+
     --picker-title-shift: 1rem;
 
     --font-weight-normal: 400;

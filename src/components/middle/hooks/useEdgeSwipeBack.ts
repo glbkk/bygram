@@ -28,8 +28,8 @@ const EXCLUDED_SELECTOR = [
 ].join(', ');
 
 /**
- * Interactive edge swipe-back. Only #MiddleColumn follows the finger; the chat
- * list is revealed underneath without being transformed (avoids multi-second freezes).
+ * Interactive preview while dragging; on commit runs the same openChat path as the
+ * header back button (no post-commit settle/lag).
  */
 export default function useEdgeSwipeBack(
   containerRef: ElementRef<HTMLElement>,
@@ -136,35 +136,12 @@ export default function useEdgeSwipeBack(
     };
 
     const finishCommit = () => {
+      // Same path as the header back button: drop interactive styles, skip heavy
+      // animation freeze, and let React/CSS open the left column.
       markEdgeSwipeCommit();
-      const main = getMain();
-
-      // Instant end-state: do not wait for React/class settle — list is already visible under the swipe.
-      requestMutation(() => {
-        main?.classList.add('history-animation-disabled', 'left-column-open', 'left-column-shown');
-        main?.classList.remove('is-edge-swiping');
-        document.body.classList.remove('is-edge-swiping');
-        document.body.style.removeProperty('--edge-swipe-progress');
-        container.style.transition = 'none';
-        container.style.transform = 'translate3d(100vw, 0, 0)';
-        container.style.boxShadow = '';
-      });
-
-      handleBack();
+      clearInlineStyles();
       resetSession();
-
-      requestAnimationFrame(() => {
-        requestMutation(() => {
-          container.style.removeProperty('transition');
-          container.style.removeProperty('transform');
-          container.style.removeProperty('box-shadow');
-        });
-        requestAnimationFrame(() => {
-          requestMutation(() => {
-            main?.classList.remove('history-animation-disabled');
-          });
-        });
-      });
+      handleBack();
     };
 
     const onTouchStart = (e: TouchEvent) => {
@@ -243,7 +220,6 @@ export default function useEdgeSwipeBack(
 
       if (shouldCommit) {
         vibrateShort();
-        // Skip snap animation — jump straight to committed state.
         finishCommit();
         return;
       }

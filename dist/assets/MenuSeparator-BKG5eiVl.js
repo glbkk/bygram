@@ -1,0 +1,2 @@
+import{Bf as e,Oc as t}from"./helpers-aaV9cd3z.js";var n={root:`_40aWbFdG`,thin:`_1yj96yuC`,thick:`_5EdrUuc8`},r=({className:r,size:i=`thin`})=>e(`div`,{className:t(n.root,n[i],r)});export{r as t};
+//# sourceMappingURL=MenuSeparator-BKG5eiVl.js.map

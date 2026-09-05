@@ -52,6 +52,21 @@
   <link rel="manifest" id="the-manifest-placeholder" href="./%TG_MANIFEST%">
 
   <script vite-ignore src="./redirect.js"></script>
+  <script>
+    // iOS home-screen PWA: paint-time safe-area fallback (WebKit may report env() as 0).
+    (function () {
+      try {
+        var isIos = /iPad|iPhone|iPod/.test(navigator.userAgent)
+          || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        var isPwa = window.navigator.standalone === true
+          || window.matchMedia('(display-mode: standalone)').matches;
+        if (!isIos || !isPwa) return;
+        document.documentElement.classList.add('is-ios-pwa');
+        document.documentElement.style.setProperty('--bygram-safe-area-top', '59px');
+        document.documentElement.style.setProperty('--bygram-safe-area-bottom', '34px');
+      } catch (e) {}
+    })();
+  </script>
   <style>
     @layer reset, variables, ui, components;
     @layer ui {

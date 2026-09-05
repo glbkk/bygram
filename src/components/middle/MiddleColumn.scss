@@ -242,6 +242,12 @@
         body.keyboard-visible & {
           padding-bottom: 0;
         }
+
+        // Column itself is already inset on iOS PWA — avoid double home-indicator gap.
+        html.is-ios-pwa &,
+        body.is-ios-pwa & {
+          padding-bottom: 0;
+        }
       }
     }
 

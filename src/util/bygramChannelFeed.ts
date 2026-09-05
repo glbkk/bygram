@@ -10,6 +10,16 @@ export const BYGRAM_FEED_MAX_CHANNELS = 80;
 export const BYGRAM_FEED_MAX_PER_CHANNEL = 100;
 export const BYGRAM_FEED_MESSAGE_LIMIT = 200;
 
+type FeedMessageKey = string;
+
+/** Messages kept visible for the current feed session even after mark-as-read. */
+let sessionMessagesByKey = new Map<FeedMessageKey, ApiMessage>();
+let sessionActive = false;
+
+function messageKey(message: ApiMessage): FeedMessageKey {
+  return `${message.chatId}:${message.id}`;
+}
+
 export function isBygramFeedChatId(chatId?: string) {
   return chatId === BYGRAM_FEED_CHAT_ID;
 }
@@ -29,6 +39,27 @@ export function getChannelUnreadState(global: GlobalState, chatId: string) {
     unreadCount: readState?.unreadCount || 0,
     lastReadInboxMessageId: readState?.lastReadInboxMessageId || 0,
   };
+}
+
+export function beginBygramFeedSession() {
+  sessionActive = true;
+  sessionMessagesByKey = new Map();
+}
+
+export function endBygramFeedSession() {
+  sessionActive = false;
+  sessionMessagesByKey = new Map();
+}
+
+export function isBygramFeedSessionActive() {
+  return sessionActive;
+}
+
+export function rememberBygramFeedMessages(messages: ApiMessage[]) {
+  if (!sessionActive) return;
+  messages.forEach((message) => {
+    sessionMessagesByKey.set(messageKey(message), message);
+  });
 }
 
 export function collectUnreadChannelIds(global: GlobalState, limit = BYGRAM_FEED_MAX_CHANNELS): string[] {
@@ -53,9 +84,16 @@ export function collectUnreadChannelIds(global: GlobalState, limit = BYGRAM_FEED
     .map((chat) => chat.id);
 }
 
-/** Unread channel posts already present in local message store, newest first. */
+/** Unread channel posts (plus session-pinned ones while the feed is open), newest first. */
 export function collectBygramFeedMessages(global: GlobalState, limit = BYGRAM_FEED_MESSAGE_LIMIT): ApiMessage[] {
-  const result: ApiMessage[] = [];
+  const byKey = new Map<FeedMessageKey, ApiMessage>();
+
+  if (sessionActive) {
+    sessionMessagesByKey.forEach((message, key) => {
+      const fresh = global.messages.byChatId[message.chatId]?.byId?.[message.id] || message;
+      byKey.set(key, fresh);
+    });
+  }
 
   Object.values(global.chats.byId).forEach((chat) => {
     if (!chat || isBygramFeedChatId(chat.id) || !isChatChannel(chat) || chat.isNotJoined || chat.isForbidden) {
@@ -63,20 +101,31 @@ export function collectBygramFeedMessages(global: GlobalState, limit = BYGRAM_FE
     }
 
     const { unreadCount, lastReadInboxMessageId } = getChannelUnreadState(global, chat.id);
-    if (unreadCount <= 0) return;
+    if (unreadCount <= 0 && !sessionActive) return;
 
-    const byId = global.messages.byChatId[chat.id]?.byId;
-    if (!byId) return;
+    const messagesById = global.messages.byChatId[chat.id]?.byId;
+    if (!messagesById) return;
 
-    Object.values(byId).forEach((message) => {
+    Object.values(messagesById).forEach((message) => {
       if (!message || message.isOutgoing) return;
-      if (message.id <= lastReadInboxMessageId) return;
       if (message.content.action) return;
-      result.push(message);
+
+      const key = messageKey(message);
+      if (sessionActive && sessionMessagesByKey.has(key)) {
+        byKey.set(key, message);
+        return;
+      }
+
+      if (message.id <= lastReadInboxMessageId) return;
+      if (unreadCount <= 0) return;
+      byKey.set(key, message);
+      if (sessionActive) {
+        sessionMessagesByKey.set(key, message);
+      }
     });
   });
 
-  return result
+  return Array.from(byKey.values())
     .sort((a, b) => b.date - a.date || b.id - a.id)
     .slice(0, limit);
 }

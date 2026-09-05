@@ -8,14 +8,15 @@ import type { Signal } from '../../util/signals';
 import { MAIN_THREAD_ID } from '../../api/types';
 import { LeftColumnContent } from '../../types';
 
-import { IS_TOUCH_ENV } from '../../util/browser/windowEnvironment';
 import buildClassName from '../../util/buildClassName';
 import {
+  beginBygramFeedSession,
   collectBygramFeedMessages,
   collectUnreadChannelIds,
+  endBygramFeedSession,
   getBygramFeedUnreadCount,
+  rememberBygramFeedMessages,
 } from '../../util/bygramChannelFeed';
-import { captureControlledSwipe } from '../../util/swipeController';
 
 import useInfiniteScroll from '../../hooks/useInfiniteScroll';
 import { useIntersectionObserver, useOnIntersect } from '../../hooks/useIntersectionObserver';
@@ -73,6 +74,7 @@ const FeedItem = memo(({
 
   useOnIntersect(itemRef, observeIntersectionForReading, (entry) => {
     if (!entry.isIntersecting) return;
+    // Marks read in the channel, but the feed session keeps the post visible.
     markBygramFeedMessageRead({
       chatId: message.chatId,
       messageId: message.id,
@@ -127,35 +129,28 @@ const BygramChannelFeed = ({
   } = getActions();
   const lang = useLang();
   const containerRef = useRef<HTMLDivElement>();
-  const rootRef = useRef<HTMLDivElement>();
   const [getIsReady, setIsReady] = useSignal(Boolean(isReady));
+
+  useEffect(() => {
+    beginBygramFeedSession();
+    loadBygramChannelFeed();
+    return () => {
+      endBygramFeedSession();
+    };
+  }, [loadBygramChannelFeed]);
 
   useEffect(() => {
     setIsReady(Boolean(isReady));
   }, [isReady, setIsReady]);
 
   useEffect(() => {
-    loadBygramChannelFeed();
-  }, [loadBygramChannelFeed]);
+    rememberBygramFeedMessages(messages);
+  }, [messages]);
 
   const handleClose = useLastCallback(() => {
+    endBygramFeedSession();
     openLeftColumnContent({ contentKey: LeftColumnContent.ChatList });
   });
-
-  useEffect(() => {
-    if (!IS_TOUCH_ENV || !rootRef.current) {
-      return undefined;
-    }
-
-    return captureControlledSwipe(rootRef.current, {
-      excludedClosestSelector: '.Modal, .Menu, .media-viewer',
-      selectorToPreventScroll: '.BygramChannelFeed-scroll',
-      onSwipeRightStart: handleClose,
-      onCancel: () => {
-        openLeftColumnContent({ contentKey: LeftColumnContent.Feed });
-      },
-    });
-  }, [handleClose, openLeftColumnContent]);
 
   const messageIds = useMemo(
     () => messages.map((message) => `${message.chatId}:${message.id}`),
@@ -194,10 +189,7 @@ const BygramChannelFeed = ({
   const openChannelLabel = lang('BygramFeedOpenChannel');
 
   return (
-    <main
-      ref={rootRef}
-      className={buildClassName('BygramChannelFeed', isReady && 'ready')}
-    >
+    <main className={buildClassName('BygramChannelFeed', isReady && 'ready')}>
       <header className="BygramChannelFeed-header">
         <Button
           round
@@ -209,9 +201,11 @@ const BygramChannelFeed = ({
         <div className="BygramChannelFeed-heading">
           <strong>{lang('BygramFeedTitle')}</strong>
           <span>
-            {unreadCount > 0
-              ? `${unreadCount} непрочитанных постов`
-              : lang('BygramFeedEmptyHint')}
+            {messages.length > 0
+              ? `${messages.length} постов`
+              : unreadCount > 0
+                ? `${unreadCount} непрочитанных`
+                : lang('BygramFeedEmptyHint')}
           </span>
         </div>
       </header>

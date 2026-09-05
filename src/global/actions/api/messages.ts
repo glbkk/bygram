@@ -1926,6 +1926,7 @@ addActionHandler('transcribeAudio', async (global, actions, payload): Promise<vo
 
   let text: string | undefined;
   try {
+    actions.showNotification({ message: 'Расшифровка голоса…' });
     text = await transcribeVoiceLocally(message);
   } catch (error) {
     if (DEBUG) {
@@ -1951,6 +1952,10 @@ addActionHandler('transcribeAudio', async (global, actions, payload): Promise<vo
     },
   };
   setGlobal(global);
+
+  if (!text) {
+    actions.showNotification({ message: 'Не удалось расшифровать голос. Попробуйте ещё раз.' });
+  }
 });
 
 addActionHandler('loadCustomEmojis', async (global, actions, payload): Promise<void> => {

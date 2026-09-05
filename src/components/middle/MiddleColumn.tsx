@@ -330,7 +330,8 @@ function MiddleColumn({
     () => {
       const messageInput = document.querySelector<HTMLDivElement>(EDITABLE_INPUT_CSS_SELECTOR);
       messageInput?.blur();
-      openChat({ id: undefined }, { forceOnHeavyAnimation: true });
+      // Match MiddleHeader back button exactly (plus sync on iOS for snappier list).
+      openChat({ id: undefined }, { forceOnHeavyAnimation: true, forceSyncOnIOs: true });
     },
   );
 

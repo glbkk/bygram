@@ -9,8 +9,9 @@ import { requestMutation } from '../../../lib/fasterdom/fasterdom';
 import { IS_ELECTRON, IS_MULTIACCOUNT_SUPPORTED, IS_TAURI } from '../../../util/browser/globalEnvironment';
 import {
   IS_ANDROID, IS_IOS, IS_LINUX,
-  IS_MAC_OS, IS_SAFARI, IS_TOUCH_ENV, IS_WINDOWS,
+  IS_MAC_OS, IS_PWA, IS_SAFARI, IS_TOUCH_ENV, IS_WINDOWS,
 } from '../../../util/browser/windowEnvironment';
+import { applyIosPwaSafeAreaInsets } from '../../../util/bygramIosPwaSafeArea';
 import { getCurrentTabId } from '../../../util/establishMultitabRole';
 import generateUniqueId from '../../../util/generateUniqueId';
 import { setTimeFormat as setLocalizedTimeFormat } from '../../../util/localization';
@@ -166,6 +167,9 @@ addCallback((global: GlobalState) => {
 
     if (IS_IOS) {
       document.body.classList.add('is-ios');
+      if (IS_PWA) {
+        applyIosPwaSafeAreaInsets();
+      }
     } else if (IS_ANDROID) {
       document.body.classList.add('is-android');
     } else if (IS_MAC_OS) {

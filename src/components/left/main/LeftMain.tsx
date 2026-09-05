@@ -3,6 +3,7 @@ import type { FC } from '../../../lib/teact/teact';
 import {
   memo, useEffect, useRef, useState,
 } from '../../../lib/teact/teact';
+import { getActions } from '../../../global';
 
 import type { FolderEditDispatch } from '../../../hooks/reducers/useFoldersReducer';
 import { LeftColumnContent } from '../../../types';
@@ -11,6 +12,7 @@ import { DEBUG } from '../../../config';
 import { IS_TAURI } from '../../../util/browser/globalEnvironment';
 import { IS_TOUCH_ENV } from '../../../util/browser/windowEnvironment';
 import buildClassName from '../../../util/buildClassName';
+import { endBygramFeedSession } from '../../../util/bygramChannelFeed';
 
 import useInterval from '../../../hooks/schedulers/useInterval';
 import useForumPanelRender from '../../../hooks/useForumPanelRender';
@@ -28,6 +30,7 @@ import LeftSearch from '../search/LeftSearch.async';
 import ChatFolders from './ChatFolders';
 import ContactList from './ContactList.async';
 import ForumPanel from './forum/ForumPanel';
+import usePanelSwipeClose from './hooks/usePanelSwipeClose';
 import LeftMainHeader from './LeftMainHeader';
 
 import './LeftMain.scss';
@@ -71,9 +74,11 @@ const LeftMain: FC<OwnProps> = ({
   isAccountFrozen,
   isFoldersSidebarShown,
 }) => {
+  const { openLeftColumnContent } = getActions();
   const [isNewChatButtonShown, setIsNewChatButtonShown] = useState(IS_TOUCH_ENV);
   const [tauriUpdate, setTauriUpdate] = useState<Update>();
   const [isTauriUpdateDownloading, setIsTauriUpdateDownloading] = useState(false);
+  const rootRef = useRef<HTMLDivElement>();
 
   const {
     shouldRenderForumPanel, handleForumPanelAnimationEnd,
@@ -88,6 +93,18 @@ const LeftMain: FC<OwnProps> = ({
   } = useShowTransitionDeprecated(isAppUpdateAvailable || Boolean(tauriUpdate));
 
   const isMouseInsideRef = useRef(false);
+  const isMusicOpen = content === LeftColumnContent.Music;
+  const isFeedOpen = content === LeftColumnContent.Feed;
+  const isOverlayPanelOpen = isMusicOpen || isFeedOpen;
+
+  const closeOverlayPanel = useLastCallback(() => {
+    if (isFeedOpen) {
+      endBygramFeedSession();
+    }
+    openLeftColumnContent({ contentKey: LeftColumnContent.ChatList });
+  });
+
+  usePanelSwipeClose(rootRef, isOverlayPanelOpen, closeOverlayPanel);
 
   const handleMouseEnter = useLastCallback(() => {
     if (content !== LeftColumnContent.ChatList) {
@@ -168,13 +185,11 @@ const LeftMain: FC<OwnProps> = ({
   );
 
   const lang = useOldLang();
-  const isMusicOpen = content === LeftColumnContent.Music;
-  const isFeedOpen = content === LeftColumnContent.Feed;
-  const isOverlayPanelOpen = isMusicOpen || isFeedOpen;
 
   return (
     <div
       id="LeftColumn-main"
+      ref={rootRef}
       onMouseEnter={!IS_TOUCH_ENV ? handleMouseEnter : undefined}
       onMouseLeave={!IS_TOUCH_ENV ? handleMouseLeave : undefined}
     >
