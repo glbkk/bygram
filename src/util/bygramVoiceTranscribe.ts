@@ -1,22 +1,16 @@
 import type { ApiMessage } from '../api/types';
 import { ApiMediaFormat } from '../api/types';
 
-import { IS_IOS, IS_SAFARI } from './browser/windowEnvironment';
+import { IS_OPUS_SUPPORTED, IS_SAFARI } from './browser/windowEnvironment';
 import { getMessageMediaHash, getMessageVideo, getMessageVoice } from '../global/helpers';
 import { fetchBlob } from './files';
 import * as mediaLoader from './mediaLoader';
 import { oggToPcm, oggToWav } from './oggToWav';
 
-// Tiny multilingual model — first run downloads once, then browser-cached.
-const WHISPER_MODEL = 'Xenova/whisper-tiny';
-const TRANSCRIBE_TIMEOUT_MS = 120_000;
 const TARGET_SAMPLE_RATE = 16_000;
+const WORKER_TIMEOUT_MS = 180_000;
 
-type AsrPipeline = (audio: Float32Array | string, options?: Record<string, unknown>) => Promise<{
-  text?: string;
-} | Array<{ text?: string }> | string>;
-
-let pipelinePromise: Promise<AsrPipeline> | undefined;
+type ProgressFn = (message: string) => void;
 
 function canTranscribeMessage(message: ApiMessage) {
   const voice = getMessageVoice(message);
@@ -40,56 +34,21 @@ function resampleMono(input: Float32Array, fromRate: number, toRate: number) {
   return output;
 }
 
-async function getAsrPipeline() {
-  if (!pipelinePromise) {
-    pipelinePromise = (async () => {
-      const transformers = await import('@huggingface/transformers') as {
-        env: {
-          allowLocalModels: boolean;
-          useBrowserCache: boolean;
-          backends?: {
-            onnx?: {
-              wasm?: {
-                numThreads?: number;
-                proxy?: boolean;
-              };
-            };
-          };
-        };
-        pipeline: (...args: unknown[]) => Promise<AsrPipeline>;
-      };
-
-      transformers.env.allowLocalModels = false;
-      transformers.env.useBrowserCache = true;
-      if (transformers.env.backends?.onnx?.wasm) {
-        // Safari / iOS: SharedArrayBuffer multi-thread path is unstable.
-        transformers.env.backends.onnx.wasm.numThreads = 1;
-        transformers.env.backends.onnx.wasm.proxy = false;
-      }
-
-      // q8 breaks on many iOS/Safari builds; fp32 is slower but reliable.
-      const dtype = (IS_IOS || IS_SAFARI) ? 'fp32' : 'q8';
-
-      return transformers.pipeline('automatic-speech-recognition', WHISPER_MODEL, {
-        dtype,
-      });
-    })().catch((error) => {
-      pipelinePromise = undefined;
-      throw error;
-    });
-  }
-
-  return pipelinePromise;
-}
-
-async function decodeWavOrNative(blob: Blob): Promise<Float32Array | undefined> {
+async function decodeWithAudioContext(blob: Blob): Promise<{ samples: Float32Array; sampleRate: number } | undefined> {
   const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
   if (!AudioCtx) return undefined;
 
   const context: AudioContext = new AudioCtx();
   try {
+    // iOS may keep context suspended until a user gesture; resume just in case.
+    if (context.state === 'suspended') {
+      await context.resume().catch(() => undefined);
+    }
     const buffer = await context.decodeAudioData(await blob.arrayBuffer());
-    return resampleMono(buffer.getChannelData(0), buffer.sampleRate, TARGET_SAMPLE_RATE);
+    return {
+      samples: buffer.getChannelData(0),
+      sampleRate: buffer.sampleRate,
+    };
   } catch {
     return undefined;
   } finally {
@@ -97,85 +56,127 @@ async function decodeWavOrNative(blob: Blob): Promise<Float32Array | undefined> 
   }
 }
 
-async function preparePcm(message: ApiMessage): Promise<Float32Array | undefined> {
+/**
+ * Prefer the same decode path Telegram Web already uses for playback on Safari:
+ * mediaLoader converts OGG→WAV when Opus isn't natively playable.
+ */
+async function preparePcm(message: ApiMessage, onProgress?: ProgressFn): Promise<Float32Array> {
   const hash = getMessageMediaHash(message, {}, 'download')
     || getMessageMediaHash(message, {}, 'inline');
-  if (!hash) return undefined;
+  if (!hash) {
+    throw new Error('Нет медиа у голосового сообщения');
+  }
 
+  onProgress?.('Скачивание голоса…');
   const mediaUrl = await mediaLoader.fetch(hash, ApiMediaFormat.BlobUrl);
-  if (!mediaUrl || typeof mediaUrl !== 'string') return undefined;
+  if (!mediaUrl || typeof mediaUrl !== 'string') {
+    throw new Error('Не удалось скачать голосовое');
+  }
 
   const blob = await fetchBlob(mediaUrl);
   const isOggLike = /ogg|opus/i.test(blob.type)
     || ((!blob.type || blob.type === 'application/octet-stream') && Boolean(getMessageVoice(message)));
 
-  if (isOggLike) {
+  // 1) Direct Opus→PCM (same workers used for Safari playback conversion).
+  if (isOggLike || (IS_SAFARI && !IS_OPUS_SUPPORTED)) {
+    onProgress?.('Декодирование Opus…');
     try {
+      // If mediaLoader already converted to WAV, this may be a wav blob — try AudioContext first.
+      if (/wav|wave/i.test(blob.type) || blob.type === 'audio/wav') {
+        const decoded = await decodeWithAudioContext(blob);
+        if (decoded?.samples.length) {
+          return resampleMono(decoded.samples, decoded.sampleRate, TARGET_SAMPLE_RATE);
+        }
+      }
+
       const pcm = await oggToPcm(blob);
       return resampleMono(pcm.samples, pcm.sampleRate, TARGET_SAMPLE_RATE);
     } catch {
-      try {
-        const wav = await oggToWav(blob);
-        return decodeWavOrNative(wav);
-      } catch {
-        // fall through
+      onProgress?.('Конвертация в WAV…');
+      const wav = await oggToWav(blob);
+      const decoded = await decodeWithAudioContext(wav);
+      if (decoded?.samples.length) {
+        return resampleMono(decoded.samples, decoded.sampleRate, TARGET_SAMPLE_RATE);
       }
     }
   }
 
-  return decodeWavOrNative(blob);
-}
-
-function extractText(result: { text?: string } | Array<{ text?: string }> | string | undefined) {
-  if (!result) return undefined;
-  if (typeof result === 'string') return result.trim() || undefined;
-  if (Array.isArray(result)) {
-    const joined = result.map((part) => part.text || '').join(' ').trim();
-    return joined || undefined;
+  const decoded = await decodeWithAudioContext(blob);
+  if (!decoded?.samples.length) {
+    throw new Error('Не удалось декодировать аудио на устройстве');
   }
-  return result.text?.trim() || undefined;
+
+  return resampleMono(decoded.samples, decoded.sampleRate, TARGET_SAMPLE_RATE);
 }
 
-function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = window.setTimeout(() => reject(new Error(`${label} timed out`)), ms);
-    promise.then(
-      (value) => {
-        window.clearTimeout(timer);
-        resolve(value);
-      },
-      (error) => {
-        window.clearTimeout(timer);
-        reject(error);
-      },
+let requestId = 0;
+
+function runInWorker(pcm: Float32Array, onProgress?: ProgressFn): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const id = ++requestId;
+    const worker = new Worker(
+      new URL('./bygramVoiceTranscribe.worker.ts', import.meta.url),
+      { type: 'module', name: 'bygram-voice-transcribe' },
     );
+
+    const timer = window.setTimeout(() => {
+      worker.terminate();
+      reject(new Error('Таймаут расшифровки (PWA). Попробуйте ещё раз на более коротком голосовом.'));
+    }, WORKER_TIMEOUT_MS);
+
+    worker.onmessage = (event: MessageEvent) => {
+      const data = event.data as {
+        id: number;
+        ok?: boolean;
+        text?: string;
+        error?: string;
+        progress?: string;
+      };
+      if (data.id !== id) return;
+
+      if (data.progress) {
+        onProgress?.(data.progress);
+        return;
+      }
+
+      window.clearTimeout(timer);
+      worker.terminate();
+
+      if (data.ok && data.text) {
+        resolve(data.text);
+        return;
+      }
+
+      reject(new Error(data.error || 'Ошибка локальной расшифровки'));
+    };
+
+    worker.onerror = (event) => {
+      window.clearTimeout(timer);
+      worker.terminate();
+      reject(new Error(event.message || 'Worker расшифровки упал'));
+    };
+
+    // Transfer the underlying buffer to avoid a second copy in the worker.
+    const copy = pcm.slice();
+    worker.postMessage({ id, pcm: copy, sampleRate: TARGET_SAMPLE_RATE }, [copy.buffer]);
   });
 }
 
-export async function transcribeVoiceLocally(message: ApiMessage): Promise<string | undefined> {
-  if (!canTranscribeMessage(message)) return undefined;
-
-  const pcm = await preparePcm(message);
-  if (!pcm?.length) {
-    throw new Error('Could not decode voice audio to PCM');
+export async function transcribeVoiceLocally(
+  message: ApiMessage,
+  onProgress?: ProgressFn,
+): Promise<string> {
+  if (!canTranscribeMessage(message)) {
+    throw new Error('Сообщение не является голосовым');
   }
 
-  const transcriber = await withTimeout(getAsrPipeline(), TRANSCRIBE_TIMEOUT_MS, 'whisper-load');
-  const result = await withTimeout(
-    transcriber(pcm, {
-      // Explicit sampling rate — required when passing raw Float32Array.
-      sampling_rate: TARGET_SAMPLE_RATE,
-      task: 'transcribe',
-      language: undefined,
-      chunk_length_s: 30,
-      stride_length_s: 5,
-      return_timestamps: false,
-    }),
-    TRANSCRIBE_TIMEOUT_MS,
-    'whisper-infer',
-  );
+  const pcm = await preparePcm(message, onProgress);
+  if (!pcm.length) {
+    throw new Error('Пустое аудио после декодирования');
+  }
 
-  return extractText(result);
+  onProgress?.('Запуск распознавания…');
+  return runInWorker(pcm, onProgress);
 }
 
 export function createLocalTranscriptionId(chatId: string, messageId: number) {

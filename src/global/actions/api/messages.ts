@@ -1864,10 +1864,16 @@ addActionHandler('transcribeAudio', async (global, actions, payload): Promise<vo
 
   if (!chat || !message) return;
 
+  const isPremium = selectIsCurrentUserPremium(global);
+  const chatLevel = chat.boostLevel || 0;
+  const transcribeMinLevel = global.appConfig.groupTranscribeLevelMin;
+  // Telegram STT only for Premium / boosted groups. Free accounts use bygram Whisper only.
+  const canUseTelegramTranscribe = isPremium
+    || Boolean(transcribeMinLevel && chatLevel >= transcribeMinLevel);
   const canUseLocalTranscribe = getBygramSettings().isLocalVoiceTranscribeEnabled;
+
   const localTranscriptionId = createLocalTranscriptionId(chatId, messageId);
 
-  // Optimistic pending state (replaced by Telegram id when server accepts the request).
   global = updateChatMessage(global, chatId, messageId, {
     transcriptionId: localTranscriptionId,
     isTranscriptionError: undefined,
@@ -1885,23 +1891,44 @@ addActionHandler('transcribeAudio', async (global, actions, payload): Promise<vo
   };
   setGlobal(global);
 
-  // Always try Telegram first — free accounts get a weekly trial quota via the same API.
-  // Premium / boosted groups get unlimited. Only fall back to local Whisper when Telegram refuses.
-  try {
-    const telegramTranscriptionId = await callApi('transcribeAudio', { chat, messageId });
-    if (telegramTranscriptionId) {
-      global = getGlobal();
-      global = updateChatMessage(global, chatId, messageId, {
-        transcriptionId: telegramTranscriptionId,
-        isTranscriptionError: undefined,
-      });
-      setGlobal(global);
-      return;
-    }
-  } catch (error) {
-    if (DEBUG) {
-      // eslint-disable-next-line no-console
-      console.warn('Telegram voice transcription failed, falling back to local', error);
+  if (canUseTelegramTranscribe) {
+    try {
+      const telegramTranscriptionId = await callApi('transcribeAudio', { chat, messageId });
+      if (telegramTranscriptionId) {
+        global = getGlobal();
+        global = updateChatMessage(global, chatId, messageId, {
+          transcriptionId: telegramTranscriptionId,
+          isTranscriptionError: undefined,
+        });
+        setGlobal(global);
+        return;
+      }
+    } catch (error) {
+      if (DEBUG) {
+        // eslint-disable-next-line no-console
+        console.warn('Telegram voice transcription failed', error);
+      }
+      // Premium path: do not silently fall through unless local is enabled.
+      if (!canUseLocalTranscribe) {
+        global = getGlobal();
+        global = updateChatMessage(global, chatId, messageId, {
+          transcriptionId: localTranscriptionId,
+          isTranscriptionError: true,
+        });
+        global = {
+          ...global,
+          transcriptions: {
+            ...global.transcriptions,
+            [localTranscriptionId]: {
+              transcriptionId: localTranscriptionId,
+              text: '',
+              isPending: false,
+            },
+          },
+        };
+        setGlobal(global);
+        return;
+      }
     }
   }
 
@@ -1923,15 +1950,23 @@ addActionHandler('transcribeAudio', async (global, actions, payload): Promise<vo
       },
     };
     setGlobal(global);
-    actions.showNotification({ message: 'Расшифровка недоступна. Включите её в настройках bygram.' });
+    actions.showNotification({ message: 'Локальная расшифровка выключена в настройках bygram.' });
     return;
   }
 
   let text: string | undefined;
+  let lastError: string | undefined;
+  let lastProgressAt = 0;
   try {
-    actions.showNotification({ message: 'Локальная расшифровка… Первый раз может занять минуту (скачивание модели).' });
-    text = await transcribeVoiceLocally(message);
+    actions.showNotification({ message: 'bygram Whisper: старт…' });
+    text = await transcribeVoiceLocally(message, (progress) => {
+      const now = Date.now();
+      if (now - lastProgressAt < 2500) return;
+      lastProgressAt = now;
+      actions.showNotification({ message: `bygram Whisper: ${progress}` });
+    });
   } catch (error) {
+    lastError = error instanceof Error ? error.message : String(error);
     if (DEBUG) {
       // eslint-disable-next-line no-console
       console.warn('bygram local voice transcription failed', error);
@@ -1958,7 +1993,9 @@ addActionHandler('transcribeAudio', async (global, actions, payload): Promise<vo
 
   if (!text) {
     actions.showNotification({
-      message: 'Не удалось расшифровать. Проверьте сеть и попробуйте ещё раз (модель ~40 МБ скачивается один раз).',
+      message: lastError
+        ? `Не удалось расшифровать: ${lastError}`
+        : 'Не удалось расшифровать голосовое. Нужен интернет для первой загрузки модели (~40 МБ).',
     });
   }
 });

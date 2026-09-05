@@ -41,6 +41,27 @@ const WATCHED_STATIC_COPY_TARGETS: Target[] = [
     dest: 'assets',
     rename: { stripBase: true },
   },
+  // Same-origin ORT wasm for local Whisper in iOS PWA (CDN scripts are blocked by CSP).
+  {
+    src: normalizePath(resolve(DIR_NAME, 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm')),
+    dest: 'ort',
+    rename: { stripBase: true },
+  },
+  {
+    src: normalizePath(resolve(DIR_NAME, 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.mjs')),
+    dest: 'ort',
+    rename: { stripBase: true },
+  },
+  {
+    src: normalizePath(resolve(DIR_NAME, 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.wasm')),
+    dest: 'ort',
+    rename: { stripBase: true },
+  },
+  {
+    src: normalizePath(resolve(DIR_NAME, 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.mjs')),
+    dest: 'ort',
+    rename: { stripBase: true },
+  },
 ];
 const UNWATCHED_STATIC_COPY_TARGETS: Target[] = [
   {
